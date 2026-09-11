@@ -66,6 +66,35 @@ Never point a dev run at the hosted project; `db reset` drops everything.
 Scripts that must exist and keep working: `dev`, `build`, `test`, `test:e2e`, `lint`,
 `typecheck`, `db:reset`, `db:types`.
 
+Three of those deviate from the README table, each for a reason. **Do not correct them
+back:**
+
+- **`typecheck` is `tsc -b --noEmit`**, not `tsc --noEmit`. The generated root tsconfig is
+  solution-style (`"files": []` plus references), so plain `tsc --noEmit` compiles zero
+  files and exits 0 — a typecheck that can never fail. `-b` checks `src/`, `e2e/`, and the
+  config files.
+- **`lint` is ESLint, not oxlint.** Current `npm create vite` scaffolds oxlint; the script
+  table mandates `eslint .`. oxlint was removed and ESLint + typescript-eslint installed.
+  `eslint.config.js` is the one hand-written config in the repo, deliberately — no
+  generator produces it any more.
+- **`supabase` is a devDependency.** `db:reset` and `db:types` call a bare `supabase`,
+  which only resolves from `node_modules/.bin`.
+
+Four more bootstrap settlements, for the same reason:
+
+- **Tailwind installs before `shadcn init`.** Current shadcn validates Tailwind and the
+  path aliases as prerequisites instead of writing them, so README step 2 fails until
+  step 6 has been done.
+- **`baseUrl` is gone from `tsconfig.strict.json`** — TypeScript 6 errors on it as
+  deprecated. `paths` alone resolves relative to the config file, and shadcn still
+  finds the aliases.
+- **`SIGN_IN_HASH_PEPPER` lives in `supabase/functions/.env.local`** (gitignored), not the
+  app's `.env.local`, which `.env.example` forbids it from ever entering (§7.4). Serve
+  with `--env-file supabase/functions/.env.local`.
+- **`src/lib/utils.ts` stays as shadcn generated it.** It is the `cn` helper every
+  generated component imports, not a `utils.ts` junk drawer; moving it breaks
+  `shadcn add`.
+
 ## Database workflow
 
 Schema changes are files, in this order, every time:
@@ -97,6 +126,11 @@ Three layers, each with a job:
   `TZ=America/Los_Angeles npm test`. The §5.4 bug — UTC midnight rendered in local time showing
   the previous day — is invisible at or east of Greenwich, so a green suite on a UTC CI runner
   proves nothing. Set both in CI.
+  **On Windows, `TZ=America/Los_Angeles` is silently ignored** — Node falls back to the
+  system zone and the suite goes green having tested nothing new. Only POSIX-style names
+  work there: use `TZ=PST8PDT npm test`, which genuinely resolves to America/Los_Angeles.
+  (`TZ=UTC` works everywhere.) Verify with
+  `node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"` if in doubt.
 - **Testing Library** for components with logic worth asserting: the form's validation
   messages, the three states of a list (§8), keyboard operation of the filter builder.
   Query by role and label, never by test id — a test that cannot find the button by its
@@ -285,6 +319,10 @@ supabase/
 - **RLS on every table**, policies for select/insert/update/delete separately. A new table
   without a policy is a bug, not a TODO.
 - The `service_role` key never appears in client code, in a client env var, or in git.
+- **`seed.sql` never runs against a hosted project.** It creates `dev-a` / `dev-b` with a
+  password and user ids that are public in this repo. Plain `npx supabase db push` does
+  not seed — keep it that way: no `--include-seed`, no `db reset --linked`. The repo is
+  public, so those credentials are an open door the moment they exist on the internet.
 - Never log PII — emails, application contents, note bodies, file names. SPEC §7.7 lists what
   to log instead.
 - Field length caps come from SPEC §7.3 — in the Zod schema and as a Postgres constraint.

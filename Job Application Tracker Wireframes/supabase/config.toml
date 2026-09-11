@@ -49,7 +49,11 @@ minimum_password_length = 12          # §7.1, no composition rules
 password_requirements = ""
 
 [auth.email]
-enable_signup = false
+# The CLI maps this key to GOTRUE_EXTERNAL_EMAIL_ENABLED, so false disables email
+# sign-IN as well as signup, and no seeded account can get in. Self-serve signup is
+# closed by [auth] enable_signup above (GOTRUE_DISABLE_SIGNUP) — that is the door
+# SPEC §4.1d means. Keep this true.
+enable_signup = true
 enable_confirmations = true           # account holds no data until verified (§7.1)
 double_confirm_changes = true         # email change confirmed at both addresses
 secure_password_change = true         # re-auth required to change a password

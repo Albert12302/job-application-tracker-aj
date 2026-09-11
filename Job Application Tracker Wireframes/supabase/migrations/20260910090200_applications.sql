@@ -8,7 +8,7 @@ create type public.application_status as enum (
 create table public.applications (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  date_applied      timestamptz not null default date_trunc('day', now() at time zone 'utc') at time zone 'utc',
+  date_applied      timestamptz not null default (date_trunc('day', now() at time zone 'utc') at time zone 'utc'),
   company           text not null,
   position          text not null,
   location          text,

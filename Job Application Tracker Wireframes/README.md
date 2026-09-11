@@ -64,7 +64,7 @@ Add these to the generated `package.json`. CLAUDE.md and CI both assume all eigh
 | `test` | `vitest run` |
 | `test:e2e` | `playwright test` |
 | `lint` | `eslint .` |
-| `typecheck` | `tsc --noEmit` |
+| `typecheck` | `tsc -b --noEmit` |
 | `db:reset` | `supabase db reset` |
 | `db:types` | `supabase gen types typescript --local > src/data/database.types.ts` |
 
@@ -110,6 +110,12 @@ redirect allowlist), or every verification and reset link bounces.
 
 Do **not** run `db reset` against the hosted project — it drops everything. `db push` only
 applies what is new.
+
+**Never pass `--include-seed` to `db push`, and never `db reset --linked`.** Both run
+`seed.sql` against the hosted project, creating `dev-a` / `dev-b` with a password,
+emails, and user ids that are published in this repo for anyone to read. Plain
+`db push` applies migrations only and is the only form you need. Your own account goes
+in by hand in the dashboard, with a password from a password manager.
 
 `config.toml` settings do not all sync on push; confirm the §7.1 auth values (JWT expiry,
 password minimum, `enable_signup`, rate limits) in the dashboard after linking, and change

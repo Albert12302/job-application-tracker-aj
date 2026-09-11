@@ -1,5 +1,10 @@
 -- Local development seed. Runs after every `npx supabase db reset`.
 -- Local only: these credentials must never exist in a hosted project.
+-- The repo is public, so the password, the emails and the fixed UUIDs below are all
+-- known to anyone. Two commands would put them in a hosted project — neither is ever
+-- correct against a linked project:
+--   npx supabase db push --include-seed   (plain `db push` does NOT seed — use that)
+--   npx supabase db reset --linked        (also drops everything first)
 --
 -- Two users, matching the launch plan (§4.1d).
 --   dev-a@example.test / devpassword1234
@@ -20,6 +25,19 @@ values
    extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
 on conflict (id) do nothing;
+
+-- GoTrue scans these columns straight into Go strings, so a NULL is a 500 at
+-- sign-in ("Database error querying schema"), not an empty value. Supabase’s own
+-- user creation writes the empty string. Blanket update so any seeded user is covered.
+update auth.users set
+  confirmation_token         = coalesce(confirmation_token,         ''),
+  recovery_token             = coalesce(recovery_token,             ''),
+  email_change               = coalesce(email_change,               ''),
+  email_change_token_new     = coalesce(email_change_token_new,     ''),
+  email_change_token_current = coalesce(email_change_token_current, ''),
+  phone_change               = coalesce(phone_change,               ''),
+  phone_change_token         = coalesce(phone_change_token,         ''),
+  reauthentication_token     = coalesce(reauthentication_token,     '');
 
 insert into auth.identities (id, user_id, provider_id, provider, identity_data, created_at, updated_at)
 values
