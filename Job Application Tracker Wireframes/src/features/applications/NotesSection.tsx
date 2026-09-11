@@ -1,9 +1,10 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { ErrorState } from '@/components/ErrorState';
+import { oldestFirst } from '@/domain/notes';
 import { noteFormSchema } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
 import { NoteLimitError, useAddNote } from '@/queries/use-note-mutations';
@@ -27,6 +28,8 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
   const [invalid, setInvalid] = useState<string | null>(null);
   const notes = useNotes(applicationId);
   const add = useAddNote(applicationId);
+  // Creation order, whatever order the rows reach this component in (§2).
+  const ordered = useMemo(() => [...(notes.data ?? [])].sort(oldestFirst), [notes.data]);
 
   const save = (body: string) => {
     setDraft('');
@@ -67,7 +70,7 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
         <p className="text-sm text-muted-foreground">No notes yet.</p>
       ) : (
         <ul aria-labelledby={`${fieldId}-heading`} className="flex flex-col divide-y rounded-lg border">
-          {notes.data?.map((note) => (
+          {ordered.map((note) => (
             <NoteItem key={note.id} note={note} applicationId={applicationId} />
           ))}
           {add.isPending && add.variables !== undefined ? (

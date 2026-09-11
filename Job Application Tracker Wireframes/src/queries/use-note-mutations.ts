@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { addNote, deleteNote, NoteLimitError, NoteNotFoundError, restoreNote, updateNote } from '@/data/notes';
+import { oldestFirst } from '@/domain/notes';
 import type { Note } from '@/domain/schemas';
 import { reporting } from './errors';
 import { keys } from './keys';
@@ -11,7 +12,7 @@ export { NoteLimitError };
 /** The cap and a note already gone are both the user's world, not bugs: shown, never reported. */
 const isExpected = (error: unknown) => error instanceof NoteLimitError || error instanceof NoteNotFoundError;
 
-const byCreation = (a: Note, b: Note) => Date.parse(a.created_at) - Date.parse(b.created_at);
+const byCreation = oldestFirst;
 
 function put(queryClient: QueryClient, key: readonly unknown[], notes: (current: Note[]) => Note[]) {
   queryClient.setQueryData<Note[]>(key, (current) => (current ? notes(current) : current));
@@ -47,13 +48,23 @@ export function useUpdateNote(applicationId: string) {
   });
 }
 
-/** Delete (§9.3): the note goes at once, and Undo puts it back where it was. */
+/**
+ * Delete (§9.3): the note goes at once, and Undo puts it back where it was.
+ *
+ * The toast belongs to this hook rather than the caller, because the note
+ * removes itself from the list the moment this starts — so the component that
+ * asked for the delete has unmounted by the time it finishes, and callbacks
+ * passed to mutate() would never run.
+ */
 export function useDeleteNote(applicationId: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
+  const restore = useRestoreNote(applicationId);
   const key = keys.notes(user.id, applicationId);
   return useMutation({
     mutationFn: (note: Note) => reporting('delete_note', () => deleteNote(note.id), isExpected),
+    onSuccess: (_result, note) =>
+      toast('Note deleted.', { action: { label: 'Undo', onClick: () => restore.mutate(note) } }),
     onMutate: async (note) => {
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<Note[]>(key);

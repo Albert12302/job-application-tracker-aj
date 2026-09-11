@@ -59,6 +59,27 @@ describe('NotesSection', () => {
     expect((await axe.run(container)).violations).toEqual([]);
   });
 
+  it('lists notes oldest first, and a new one lands at the end (§2)', async () => {
+    const older = noteRow({ body: 'First, at the start.', created_at: '2026-09-01T10:00:00+00:00' });
+    const newer = noteRow({ body: 'Second, later.', created_at: '2026-09-02T10:00:00+00:00' });
+    // Whatever order the answer arrives in, creation order is what shows.
+    listNotes.mockResolvedValue([newer, older]);
+    const added = noteRow({ body: 'Third, newest.', created_at: '2026-09-03T10:00:00+00:00' });
+    addNote.mockResolvedValue(added);
+    const { user } = renderNotes();
+
+    await screen.findByText('First, at the start.');
+    const order = () => screen.getAllByRole('listitem').map((item) => item.textContent);
+    expect(order()[0]).toContain('First, at the start.');
+
+    listNotes.mockResolvedValue([older, newer, added]);
+    await user.type(screen.getByLabelText('Add a note'), 'Third, newest.');
+    await user.click(screen.getByRole('button', { name: 'Add note' }));
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(3));
+    expect(order().map((text) => text?.slice(0, 6))).toEqual(['First,', 'Second', 'Third,']);
+  });
+
   it('lists the notes it has', async () => {
     listNotes.mockResolvedValue([noteRow({ body: SHORT, application_id: APPLICATION })]);
     const { container } = renderNotes();

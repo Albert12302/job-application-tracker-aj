@@ -1,6 +1,5 @@
 import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatMoment } from '@/domain/date';
 import { noteDeleteNeedsConfirmation } from '@/domain/notes';
 import type { Note } from '@/domain/schemas';
-import { useDeleteNote, useRestoreNote, useUpdateNote } from '@/queries/use-note-mutations';
+import { useDeleteNote, useUpdateNote } from '@/queries/use-note-mutations';
 
 const ICON_BUTTON = 'text-muted-foreground max-[760px]:size-11';
 
@@ -31,7 +30,6 @@ export function NoteItem({ note, applicationId }: { note: Note; applicationId: s
   const [confirming, setConfirming] = useState(false);
   const update = useUpdateNote(applicationId);
   const remove = useDeleteNote(applicationId);
-  const restore = useRestoreNote(applicationId);
 
   const when = formatMoment(note.created_at);
   const edited = note.updated_at !== note.created_at;
@@ -51,12 +49,10 @@ export function NoteItem({ note, applicationId }: { note: Note; applicationId: s
     update.mutate({ id: note.id, body }, { onSuccess: () => setEditing(false) });
   };
 
+  // The undo toast lives in the mutation: this note unmounts as soon as it goes.
   const deleteNote = () => {
     setConfirming(false);
-    remove.mutate(note, {
-      onSuccess: () =>
-        toast('Note deleted.', { action: { label: 'Undo', onClick: () => restore.mutate(note) } }),
-    });
+    remove.mutate(note);
   };
 
   if (editing) {
