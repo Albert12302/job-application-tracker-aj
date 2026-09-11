@@ -128,6 +128,111 @@ test.describe('7.8.1 cross-user isolation', () => {
   });
 });
 
+test.describe('7.8.1 cross-user isolation — the status functions (§6 step 2)', () => {
+  test('user B cannot change user A status through change_application_status', async () => {
+    const a = await signIn('dev-a@example.test');
+    const history = async () =>
+      (await a.from('status_history').select('id').eq('application_id', USER_A_APPLICATION)).data ?? [];
+    const before = await history();
+
+    const b = await signIn('dev-b@example.test');
+    const { data, error } = await b.rpc('change_application_status', {
+      p_application_id: USER_A_APPLICATION,
+      p_status: 'Offer',
+    });
+    // The function's "no such application": RLS hid the row, so B learns nothing more.
+    expect(data).toBeNull();
+    expect(error?.code).toBe('P0002');
+
+    const { data: still } = await a.from('applications').select('status').eq('id', USER_A_APPLICATION).single();
+    expect(still?.status).toBe('Callback');
+    expect(await history()).toHaveLength(before.length);
+  });
+
+  test('signed-out callers cannot run either function', async () => {
+    const anon = createClient(URL, ANON, { auth: { persistSession: false } });
+
+    const { error: changeError } = await anon.rpc('change_application_status', {
+      p_application_id: USER_A_APPLICATION,
+      p_status: 'Offer',
+    });
+    expect(changeError).not.toBeNull();
+
+    const { error: createError } = await anon.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: 'Anon',
+      p_position: 'Anon',
+      p_status: 'Applied',
+      p_referral: false,
+    });
+    expect(createError).not.toBeNull();
+  });
+});
+
+test.describe('§2 status history — written with the status, atomically', () => {
+  test('creation writes one row from null; a change, one row from the real status; no change, none', async () => {
+    const d = await signIn('dev-d@example.test');
+    const { data: created, error } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: `History ${crypto.randomUUID()}`,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'first note',
+    });
+    expect(error).toBeNull();
+    const id = (created as { id: string }).id;
+
+    const history = async () =>
+      (
+        await d
+          .from('status_history')
+          .select('from_status, to_status')
+          .eq('application_id', id)
+          .order('changed_at', { ascending: true })
+      ).data ?? [];
+
+    try {
+      expect(await history()).toEqual([{ from_status: null, to_status: 'Applied' }]);
+      const { data: notes } = await d.from('notes').select('body').eq('application_id', id);
+      expect(notes).toEqual([{ body: 'first note' }]);
+
+      const { error: changeError } = await d.rpc('change_application_status', { p_application_id: id, p_status: 'Interview' });
+      expect(changeError).toBeNull();
+      // Unchanged: §2 says no row, and the table's check constraint would refuse one anyway.
+      const { error: sameError } = await d.rpc('change_application_status', { p_application_id: id, p_status: 'Interview' });
+      expect(sameError).toBeNull();
+
+      expect(await history()).toEqual([
+        { from_status: null, to_status: 'Applied' },
+        { from_status: 'Applied', to_status: 'Interview' },
+      ]);
+    } finally {
+      await d.from('applications').delete().eq('id', id);
+    }
+  });
+
+  test('a creation that fails part-way writes nothing at all', async () => {
+    const d = await signIn('dev-d@example.test');
+    const company = `Atomic ${crypto.randomUUID()}`;
+
+    // The first note breaks its 2,000-character cap (§7.3), after the
+    // application row has been inserted — so the whole transaction must go.
+    const { error } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: company,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'x'.repeat(2001),
+    });
+    expect(error).not.toBeNull();
+
+    const { data } = await d.from('applications').select('id').eq('company', company);
+    expect(data).toEqual([]);
+  });
+});
+
 test.describe('7.8.4 delete leaves nothing behind', () => {
   test('deleting an application removes its notes, history, and file', async () => {
     const a = await signIn('dev-a@example.test');

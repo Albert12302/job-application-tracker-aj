@@ -1,16 +1,119 @@
+import type { ApplicationInput } from '@/domain/application-input';
+import { applicationSchema, type Application } from '@/domain/schemas';
+import type { Status } from '@/domain/status';
 import { supabase } from './client';
 
 /**
- * Applications. Step 1 needs only the count on the profile screen (SPEC §4.6);
- * list / get / create / update / remove arrive with step 2.
+ * Applications (SPEC §2). RLS scopes every call to the signed-in user (§7.2):
+ * nothing here sends a user_id, and the user_id filters only keep a query
+ * honest if a policy ever regresses.
  */
+
+/** Gone, or not this user's — RLS makes the two look the same, and so does the app (§8.2). */
+export class ApplicationNotFoundError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super('application_not_found', options);
+    this.name = 'ApplicationNotFoundError';
+  }
+}
+
+/** Newest first (§5.3): date applied, then most recently added — as domain/order.ts sorts. */
+export async function listApplications(userId: string): Promise<Application[]> {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('date_applied', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return applicationSchema.array().parse(data);
+}
+
+/** Null when missing or someone else's (§8.2: never reveal which). */
+export async function getApplication(id: string): Promise<Application | null> {
+  const { data, error } = await supabase.from('applications').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? applicationSchema.parse(data) : null;
+}
 
 export async function countApplications(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from('applications')
     .select('id', { count: 'exact', head: true })
-    // RLS already scopes this; the filter keeps the query honest if a policy ever regresses.
     .eq('user_id', userId);
   if (error) throw error;
   return count ?? 0;
+}
+
+/**
+ * Add (§4.3): the application, its creation status_history row, and the first
+ * note, in one transaction (create_application). An absent optional is left
+ * out rather than sent: the function's own default is what stores the null.
+ */
+export async function createApplication(input: ApplicationInput, firstNote: string | null): Promise<Application> {
+  const { data, error } = await supabase.rpc('create_application', {
+    p_date_applied: input.date_applied,
+    p_company: input.company,
+    p_position: input.position,
+    p_status: input.status,
+    p_referral: input.referral,
+    ...(input.location === null ? {} : { p_location: input.location }),
+    ...(input.description === null ? {} : { p_description: input.description }),
+    ...(firstNote === null ? {} : { p_first_note: firstNote }),
+  });
+  if (error) throw error;
+  return applicationSchema.parse(data);
+}
+
+/**
+ * Every edited field except the status, which changes only through
+ * services/change-status.ts (§9.1) — a status written here would have no
+ * history row.
+ */
+export async function updateApplicationFields(
+  id: string,
+  fields: Omit<ApplicationInput, 'status'>,
+): Promise<Application> {
+  const { data, error } = await supabase.from('applications').update(fields).eq('id', id).select('*').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ApplicationNotFoundError();
+  return applicationSchema.parse(data);
+}
+
+export async function setStarred(id: string, starred: boolean): Promise<void> {
+  const { data, error } = await supabase.from('applications').update({ starred }).eq('id', id).select('id');
+  if (error) throw error;
+  // RLS answers an update it refuses with zero rows, not an error.
+  if (!data.length) throw new ApplicationNotFoundError();
+}
+
+/**
+ * Status + status_history row in one transaction (change_application_status).
+ * Called only by services/change-status.ts, the one status-change path (§9.1).
+ */
+export async function changeApplicationStatus(id: string, status: Status): Promise<Application> {
+  const { data, error } = await supabase.rpc('change_application_status', { p_application_id: id, p_status: status });
+  if (error) {
+    // P0002 is the function's own "no such application"; the message is its code, not user data.
+    if (error.code === 'P0002') throw new ApplicationNotFoundError({ cause: error });
+    throw error;
+  }
+  return applicationSchema.parse(data);
+}
+
+/**
+ * Deletes the row; its notes and status_history rows go with it (on delete
+ * cascade, §9.2). Returns the cover letter path it held, because Storage does
+ * not cascade and the caller has to remove the file.
+ */
+export async function deleteApplicationRow(id: string): Promise<{ coverLetterPath: string | null }> {
+  const { data, error } = await supabase
+    .from('applications')
+    .delete()
+    .eq('id', id)
+    .select('cover_letter_path')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ApplicationNotFoundError();
+  return { coverLetterPath: data.cover_letter_path };
 }

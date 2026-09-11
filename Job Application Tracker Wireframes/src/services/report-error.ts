@@ -21,6 +21,19 @@ export type ErrorAction =
   | 'upload_avatar'
   | 'remove_avatar'
   | 'load_application_count'
+  | 'load_applications'
+  | 'load_application'
+  | 'create_application'
+  | 'update_application'
+  | 'change_status'
+  | 'star_application'
+  | 'delete_application'
+  | 'remove_cover_letter'
+  | 'load_notes'
+  | 'add_note'
+  | 'update_note'
+  | 'delete_note'
+  | 'restore_note'
   | 'render';
 
 export type ErrorContext = { action: ErrorAction };

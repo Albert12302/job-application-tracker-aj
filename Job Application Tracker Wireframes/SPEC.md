@@ -80,7 +80,10 @@ it cannot be backfilled, and without it stats can only ever describe the present
 
 Rules:
 - Written by exactly one code path (§9.1) — the detail-screen selector and the edit form both
-  call it. Two writers means one will be forgotten.
+  call it. Two writers means one will be forgotten. In the build that path is
+  `services/change-status.ts`, calling the Postgres function `change_application_status`, which
+  updates the status and appends the row in one transaction. The creation row comes from
+  `create_application`, which inserts the application, that row, and any first note together.
 - A row is written when the application is created, with `from_status = null`.
 - No row when a save leaves the status unchanged.
 - Never updated or deleted except by the application's cascade. No RLS update or delete policy
@@ -898,6 +901,15 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-11
+- **A status change, and a creation, are each one Postgres transaction (§2, §9.1).**
+  `change_application_status` locks the row, reads its current status, updates it, and appends
+  the `status_history` row; `create_application` inserts the application, its creation row, and
+  the first note. As separate requests from the browser, a dropped connection or a write-limit
+  trip between them would leave a status with no history row — which cannot be backfilled — and
+  a second tab could record the wrong `from_status`. Both run with the caller's rights, so RLS
+  and the rate limit still apply, and `services/change-status.ts` is still the one client path.
+- **A fourth local seed user, `dev-d`, for the tests that add and delete applications.** They
+  run in parallel with the auth test that asserts `dev-a`'s exact application count.
 - **"Longer than a line" fixed at 80 characters or any line break (§9.3).** A rendered line
   depends on screen width, so the note-delete rule needed an answer that does not.
 - **The Add form defaults to the user's local today, not UTC's (§4.3, §5.4).** The default was

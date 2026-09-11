@@ -316,9 +316,71 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      change_application_status: {
+        Args: {
+          p_application_id: string
+          p_status: Database["public"]["Enums"]["application_status"]
+        }
+        Returns: {
+          company: string
+          cover_letter_name: string | null
+          cover_letter_path: string | null
+          created_at: string
+          date_applied: string
+          description: string | null
+          id: string
+          location: string | null
+          position: string
+          referral: boolean
+          starred: boolean
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "applications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       consume_rate_limit: {
         Args: { p_bucket: string; p_limit: number; p_window: string }
         Returns: undefined
+      }
+      create_application: {
+        Args: {
+          p_company: string
+          p_date_applied: string
+          p_description?: string
+          p_first_note?: string
+          p_location?: string
+          p_position: string
+          p_referral: boolean
+          p_status: Database["public"]["Enums"]["application_status"]
+        }
+        Returns: {
+          company: string
+          cover_letter_name: string | null
+          cover_letter_path: string | null
+          created_at: string
+          date_applied: string
+          description: string | null
+          id: string
+          location: string | null
+          position: string
+          referral: boolean
+          starred: boolean
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "applications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       purge_old_logs: { Args: never; Returns: undefined }
     }

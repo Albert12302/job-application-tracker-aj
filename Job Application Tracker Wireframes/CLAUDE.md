@@ -155,6 +155,9 @@ Three layers, each with a job:
   1. user B cannot read or write user A's application by id;
   2. deleting an application removes its notes, history rows, and Storage object.
 
+  Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
+  exact application count, and the suites run in parallel.
+
   `e2e/security.spec.ts` exists already and fails until the features do. Two standing rules for
   it: get it green by fixing policies, **never** by softening an assertion; and its delete test
   currently calls the tables directly — **rewire it to `services/delete-application.ts` the
@@ -202,7 +205,8 @@ src/
     applications.ts           list / get / create / update / remove
     notes.ts
     saved-filters.ts
-    status-history.ts         append-only
+    status-history.ts         reads, when stats need them (§6 step 4); rows are written only
+                              by the two SQL functions, never from the client
     storage.ts                upload (via the upload function) / signed URL / delete
     profile.ts
 
@@ -220,7 +224,9 @@ src/
     use-notes.ts
     use-saved-filters.ts
     use-stats.ts
-    use-mutations.ts
+    use-mutations.ts          sign-in, sign-out, avatar
+    use-application-mutations.ts   add, edit, status, star, delete
+    use-note-mutations.ts     add, edit, delete, restore
 
   features/                   feature-owned UI. May import ui/, domain/, queries/, hooks/ —
                               never another feature's internals.
@@ -391,7 +397,9 @@ supabase/
   one back, or the server-side type check becomes optional. The function chooses the path.
 - Never `dangerouslySetInnerHTML` on user content. Descriptions and notes are free text.
 - Status changes always go through one code path that writes `status_history` — detail screen
-  and edit form both.
+  and edit form both. That path is `services/change-status.ts` → the `change_application_status`
+  Postgres function; the creation row comes from `create_application`. Never write `status` in
+  a plain update, and never insert into `status_history` from the client.
 - Deleting an application deletes its notes, history, and Storage objects. No orphaned files.
 - Debug mode and verbose errors off in production builds.
 - **Every error is reported through `reportError()`** — never a direct insert or SDK call from
@@ -407,9 +415,11 @@ supabase/
   Every other timestamp is a real moment and formats in the viewer's zone.
 - **Migrations are already written for the whole schema** (`supabase/migrations/`). They have
   been applied nowhere but locally, so fixing one in place is still correct; once anything is
-  hosted, write a new one. The two that repay reading before you touch them:
+  hosted, write a new one. The three that repay reading before you touch them:
   `20260910090400_status_history.sql` (append-only via the *absence* of update and delete
-  policies) and `20260910090700_log_tables.sql` (`auth.uid()` defaults, insert-only, clamped).
+  policies), `20260911165950_status_change_functions.sql` (the only writers of that table, one
+  transaction each, invoker rights), and `20260910090700_log_tables.sql` (`auth.uid()`
+  defaults, insert-only, clamped).
 - Browser support is SPEC §12. iOS Safari 17+ is a first-class target, not an afterthought —
   every browser on iOS is WebKit.
 - **Security headers live in `vercel.json`**, the one place (SPEC §7.5). Hosting is Vercel

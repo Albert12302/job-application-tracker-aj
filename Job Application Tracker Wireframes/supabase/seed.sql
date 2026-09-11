@@ -14,6 +14,11 @@
 -- User C exists only to be locked out by e2e/sign-in-function.spec.ts (§7.8.5).
 -- A lockout lasts 15 minutes, so it cannot be run against an account any other
 -- test signs in as.
+--   dev-d@example.test / devpassword1234
+-- User D is for the tests that add and delete applications
+-- (e2e/applications.spec.ts, and the §7.8.4 delete test in e2e/security.spec.ts).
+-- They run in parallel with e2e/auth.spec.ts, which asserts user A's exact
+-- application count — so they never touch user A.
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -30,6 +35,10 @@ values
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
   ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'dev-c@example.test',
+   extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
+   now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
+  ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'dev-d@example.test',
    extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
 on conflict (id) do nothing;
@@ -54,11 +63,14 @@ values
   (gen_random_uuid(), '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222',
    'email', '{"sub":"22222222-2222-2222-2222-222222222222","email":"dev-b@example.test"}', now(), now()),
   (gen_random_uuid(), '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333',
-   'email', '{"sub":"33333333-3333-3333-3333-333333333333","email":"dev-c@example.test"}', now(), now())
+   'email', '{"sub":"33333333-3333-3333-3333-333333333333","email":"dev-c@example.test"}', now(), now()),
+  (gen_random_uuid(), '44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444',
+   'email', '{"sub":"44444444-4444-4444-4444-444444444444","email":"dev-d@example.test"}', now(), now())
 on conflict do nothing;
 
 update public.profiles set name = 'Dev A' where id = '11111111-1111-1111-1111-111111111111';
 update public.profiles set name = 'Dev B' where id = '22222222-2222-2222-2222-222222222222';
+update public.profiles set name = 'Dev D' where id = '44444444-4444-4444-4444-444444444444';
 
 -- Applications for user A, spread across the funnel so stats and the
 -- breakdown bar have something to render.

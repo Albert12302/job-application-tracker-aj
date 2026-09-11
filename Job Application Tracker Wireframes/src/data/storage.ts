@@ -12,6 +12,7 @@ import { supabase } from './client';
  */
 
 const AVATARS = 'avatars';
+const COVER_LETTERS = 'cover-letters';
 
 export type UploadKind = 'avatar' | 'cover-letter';
 export type UploadRefusal = 'type' | 'size' | 'dimensions' | 'rate_limited';
@@ -62,9 +63,17 @@ export async function downloadAvatarDataUrl(path: string): Promise<string> {
   });
 }
 
-export async function removeAvatarObject(path: string): Promise<void> {
-  const { data, error } = await supabase.storage.from(AVATARS).remove([path]);
+async function removeObject(bucket: string, path: string): Promise<void> {
+  const { data, error } = await supabase.storage.from(bucket).remove([path]);
   if (error) throw error;
   // An empty result means nothing was deleted — an orphan, which the caller reports.
   if (!data?.length) throw new Error('storage_remove_noop');
+}
+
+export function removeAvatarObject(path: string): Promise<void> {
+  return removeObject(AVATARS, path);
+}
+
+export function removeCoverLetterObject(path: string): Promise<void> {
+  return removeObject(COVER_LETTERS, path);
 }
