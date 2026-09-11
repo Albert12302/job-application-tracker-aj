@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { apiSession, startSignedIn } from './session';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.
@@ -268,10 +269,10 @@ test.describe('7.8.4 delete leaves nothing behind', () => {
       .update({ cover_letter_path: path, cover_letter_name: 'test.pdf' })
       .eq('id', id);
 
-    await page.goto(`/sign-in?redirect=${encodeURIComponent(`/applications/${id}`)}`);
-    await page.getByLabel('Email').fill('dev-d@example.test');
-    await page.getByLabel('Password').fill(PASSWORD);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    // Signed in without the form: this test is about what a delete leaves
+    // behind, and sign-in has its own suite and its own budget (e2e/session.ts).
+    await startSignedIn(page, await apiSession('dev-d@example.test'));
+    await page.goto(`/applications/${id}`);
     await expect(page.getByRole('heading', { level: 1, name: company })).toBeVisible();
 
     await page.getByRole('button', { name: 'Delete application' }).click();
