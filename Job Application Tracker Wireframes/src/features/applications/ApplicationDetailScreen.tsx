@@ -142,6 +142,16 @@ export function ApplicationDetailScreen() {
         </div>
 
         <NotesSection applicationId={found.id} />
+
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            to="/applications/$id/edit"
+            params={{ id: found.id }}
+            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
+          >
+            Edit application
+          </Link>
+        </div>
       </section>
     </div>
   );
