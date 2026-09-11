@@ -1,13 +1,15 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applicationRow } from '@/test/factories';
+import { applicationRow, noteRow } from '@/test/factories';
 import { renderRoutes } from '@/test/render-routes';
 import { ApplicationDetailScreen } from './ApplicationDetailScreen';
 
 const getApplication = vi.fn();
 const changeApplicationStatus = vi.fn();
 const setStarred = vi.fn();
+const deleteApplicationRow = vi.fn();
+const listNotes = vi.fn();
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -20,10 +22,10 @@ vi.mock('@/queries/use-session', () => ({
   isSignedInNow: () => true,
 }));
 
-// The notes have their own tests; here they only need to load and be empty.
+// The notes have their own tests; here they only count towards the delete copy.
 vi.mock('@/data/notes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/notes')>()),
-  listNotes: () => Promise.resolve([]),
+  listNotes: (...args: unknown[]) => listNotes(...args),
 }));
 
 vi.mock('@/data/applications', async (importOriginal) => ({
@@ -31,6 +33,7 @@ vi.mock('@/data/applications', async (importOriginal) => ({
   getApplication: (...args: unknown[]) => getApplication(...args),
   changeApplicationStatus: (...args: unknown[]) => changeApplicationStatus(...args),
   setStarred: (...args: unknown[]) => setStarred(...args),
+  deleteApplicationRow: (...args: unknown[]) => deleteApplicationRow(...args),
 }));
 
 const ID = 'a0000000-0000-0000-0000-000000000001';
@@ -41,6 +44,8 @@ beforeEach(() => {
   getApplication.mockReset();
   changeApplicationStatus.mockReset();
   setStarred.mockReset();
+  deleteApplicationRow.mockReset().mockResolvedValue({ coverLetterPath: null });
+  listNotes.mockReset().mockResolvedValue([]);
 });
 
 describe('ApplicationDetailScreen', () => {
@@ -123,6 +128,47 @@ describe('ApplicationDetailScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Applied'),
     );
+  });
+
+  it('names the record and what goes with it before deleting (§9.2)', async () => {
+    getApplication.mockResolvedValue(
+      applicationRow({ id: ID, company: 'Tailspin Toys', cover_letter_path: 'x/y.pdf', cover_letter_name: 'cl.pdf' }),
+    );
+    listNotes.mockResolvedValue([noteRow({ application_id: ID }), noteRow({ application_id: ID })]);
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+    expect(await screen.findByText('Delete your application to Tailspin Toys?')).toBeTruthy();
+    expect(screen.getByText(/This also deletes 2 notes and 1 attached file\. This cannot be undone\./)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Keep application' }));
+    await waitFor(() => expect(screen.queryByText('Delete your application to Tailspin Toys?')).toBeNull());
+    expect(deleteApplicationRow).not.toHaveBeenCalled();
+  });
+
+  it('deletes through the delete service and returns to the list', async () => {
+    getApplication.mockResolvedValue(applicationRow({ id: ID, company: 'Tailspin Toys' }));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+
+    await waitFor(() => expect(deleteApplicationRow).toHaveBeenCalledWith(ID));
+    expect(await screen.findByRole('heading', { name: 'Route /applications' })).toBeTruthy();
+  });
+
+  it('keeps the application and says so when the delete fails', async () => {
+    getApplication.mockResolvedValue(applicationRow({ id: ID, company: 'Tailspin Toys' }));
+    deleteApplicationRow.mockRejectedValue(new Error('network'));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain("Couldn't delete this application.");
+    expect(alert.textContent).toMatch(/Error reference [0-9a-f]{8}/);
+    expect(screen.queryByRole('heading', { name: 'Route /applications' })).toBeNull();
   });
 
   it('stars the application from its header', async () => {

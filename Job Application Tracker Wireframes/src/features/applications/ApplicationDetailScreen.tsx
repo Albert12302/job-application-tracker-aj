@@ -1,13 +1,21 @@
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ChevronLeftIcon } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { formatUtcDate } from '@/domain/date';
 import { applicationIdSchema } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
-import { useToggleStar } from '@/queries/use-application-mutations';
+import {
+  useDeleteApplication,
+  useForgetApplication,
+  useToggleStar,
+} from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
+import { useNotes } from '@/queries/use-notes';
+import { DeleteApplicationDialog } from './DeleteApplicationDialog';
 import { FunnelIndicator } from './FunnelIndicator';
 import { NotesSection } from './NotesSection';
 import { PANEL, SECTION_HEADING } from './panel';
@@ -37,9 +45,18 @@ export function ApplicationDetailScreen() {
   // Not tied to the route's id: the param is validated here anyway, and an
   // unparsable one is simply an application that is not found (§8.2).
   const { id } = useParams({ strict: false });
+  const navigate = useNavigate();
   const parsed = applicationIdSchema.safeParse(id);
-  const application = useApplication(parsed.success ? parsed.data : null);
+  const applicationId = parsed.success ? parsed.data : null;
+
+  const application = useApplication(applicationId);
+  // The same query the notes list uses, so the dialog can say how many go with
+  // the record (§9.2) without asking again.
+  const notes = useNotes(applicationId);
   const star = useToggleStar();
+  const remove = useDeleteApplication(applicationId ?? '');
+  const forget = useForgetApplication();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (parsed.success && application.isPending) {
     return (
@@ -73,7 +90,7 @@ export function ApplicationDetailScreen() {
     );
   }
 
-  const found = parsed.success ? application.data : null;
+  const found = applicationId ? application.data : null;
   if (!found) {
     return (
       <div className={PANEL}>
@@ -151,8 +168,33 @@ export function ApplicationDetailScreen() {
           >
             Edit application
           </Link>
+          <Button variant="destructive" className="h-9 max-[760px]:h-11" onClick={() => setConfirmDelete(true)}>
+            Delete application
+          </Button>
         </div>
       </section>
+
+      <DeleteApplicationDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        company={found.company}
+        noteCount={notes.data?.length ?? 0}
+        hasFile={found.cover_letter_path !== null}
+        pending={remove.isPending}
+        error={remove.error}
+        onConfirm={() =>
+          remove.mutate(undefined, {
+            onSuccess: async () => {
+              setConfirmDelete(false);
+              await navigate({ to: '/applications' });
+              // Only once the screen showing it has gone, so it never flashes
+              // "not found" on the way out.
+              forget(found.id);
+              toast.success('Application deleted.');
+            },
+          })
+        }
+      />
     </div>
   );
 }

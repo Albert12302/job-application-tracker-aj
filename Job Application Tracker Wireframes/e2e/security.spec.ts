@@ -108,13 +108,17 @@ test.describe('7.8.1 cross-user isolation', () => {
 
   test('status_history rejects update and delete', async () => {
     const a = await signIn('dev-a@example.test');
-    const { data: rows } = await a
+    const { data: rows, error } = await a
       .from('status_history')
       .select('id')
       .eq('application_id', USER_A_APPLICATION)
       .limit(1);
+    // Asserted, not skipped: seed.sql always writes these, so an empty answer
+    // means the read failed — and a security check that skips itself when it
+    // cannot read is a check that never runs.
+    expect(error).toBeNull();
     const id = rows?.[0]?.id as string | undefined;
-    test.skip(!id, 'no history rows seeded');
+    expect(id, 'seeded history rows missing — run npm run db:reset').toBeTruthy();
 
     const { data: updated } = await a
       .from('status_history')
@@ -234,52 +238,60 @@ test.describe('§2 status history — written with the status, atomically', () =
 });
 
 test.describe('7.8.4 delete leaves nothing behind', () => {
-  test('deleting an application removes its notes, history, and file', async () => {
-    const a = await signIn('dev-a@example.test');
-    const { data: user } = await a.auth.getUser();
+  /**
+   * Driven through the screen rather than the tables: the delete this checks
+   * has to be services/delete-application.ts, the path that ships. Deleting by
+   * hand here would prove the cascade works and nothing about the app.
+   *
+   * As dev-d, whose applications no other suite counts.
+   */
+  test('deleting an application removes its notes, history, and file', async ({ page }) => {
+    const d = await signIn('dev-d@example.test');
+    const { data: user } = await d.auth.getUser();
     const userId = user.user!.id;
 
-    const { data: created, error: createError } = await a
-      .from('applications')
-      .insert({
-        company: 'Doomed Co',
-        position: 'Tester',
-        date_applied: '2026-09-10T00:00:00.000Z',
-      })
-      .select()
-      .single();
+    const company = `Doomed ${crypto.randomUUID().slice(0, 8)}`;
+    const { data: created, error: createError } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: company,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'note that should not survive',
+    });
     expect(createError).toBeNull();
-    const id = created!.id as string;
+    const id = (created as { id: string }).id;
 
-    await a.from('notes').insert({ application_id: id, body: 'note that should not survive' });
-    await a
-      .from('status_history')
-      .insert({ application_id: id, from_status: null, to_status: 'Applied' });
-
-    const path = await uploadThroughFunction(a, 'cover-letter', '%PDF-1.4 test');
-    await a
+    const path = await uploadThroughFunction(d, 'cover-letter', '%PDF-1.4 test');
+    await d
       .from('applications')
       .update({ cover_letter_path: path, cover_letter_name: 'test.pdf' })
       .eq('id', id);
 
-    // TODO(delete-application): replace these two calls with
-    // services/delete-application.ts as soon as that file exists. Right now this
-    // test proves the cascade and the Storage policy work; it does NOT prove the
-    // app's own delete path cleans up, which is the thing SPEC §7.8.4 is actually
-    // asking about. Deleting by hand here and calling it covered is the failure
-    // mode this comment exists to prevent.
-    const { error: removeError } = await a.storage.from('cover-letters').remove([path]);
-    expect(removeError).toBeNull();
-    const { error: deleteError } = await a.from('applications').delete().eq('id', id);
-    expect(deleteError, 'the delete itself failed — the checks below would blame the cascade').toBeNull();
+    await page.goto(`/sign-in?redirect=${encodeURIComponent(`/applications/${id}`)}`);
+    await page.getByLabel('Email').fill('dev-d@example.test');
+    await page.getByLabel('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: company })).toBeVisible();
 
-    const { data: notes } = await a.from('notes').select('id').eq('application_id', id);
+    await page.getByRole('button', { name: 'Delete application' }).click();
+    await expect(page.getByText(`Delete your application to ${company}?`)).toBeVisible();
+    await expect(page.getByText(/This also deletes 1 note and 1 attached file/)).toBeVisible();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete application' }).click();
+
+    await expect(page).toHaveURL(/\/applications$/);
+    await expect(page.getByText('Application deleted.')).toBeVisible();
+
+    const { data: gone } = await d.from('applications').select('id').eq('id', id);
+    expect(gone ?? [], 'the application itself survived the delete').toEqual([]);
+
+    const { data: notes } = await d.from('notes').select('id').eq('application_id', id);
     expect(notes ?? []).toEqual([]);
 
-    const { data: history } = await a.from('status_history').select('id').eq('application_id', id);
+    const { data: history } = await d.from('status_history').select('id').eq('application_id', id);
     expect(history ?? []).toEqual([]);
 
-    const { data: files } = await a.storage.from('cover-letters').list(userId);
+    const { data: files } = await d.storage.from('cover-letters').list(userId);
     expect((files ?? []).some((f) => path.endsWith(`/${f.name}`))).toBe(false);
   });
 });
