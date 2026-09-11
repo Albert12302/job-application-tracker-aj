@@ -1,4 +1,5 @@
 import { createRouter } from '@tanstack/react-router';
+import { applicationDetailRoute } from './routes/application-detail';
 import { applicationNewRoute } from './routes/application-new';
 import { applicationsRoute } from './routes/applications';
 import { authenticatedRoute } from './routes/authenticated';
@@ -10,7 +11,7 @@ import { signInRoute } from './routes/sign-in';
 const routeTree = rootRoute.addChildren([
   indexRoute,
   signInRoute,
-  authenticatedRoute.addChildren([applicationsRoute, applicationNewRoute, profileRoute]),
+  authenticatedRoute.addChildren([applicationsRoute, applicationNewRoute, applicationDetailRoute, profileRoute]),
 ]);
 
 export const router = createRouter({
