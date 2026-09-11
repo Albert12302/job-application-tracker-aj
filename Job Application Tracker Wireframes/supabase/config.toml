@@ -1,0 +1,78 @@
+# Supabase local + project configuration, version-controlled.
+# The values in [auth] mirror SPEC §7.1 — they are set here rather than in the
+# dashboard so a change is a reviewable diff, and so a fresh environment comes
+# up with the same limits instead of provider defaults.
+
+project_id = "job-application-tracker"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000                       # a runaway query cannot pull the whole table
+
+[db]
+port = 54322
+major_version = 15
+
+[db.migrations]
+schema_paths = []
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true                        # local mail catcher for verification + reset links
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"             # SPEC §7.3 cover-letter cap
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+
+jwt_expiry = 3600                     # 1 hour access token (§7.1)
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+# Self-serve signup stays closed: two accounts at launch (§4.1d).
+# Flip to true only when the product is meant to be open.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+minimum_password_length = 12          # §7.1, no composition rules
+password_requirements = ""
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true           # account holds no data until verified (§7.1)
+double_confirm_changes = true         # email change confirmed at both addresses
+secure_password_change = true         # re-auth required to change a password
+otp_expiry = 3600                     # 60-minute single-use reset/verify links (§7.1)
+max_frequency = "60s"                 # per-address resend floor
+
+[auth.rate_limit]
+# Provider-side limits. These are per-IP by nature — the per-ACCOUNT sign-in
+# lockout §7.1 also requires is not expressible here and lives in the sign-in
+# edge function (supabase/functions/sign-in).
+email_sent = 10                       # per hour, covers verify + reset sends
+sign_in_sign_ups = 20                 # per 5 min per IP
+token_refresh = 150                   # per 5 min per IP
+token_verifications = 30              # per 5 min per IP
+anonymous_users = 0
+
+[auth.sessions]
+timebox = "2160h"                     # 90-day absolute cap, then full re-auth (§7.1)
+inactivity_timeout = "336h"           # 14 days idle (§7.1)
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+
+[functions.sign-in]
+verify_jwt = false                    # it is the pre-auth endpoint

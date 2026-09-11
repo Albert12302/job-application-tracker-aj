@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;font-family:'Inter',sans-serif;
+--bg:oklch(97% 0.018 350);--surface:oklch(100% 0 0);--text:oklch(24% 0.02 350);--soft:oklch(24% 0.02 350);
+--primary:oklch(56% 0.16 350);--primary-ink:oklch(99% 0.01 350);--primary-100:oklch(94% 0.03 350);--primary-700:oklch(42% 0.1 350);
+--mint:oklch(88% 0.07 155);--mint-ink:oklch(35% 0.08 155);--peach:oklch(90% 0.06 60);--peach-ink:oklch(40% 0.08 55);
+--lav:oklch(89% 0.05 300);--lav-ink:oklch(40% 0.07 300);--border:oklch(91% 0.015 350);--border-strong:oklch(65% 0.02 350);--danger:oklch(55% 0.16 25);--danger-border:oklch(64% 0.16 25);
+background:var(--bg);color:var(--text)}
+input,textarea,select,button{font-family:'Inter',sans-serif;font-size:14px;color:var(--text)}
+input,textarea,select{border-color:var(--border-strong) !important}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--primary);outline-offset:-1px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+a{color:var(--primary-700)}a:hover{color:var(--primary)}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height:100vh;background:var(--bg);font-size:14px;color:var(--text)">
+
+<sc-if value="{{ isAuth }}" hint-placeholder-val="{{ true }}">
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px">
+  <div style="{{ authCardStyle }}">
+    <div style="font:600 20px 'Quicksand',sans-serif;text-align:center;margin-bottom:6px">AJ's Hunt</div>
+    <div style="font-size:13px;color:var(--soft);text-align:center;margin-bottom:22px">{{ authSub }}</div>
+
+    <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <sc-if value="{{ authNotice }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--primary-700);background:var(--primary-100);border-radius:0.5rem;padding:10px 12px;line-height:1.5">{{ authNotice }}</div>
+      </sc-if>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Email</div>
+        <input value="{{ email }}" onChange="{{ onEmail }}" placeholder="you@email.com" style="{{ fieldStyle }}">
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Password</div>
+        <input type="password" value="{{ password }}" onChange="{{ onPassword }}" placeholder="••••••••" style="{{ fieldStyle }}">
+      </div>
+      <button onClick="{{ goForgot }}" style="align-self:flex-end;border:none;background:none;padding:4px 0;font-size:13px;color:var(--primary-700);cursor:pointer;text-decoration:underline">Forgot password?</button>
+      <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--danger)">{{ authError }}</div>
+      </sc-if>
+      <button onClick="{{ signIn }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Sign in</button>
+    </div>
+    <div style="display:flex;justify-content:center;gap:6px;align-items:baseline;margin-top:18px;font-size:13px">
+      <span>No account?</span>
+      <button onClick="{{ goSignup }}" style="border:none;background:none;padding:4px 0;font-size:13px;font-weight:600;color:var(--primary-700);cursor:pointer;text-decoration:underline">Create one</button>
+    </div>
+    <div style="font-size:12px;color:var(--soft);text-align:center;margin-top:10px">Any email + password works in this demo.</div>
+    </sc-if>
+
+    <sc-if value="{{ isSignup }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Email</div>
+        <input value="{{ email }}" onChange="{{ onEmail }}" placeholder="you@email.com" style="{{ fieldStyle }}">
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Password</div>
+        <input type="password" value="{{ password }}" onChange="{{ onPassword }}" placeholder="at least 12 characters" style="{{ fieldStyle }}">
+        <div style="font-size:12px;color:var(--soft);margin-top:5px">12 characters minimum. A passphrase beats a short complex password.</div>
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Confirm password</div>
+        <input type="password" value="{{ password2 }}" onChange="{{ onPassword2 }}" placeholder="repeat your password" style="{{ fieldStyle }}">
+      </div>
+      <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--danger)">{{ authError }}</div>
+      </sc-if>
+      <button onClick="{{ submitSignup }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Create account</button>
+    </div>
+    <div style="display:flex;justify-content:center;gap:6px;align-items:baseline;margin-top:18px;font-size:13px">
+      <span>Already have an account?</span>
+      <button onClick="{{ goLogin }}" style="border:none;background:none;padding:4px 0;font-size:13px;font-weight:600;color:var(--primary-700);cursor:pointer;text-decoration:underline">Sign in</button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isVerify }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:14px;text-align:center">
+      <div style="display:flex;justify-content:center;color:var(--primary-700)">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><polyline points="2 7 12 13 22 7"></polyline></svg>
+      </div>
+      <div style="font-size:14px;line-height:1.55">We sent a verification link to <strong>{{ pendingEmail }}</strong>. Open it to activate your account.</div>
+      <div style="font-size:13px;color:var(--soft)">The link expires in 60 minutes and can only be used once.</div>
+      <sc-if value="{{ authNotice }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--primary-700)">{{ authNotice }}</div>
+      </sc-if>
+      <button onClick="{{ confirmVerified }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Simulate opening the link</button>
+      <button onClick="{{ resend }}" style="{{ secondaryBtnStyle }}" style-hover="background:var(--primary-100)">Resend email</button>
+      <button onClick="{{ goLogin }}" style="border:none;background:none;padding:4px 0;font-size:13px;color:var(--primary-700);cursor:pointer;text-decoration:underline">Back to sign in</button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isForgot }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:14px;line-height:1.55">Enter your email and we'll send a link to set a new password.</div>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Email</div>
+        <input value="{{ email }}" onChange="{{ onEmail }}" placeholder="you@email.com" style="{{ fieldStyle }}">
+      </div>
+      <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--danger)">{{ authError }}</div>
+      </sc-if>
+      <button onClick="{{ submitForgot }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Send reset link</button>
+      <button onClick="{{ goLogin }}" style="border:none;background:none;padding:4px 0;font-size:13px;color:var(--primary-700);cursor:pointer;text-decoration:underline">Back to sign in</button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:14px;text-align:center">
+      <div style="display:flex;justify-content:center;color:var(--primary-700)">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><polyline points="2 7 12 13 22 7"></polyline></svg>
+      </div>
+      <div style="font-size:14px;line-height:1.55">If that email has an account, we've sent a link to reset the password.</div>
+      <div style="font-size:13px;color:var(--soft)">Check spam before requesting another. Links expire in 60 minutes.</div>
+      <button onClick="{{ openResetLink }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Simulate opening the link</button>
+      <button onClick="{{ goLogin }}" style="border:none;background:none;padding:4px 0;font-size:13px;color:var(--primary-700);cursor:pointer;text-decoration:underline">Back to sign in</button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isReset }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">New password</div>
+        <input type="password" value="{{ password }}" onChange="{{ onPassword }}" placeholder="at least 12 characters" style="{{ fieldStyle }}">
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Confirm new password</div>
+        <input type="password" value="{{ password2 }}" onChange="{{ onPassword2 }}" placeholder="repeat your password" style="{{ fieldStyle }}">
+      </div>
+      <div style="font-size:12px;color:var(--soft)">Saving this signs out every other device.</div>
+      <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:13px;color:var(--danger)">{{ authError }}</div>
+      </sc-if>
+      <button onClick="{{ submitReset }}" style="{{ primaryBtnStyle }}" style-hover="background:var(--primary-700)">Save new password</button>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ false }}">
+<div>
+  <div style="background:var(--surface);border-bottom:1px solid var(--border)">
+    <div style="{{ headerRowStyle }}">
+      <div style="display:flex;align-items:center;gap:22px">
+        <div style="font:600 15px 'Quicksand',sans-serif">AJ's Hunt</div>
+        <div style="display:flex;gap:16px">
+          <div onClick="{{ goHome }}" style="{{ navHomeStyle }}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path></svg>
+            Home
+          </div>
+          <div onClick="{{ goStats }}" style="{{ navStatsStyle }}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            Stats
+          </div>
+        </div>
+      </div>
+      <div onClick="{{ goProfile }}" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <div style="{{ userAvatarStyle }}">{{ userInitial }}</div>
+        <div style="font-size:13px;font-weight:600">{{ userName }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="{{ containerStyle }}">
+
+  <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ dashHeadStyle }}">
+      <div style="font:600 20px 'Quicksand',sans-serif;letter-spacing:-0.01em">My Applications</div>
+      <div style="{{ dashActionsStyle }}">
+        <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search company or role…" style="{{ searchStyle }}">
+        <button onClick="{{ startAdd }}" style="{{ addBtnStyle }}" style-hover="background:var(--primary-700)">+ Add Application</button>
+      </div>
+    </div>
+    <div style="display:inline-flex;align-items:center;flex-wrap:wrap;background:var(--primary-100);border-radius:0.5rem;padding:3px;gap:2px;margin-bottom:16px;flex-wrap:wrap">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+        <div onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</div>
+      </sc-for>
+      <sc-for list="{{ customTabs }}" as="c" hint-placeholder-count="0">
+        <div onClick="{{ c.onClick }}" style="{{ c.style }}">
+          {{ c.label }}
+          <span onClick="{{ c.onRemove }}" style="display:flex;opacity:.6">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </span>
+        </div>
+      </sc-for>
+      <div onClick="{{ toggleFilterForm }}" style="{{ addFilterStyle }}">+ Filter</div>
+    </div>
+    <sc-if value="{{ showFilterForm }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:0.75rem;box-shadow:0 1px 3px oklch(0% 0 0 / 0.06);padding:22px;margin-bottom:16px;display:flex;flex-direction:column;gap:26px">
+        <div style="font:600 15px 'Quicksand',sans-serif">New filter</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:5px">Name</div>
+            <input value="{{ dName }}" onChange="{{ onDName }}" placeholder="e.g. Warm leads" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+          </div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:5px">Text match (optional)</div>
+            <input value="{{ dText }}" onChange="{{ onDText }}" placeholder="company, role or description" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+          </div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:5px">Location</div>
+            <select value="{{ dLocOpt }}" onChange="{{ onDLocOpt }}" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 8px;height:36px;background:var(--surface);cursor:pointer">
+              <sc-for list="{{ locationOpts }}" as="o" hint-placeholder-count="4">
+                <option value="{{ o }}">{{ o }}</option>
+              </sc-for>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Statuses (none = all)</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ draftStatusChips }}" as="s" hint-placeholder-count="6">
+              <div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">Referral</div>
+            <div style="display:inline-flex;align-items:center;flex-wrap:wrap;background:var(--primary-100);border-radius:0.5rem;padding:3px;gap:2px">
+              <sc-for list="{{ draftReferralOpts }}" as="o" hint-placeholder-count="3">
+                <div onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">Starred</div>
+            <div style="display:inline-flex;align-items:center;flex-wrap:wrap;background:var(--primary-100);border-radius:0.5rem;padding:3px;gap:2px">
+              <sc-for list="{{ dStarredOpts }}" as="o" hint-placeholder-count="3">
+                <div onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button onClick="{{ saveFilter }}" style="height:36px;white-space:nowrap;border:none;border-radius:0.5rem;background:var(--primary);color:var(--primary-ink);font-weight:500;padding:0 18px;cursor:pointer" style-hover="background:var(--primary-700)">Save filter</button>
+          <button onClick="{{ toggleFilterForm }}" style="height:36px;white-space:nowrap;border:1px solid var(--border);border-radius:0.5rem;background:var(--surface);font-weight:500;padding:0 18px;cursor:pointer" style-hover="background:var(--primary-100)">Cancel</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isNarrow }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button onClick="{{ toggleSort }}" style="{{ sortBtnStyle }}" style-hover="background:var(--primary-100)">
+          {{ sortLabel }}
+          <sc-if value="{{ sortDesc }}" hint-placeholder-val="{{ true }}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </sc-if>
+          <sc-if value="{{ sortAsc }}" hint-placeholder-val="{{ false }}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </sc-if>
+        </button>
+      </div>
+    </sc-if>
+    <div style="border:1px solid var(--border);border-radius:0.5rem;overflow:hidden;background:var(--surface)">
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:26px 82px 1.05fr 1.1fr 1fr 0.95fr 36px 58px 30px;gap:8px;padding:10px 14px;font:500 12px 'Inter',sans-serif;color:var(--soft);border-bottom:1px solid var(--border)">
+        <div></div>
+        <div onClick="{{ toggleSort }}" style="display:flex;align-items:center;gap:3px;cursor:pointer;user-select:none">
+          Date
+          <sc-if value="{{ sortDesc }}" hint-placeholder-val="{{ true }}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </sc-if>
+          <sc-if value="{{ sortAsc }}" hint-placeholder-val="{{ false }}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </sc-if>
+        </div>
+        <div>Company</div><div>Position</div><div>Location</div><div>Status</div><div>CL</div><div>Referral</div><div></div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ isNarrow }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+        <div onClick="{{ r.onOpen }}" style="{{ r.cardStyle }}" style-hover="background:var(--primary-100)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="min-width:0">
+              <div style="font-weight:600;font-size:15px;line-height:1.3">{{ r.company }}</div>
+              <div style="font-size:13px;margin-top:2px">{{ r.position }}</div>
+            </div>
+            <div onClick="{{ r.onStar }}" title="Star this role" style="{{ r.starTapStyle }}">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="{{ r.starFill }}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.1 8.6 22 9.6 17 14.5 18.2 21.4 12 18.1 5.8 21.4 7 14.5 2 9.6 8.9 8.6 12 2"></polygon></svg>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <div style="{{ r.tagStyle }}">{{ r.status }}</div>
+            <span style="font-size:13px">{{ r.date }}</span>
+            <span style="font-size:13px">{{ r.location }}</span>
+            <sc-if value="{{ r.hasCL }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:13px">📎 Cover letter</span>
+            </sc-if>
+            <sc-if value="{{ r.hasReferral }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:13px">Referral</span>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+      </sc-if>
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+        <div onClick="{{ r.onOpen }}" style="{{ r.rowStyle }}" style-hover="background:var(--primary-100)">
+          <div onClick="{{ r.onStar }}" title="Star this role" style="{{ r.starStyle }}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="{{ r.starFill }}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.1 8.6 22 9.6 17 14.5 18.2 21.4 12 18.1 5.8 21.4 7 14.5 2 9.6 8.9 8.6 12 2"></polygon></svg>
+          </div>
+          <div style="color:var(--soft)">{{ r.date }}</div>
+          <div style="font-weight:600">{{ r.company }}</div>
+          <div>{{ r.position }}</div>
+          <div>{{ r.location }}</div>
+          <div style="{{ r.tagStyle }}">{{ r.status }}</div>
+          <div>{{ r.cl }}</div>
+          <div style="color:var(--soft)">{{ r.referral }}</div>
+          <div style="color:var(--soft);display:flex"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
+        </div>
+      </sc-for>
+      </sc-if>
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:36px;text-align:center;color:var(--soft)">Nothing here yet — add an application to get started.</div>
+      </sc-if>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;color:var(--soft);white-space:nowrap">Rows per page</span>
+        <select value="{{ pageSize }}" onChange="{{ onPageSize }}" style="height:36px;border:1px solid var(--border);border-radius:0.5rem;background:var(--surface);padding:0 8px;cursor:pointer">
+          <sc-for list="{{ pageSizeOpts }}" as="o" hint-placeholder-count="3">
+            <option value="{{ o }}">{{ o }}</option>
+          </sc-for>
+        </select>
+        <span style="font-size:13px;color:var(--soft);white-space:nowrap">{{ rangeLabel }}</span>
+      </div>
+      <nav style="display:flex;align-items:center;gap:4px">
+        <div onClick="{{ onPrev }}" style="{{ prevStyle }}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
+          Previous
+        </div>
+        <sc-for list="{{ pageItems }}" as="p" hint-placeholder-count="2">
+          <div onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.label }}</div>
+        </sc-for>
+        <div onClick="{{ onNext }}" style="{{ nextStyle }}">
+          Next
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+        </div>
+      </nav>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ panelStyle }}">
+      <div style="font:600 20px 'Quicksand',sans-serif;margin-bottom:16px">Add Application</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Date applied</div>
+          <input type="date" value="{{ fDate }}" onChange="{{ onFDate }}" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Company</div>
+          <input value="{{ fCompany }}" onChange="{{ onFCompany }}" placeholder="e.g. Acme Corp" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Location</div>
+          <input value="{{ fLocation }}" onChange="{{ onFLocation }}" list="loc-suggest" autoComplete="off" placeholder="e.g. Remote or Austin, TX" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+          <datalist id="loc-suggest">
+            <sc-for list="{{ locationSuggestions }}" as="l" hint-placeholder-count="0">
+              <option value="{{ l }}"></option>
+            </sc-for>
+          </datalist>
+          <div style="font-size:12px;margin-top:4px">Pick an existing location or type a new one</div>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Referral</div>
+          <div style="display:inline-flex;align-items:center;flex-wrap:wrap;background:var(--primary-100);border-radius:0.5rem;padding:3px;gap:2px">
+            <sc-for list="{{ referralOpts }}" as="o" hint-placeholder-count="2">
+              <div onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Position</div>
+          <input value="{{ fPosition }}" onChange="{{ onFPosition }}" placeholder="e.g. Product Designer" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:36px;white-space:nowrap;background:var(--surface)">
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Job description</div>
+          <textarea value="{{ fDesc }}" onChange="{{ onFDesc }}" placeholder="paste or type description…" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:8px 12px;height:64px;line-height:1.5;background:var(--surface);resize:vertical"></textarea>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Cover letter</div>
+          <div style="display:inline-flex;align-items:center;flex-wrap:wrap;background:var(--primary-100);border-radius:0.5rem;padding:3px;gap:2px;margin-bottom:8px">
+            <sc-for list="{{ clOpts }}" as="o" hint-placeholder-count="2">
+              <div onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ fCL }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ attachFile }}" style="border:1.5px dashed var(--border);border-radius:0.5rem;padding:12px;text-align:center;color:var(--soft);font-size:13px;cursor:pointer" style-hover="background:var(--primary-100)">{{ fFileLabel }}</div>
+            <div style="font-size:12px;color:var(--soft);margin-top:4px">PDF only</div>
+          </sc-if>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Status</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ statusChips }}" as="s" hint-placeholder-count="6">
+              <div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:5px">Notes (optional)</div>
+          <textarea value="{{ fNotes }}" onChange="{{ onFNotes }}" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:0.5rem;padding:8px 12px;height:44px;line-height:1.5;background:var(--surface);resize:vertical"></textarea>
+        </div>
+        <sc-if value="{{ formError }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:13px;color:var(--danger)">{{ formError }}</div>
+        </sc-if>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button onClick="{{ saveApp }}" style="flex:1;height:36px;white-space:nowrap;border:none;border-radius:0.5rem;background:var(--primary);color:var(--primary-ink);font-weight:500;cursor:pointer" style-hover="background:var(--primary-700)">Save</button>
+          <button onClick="{{ goHome }}" style="flex:1;height:36px;white-space:nowrap;border:1px solid var(--border);border-radius:0.5rem;background:var(--surface);font-weight:500;cursor:pointer" style-hover="background:var(--primary-100)">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ detailWrapStyle }}">
+      <div onClick="{{ goHome }}" style="display:inline-flex;align-items:center;gap:6px;color:var(--soft);cursor:pointer;margin-bottom:12px;font-size:13px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
+        Back to applications
+      </div>
+      <div style="{{ panelStyle }}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px">
+          <div style="flex:1;min-width:0">
+            <input value="{{ dCompany }}" onChange="{{ onDCompany }}" style="width:100%;box-sizing:border-box;font:600 20px 'Quicksand',sans-serif;border:1px solid transparent;border-radius:0.5rem;padding:2px 6px;margin-left:-6px;background:transparent" style-hover="border-color:var(--border)">
+            <input value="{{ dPosition }}" onChange="{{ onDPosition }}" style="width:100%;box-sizing:border-box;font-size:13px;color:var(--soft);border:1px solid transparent;border-radius:0.5rem;padding:2px 6px;margin-left:-6px;background:transparent" style-hover="border-color:var(--border)">
+          </div>
+          <div style="position:relative;display:inline-flex;align-items:center">
+            <select value="{{ dStatus }}" onChange="{{ onDStatus }}" style="{{ dStatusStyle }}">
+              <sc-for list="{{ statusNames }}" as="s" hint-placeholder-count="6">
+                <option value="{{ s }}">{{ s }}</option>
+              </sc-for>
+            </select>
+            <span style="{{ dStatusArrowStyle }}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:13px;color:var(--soft);flex-wrap:wrap">
+          <span>Applied {{ dDate }}</span>
+          <span>·</span>
+          <input value="{{ dLocation }}" onChange="{{ onDLocation }}" onBlur="{{ onDLocationBlur }}" list="loc-suggest-detail" autoComplete="off" placeholder="Location" style="width:150px;font-size:13px;border:1px solid transparent;border-radius:0.5rem;padding:2px 6px;background:transparent" style-hover="border-color:var(--border)">
+          <datalist id="loc-suggest-detail">
+            <sc-for list="{{ locationSuggestions }}" as="l" hint-placeholder-count="0">
+              <option value="{{ l }}"></option>
+            </sc-for>
+          </datalist>
+          <div onClick="{{ toggleReferral }}" style="{{ dReferralStyle }}">Referral: {{ dReferral }}</div>
+        </div>
+        <div style="border:1px dashed var(--border);border-radius:0.5rem;padding:14px;margin-bottom:14px">
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Job description</div>
+          <textarea value="{{ dDesc }}" onChange="{{ onDDesc }}" style="width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:0.5rem;padding:4px 6px;margin-left:-6px;height:64px;line-height:1.5;background:transparent;resize:vertical" style-hover="border-color:var(--border)"></textarea>
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:6px">Cover letter</div>
+          <div style="border:1px solid var(--border);border-radius:0.5rem;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+            <span>{{ dCLLabel }}</span>
+            <span onClick="{{ replaceCL }}" style="font-size:13px;color:var(--primary-700);cursor:pointer">{{ dCLAction }}</span>
+          </div>
+        </div>
+        <div style="margin-bottom:18px">
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:8px">Progress</div>
+          <div style="display:flex;height:8px;background:var(--primary-100);border-radius:999px;overflow:hidden">
+            <div style="{{ dProgressStyle }}"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--soft)">
+            <span>Applied</span><span>Interview</span><span>Callback</span><span>Offer</span>
+          </div>
+        </div>
+        <div style="margin-bottom:18px">
+          <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:8px">Notes</div>
+          <div style="border:1px solid var(--border);border-radius:0.5rem;padding:10px 14px;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ dNotes }}" as="n" hint-placeholder-count="2">
+              <div style="font-size:13px;color:var(--soft)">{{ n }}</div>
+            </sc-for>
+            <sc-if value="{{ dNoNotes }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:var(--soft)">No notes yet.</div>
+            </sc-if>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input value="{{ noteDraft }}" onChange="{{ onNoteDraft }}" onKeyDown="{{ onNoteKey }}" placeholder="Add a note…" style="flex:1;border:1px solid var(--border);border-radius:0.5rem;padding:0 12px;height:34px;white-space:nowrap;background:var(--surface)">
+            <button onClick="{{ addNote }}" style="height:34px;white-space:nowrap;border:1px solid var(--border);border-radius:0.5rem;background:var(--surface);padding:0 14px;cursor:pointer" style-hover="background:var(--primary-100)">Add</button>
+          </div>
+        </div>
+        <button onClick="{{ deleteApp }}" style="width:100%;height:36px;white-space:nowrap;border:1px solid var(--danger-border);border-radius:0.5rem;background:var(--surface);color:var(--danger);font-weight:500;cursor:pointer" style-hover="background:oklch(96% 0.03 25)">Delete application</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isStats }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ statsPanelStyle }}">
+      <div style="font:600 20px 'Quicksand',sans-serif;margin-bottom:16px">Your Stats</div>
+      <div style="{{ statGridStyle }}">
+        <sc-for list="{{ statCards }}" as="c" hint-placeholder-count="4">
+          <div style="border:1px solid var(--border);border-radius:0.75rem;padding:12px;text-align:center">
+            <div style="{{ c.numStyle }}">{{ c.value }}</div>
+            <div style="font-size:13px;color:var(--soft)">{{ c.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:2px">How far applications got</div>
+      
+      <div style="{{ statGridStyle }}">
+        <sc-for list="{{ rateCards }}" as="c" hint-placeholder-count="3">
+          <div style="border:1px solid var(--border);border-radius:0.75rem;padding:10px;text-align:center">
+            <div style="{{ c.numStyle }}">{{ c.value }}</div>
+            <div style="font-size:13px;color:var(--soft)">{{ c.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:13px;color:var(--soft);font-weight:600;margin-bottom:8px">Status breakdown</div>
+      <div style="display:flex;height:22px;border-radius:999px;overflow:hidden;background:var(--primary-100)">
+        <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="4">
+          <div style="{{ b.style }}"></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--soft)">
+        <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="4">
+          <span>{{ b.label }} · {{ b.count }}</span>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:320px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:0.75rem;box-shadow:0 1px 3px oklch(0% 0 0 / 0.06);padding:22px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:22px">
+        <label title="Upload a photo" style="position:relative;cursor:pointer;display:block">
+          <div style="{{ bigAvatarStyle }}">{{ userInitial }}</div>
+          <div style="position:absolute;right:-2px;bottom:-2px;width:24px;height:24px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 1px 3px oklch(0% 0 0 / 0.14);display:flex;align-items:center;justify-content:center;color:var(--primary-700)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          </div>
+          <input type="file" accept="image/*" onChange="{{ onPhotoPick }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"></input>
+        </label>
+        <div style="font:600 17px 'Quicksand',sans-serif">{{ userName }}</div>
+        <sc-if value="{{ hasPhoto }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ removePhoto }}" style="border:none;background:none;padding:0;font-size:12px;color:var(--primary-700);cursor:pointer;text-decoration:underline">Remove photo</button>
+        </sc-if>
+        
+      </div>
+      <button onClick="{{ signOut }}" style="width:100%;height:36px;white-space:nowrap;border:1px solid var(--danger-border);border-radius:0.5rem;background:var(--surface);color:var(--danger);font-weight:500;cursor:pointer" style-hover="background:oklch(96% 0.03 25)">Sign out</button>
+    </div>
+  </sc-if>
+
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showJump }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ jumpToBottom }}" title="Jump to bottom" style="position:fixed;left:50%;transform:translateX(-50%);bottom:18px;height:38px;padding:0 16px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 4px 14px oklch(0% 0 0 / 0.14);display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--primary-700);white-space:nowrap;cursor:pointer;z-index:20" style-hover="background:var(--primary-100)">
+    Jump to bottom
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;oklch(56% 0.16 350)&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;oklch(56% 0.16 350)&quot;,&quot;oklch(54% 0.16 250)&quot;,&quot;oklch(54% 0.14 155)&quot;,&quot;oklch(54% 0.16 40)&quot;]},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;login&quot;,&quot;options&quot;:[&quot;login&quot;,&quot;dashboard&quot;,&quot;stats&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+const AUTH_SCREENS = ['login','signup','verify','forgot','sent','reset'];
+const AUTH_SUB = {
+  login: 'sign in to your account',
+  signup: 'create your account',
+  verify: 'one more step',
+  forgot: 'reset your password',
+  sent: 'check your inbox',
+  reset: 'choose a new password'
+};
+const STATUSES = ['Applied','Interview','Callback','Offer','Rejected','Withdrawn'];
+const STAGES = ['Applied','Interview','Callback','Offer'];
+const TONE = {
+  Applied:  ['oklch(94% 0.07 95)','oklch(42% 0.09 80)'],
+  Interview:['oklch(90% 0.06 245)','oklch(42% 0.12 250)'],
+  Callback: ['oklch(91% 0.07 150)','oklch(38% 0.09 155)'],
+  Offer:    ['oklch(48% 0.11 155)','oklch(98% 0.02 155)'],
+  Rejected: ['oklch(52% 0.16 25)','oklch(98% 0.02 25)'],
+  Withdrawn:['oklch(90% 0.08 60)','oklch(42% 0.11 55)']
+};
+const SEED = {
+  Albert: [
+    {id:1,date:'2026-09-02',company:'Acme Corp',location:'San Francisco, CA',position:'Product Designer',status:'Applied',referral:true,cl:'acme_cover_letter.pdf',desc:'Own end-to-end design for the checkout surface.',notes:['9/2 — applied via referral from Dana']},
+    {id:2,date:'2026-08-28',company:'Nimbus Inc',location:'Remote',position:'UX Researcher',status:'Applied',referral:false,cl:'',desc:'Mixed-methods research for the platform team.',notes:[]},
+    {id:3,date:'2026-08-20',company:'Beacon Labs',starred:true,location:'New York, NY',position:'Sr. Designer',status:'Interview',referral:true,cl:'beacon_cover_letter.pdf',desc:'Design end-to-end flows for the core product, partner with PM/eng, run user research…',notes:['9/10 — phone screen w/ recruiter','9/15 — onsite scheduled']},
+    {id:4,date:'2026-08-14',company:'Harbor Studio',location:'Seattle, WA',position:'Design Lead',status:'Callback',referral:false,cl:'harbor_cl.pdf',desc:'Lead a team of three across brand and product.',notes:['9/1 — hiring manager asked for portfolio walkthrough']},
+    {id:8,date:'2026-08-18',company:'Willow & Co',starred:true,location:'Austin, TX',position:'Staff Designer',status:'Offer',referral:true,cl:'willow_cl.pdf',desc:'Own the design direction for a new product line.',notes:['9/4 — verbal offer, deciding by 9/18']},
+    {id:9,date:'2026-08-16',company:'Northgate',location:'Remote',position:'Product Designer II',status:'Callback',referral:false,cl:'',desc:'Design for the payments team.',notes:['8/29 — recruiter asked to reschedule']},
+    {id:5,date:'2026-08-10',company:'Vertex Co',location:'Chicago, IL',position:'Designer',status:'Rejected',referral:false,cl:'',desc:'Generalist product design role.',notes:['8/22 — rejected, role paused']},
+    {id:6,date:'2026-08-04',company:'Pinecone',location:'Boston, MA',position:'Product Designer',status:'Rejected',referral:false,cl:'',desc:'Growth-focused design role.',notes:[]},
+    {id:7,date:'2026-07-29',company:'Loomwork',location:'Denver, CO',position:'Design Systems',status:'Withdrawn',referral:false,cl:'',desc:'Own the component library.',notes:['withdrew — relocation required']},
+    {id:20,date:'2026-07-27',company:'Marlow Health',location:'Philadelphia, PA',position:'Product Designer',status:'Interview',referral:false,cl:'marlow_cl.pdf',desc:'Patient-facing scheduling flows.',notes:['8/3 — portfolio review']},
+    {id:21,date:'2026-07-24',company:'Cobalt Row',location:'Remote',position:'Sr. Product Designer',status:'Rejected',referral:false,cl:'',desc:'B2B dashboard redesign.',notes:[]},
+    {id:22,date:'2026-07-21',company:'Quilt',starred:true,location:'Brooklyn, NY',position:'Designer, Growth',status:'Applied',referral:true,cl:'quilt_cl.pdf',desc:'Onboarding and activation experiments.',notes:[]},
+    {id:23,date:'2026-07-18',company:'Ferrous Labs',location:'Detroit, MI',position:'UX Designer',status:'Callback',referral:false,cl:'',desc:'Internal tooling for hardware teams.',notes:['8/1 — asked about availability']},
+    {id:24,date:'2026-07-15',company:'Halcyon',location:'Los Angeles, CA',position:'Product Designer',status:'Rejected',referral:false,cl:'halcyon_cl.pdf',desc:'Consumer mobile app.',notes:[]},
+    {id:25,date:'2026-07-12',company:'Sundial',location:'Portland, OR',position:'Design Lead',status:'Withdrawn',referral:true,cl:'',desc:'Lead design for a two-person team.',notes:['withdrew — comp too low']},
+    {id:26,date:'2026-07-09',company:'Bramble',location:'Remote',position:'UX Researcher',status:'Applied',referral:false,cl:'',desc:'Longitudinal studies for retention.',notes:[]},
+    {id:27,date:'2026-07-06',company:'Northwind Data',location:'Minneapolis, MN',position:'Product Designer',status:'Interview',referral:true,cl:'northwind_cl.pdf',desc:'Data exploration UI.',notes:['7/20 — first round done']},
+    {id:28,date:'2026-07-03',company:'Palewell',location:'Nashville, TN',position:'Designer',status:'Rejected',referral:false,cl:'',desc:'Marketing site and brand.',notes:[]},
+    {id:29,date:'2026-06-30',company:'Trellis',starred:true,location:'Remote',position:'Sr. Designer',status:'Offer',referral:true,cl:'trellis_cl.pdf',desc:'Own the reporting surface end to end.',notes:['7/22 — offer received, declined']},
+    {id:30,date:'2026-06-27',company:'Kiln Studio',location:'Oakland, CA',position:'Product Designer',status:'Applied',referral:false,cl:'kiln_cl.pdf',desc:'Agency work across three clients.',notes:[]},
+    {id:31,date:'2026-06-24',company:'Overtone',location:'Atlanta, GA',position:'Design Systems',status:'Rejected',referral:false,cl:'',desc:'Token pipeline and docs.',notes:[]},
+    {id:32,date:'2026-06-21',company:'Perch',location:'Miami, FL',position:'Product Designer',status:'Callback',referral:false,cl:'',desc:'Marketplace supply side.',notes:['7/5 — recruiter follow-up']},
+    {id:33,date:'2026-06-18',company:'Mesa Bright',location:'Phoenix, AZ',position:'UX Designer',status:'Applied',referral:true,cl:'',desc:'Solar installer tooling.',notes:[]},
+    {id:34,date:'2026-06-15',company:'Latchkey',location:'Remote',position:'Designer II',status:'Rejected',referral:false,cl:'',desc:'Access control mobile app.',notes:[]},
+    {id:35,date:'2026-06-12',company:'Ravel',starred:true,location:'San Francisco, CA',position:'Sr. Product Designer',status:'Interview',referral:false,cl:'ravel_cl.pdf',desc:'Editor and canvas interactions.',notes:['6/28 — design exercise sent']},
+    {id:36,date:'2026-06-09',company:'Stonefruit',location:'Sacramento, CA',position:'Product Designer',status:'Withdrawn',referral:false,cl:'',desc:'Grocery logistics.',notes:['withdrew — accepted other process']},
+    {id:37,date:'2026-06-06',company:'Auric',location:'Remote',position:'Designer, Platform',status:'Applied',referral:false,cl:'',desc:'Identity and permissions.',notes:[]},
+    {id:38,date:'2026-06-03',company:'Belfry',location:'New York, NY',position:'Product Designer',status:'Rejected',referral:true,cl:'belfry_cl.pdf',desc:'Fintech onboarding.',notes:[]},
+    {id:39,date:'2026-05-31',company:'Windrow',location:'Des Moines, IA',position:'UX Designer',status:'Callback',referral:false,cl:'',desc:'Farm equipment telemetry.',notes:['6/14 — team intro call']}
+  ],
+  Joyce: [
+    {id:11,date:'2026-09-05',company:'Fernwood',location:'Remote',position:'Frontend Engineer',status:'Applied',referral:true,cl:'fernwood_cl.pdf',desc:'React + design systems work.',notes:[]},
+    {id:12,date:'2026-08-30',company:'Tidal Group',location:'San Diego, CA',position:'Software Engineer',status:'Interview',referral:false,cl:'',desc:'Full-stack product engineering.',notes:['9/6 — tech screen passed']},
+    {id:13,date:'2026-08-12',company:'Kestrel AI',location:'Palo Alto, CA',position:'Engineer, Platform',status:'Rejected',referral:false,cl:'',desc:'Infra for model serving.',notes:[]}
+  ]
+};
+
+class Component extends DCLogic {
+  state = {
+    screen: 'login', user: null, email: '', password: '', authError: '',
+    password2: '', pendingEmail: '', authNotice: '', resendCount: 0,
+    narrow: typeof window !== 'undefined' && window.innerWidth < 760,
+    data: JSON.parse(JSON.stringify(SEED)),
+    filter: 'All', query: '', selectedId: null, noteDraft: '',
+    form: null, formError: '',
+    nextId: 100,
+    pageSize: 10, page: 1, showJump: false,
+    sortDir: 'desc',
+    customFilters: [], showFilterForm: false, nextFilterId: 1,
+    draft: {name:'', statuses:[], referral:'any', text:'', location:'Any location', starred:'any'}
+  };
+
+  normalizeLocation(v){
+    const raw = (v || '').trim().replace(/\s+/g, ' ');
+    if (!raw) return '';
+    const existing = this.apps().map(a => a.location).filter(Boolean);
+    const hit = existing.find(e => e.toLowerCase() === raw.toLowerCase());
+    if (hit) return hit;
+    return raw.split(', ').map(part =>
+      part.length <= 2 ? part.toUpperCase()
+        : part.split(' ').map(w => w.length <= 2 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1)).join(' ')
+    ).join(', ');
+  }
+  matches(a, c){
+    if (c.statuses.length && !c.statuses.includes(a.status)) return false;
+    if (c.referral === 'yes' && !a.referral) return false;
+    if (c.referral === 'no' && a.referral) return false;
+    if (c.location && c.location !== 'Any location' && (a.location || '') !== c.location) return false;
+    if (c.starred === 'yes' && !a.starred) return false;
+    if (c.starred === 'no' && a.starred) return false;
+    const t = (c.text || '').trim().toLowerCase();
+    if (t && !(a.company + ' ' + a.position + ' ' + (a.location || '') + ' ' + a.desc).toLowerCase().includes(t)) return false;
+    return true;
+  }
+  setDraft(p){ this.setState(st => ({draft:{...st.draft, ...p}})); }
+  saveFilter(){
+    const d = this.state.draft;
+    const id = 'c' + this.state.nextFilterId;
+    const name = d.name.trim() || 'Custom ' + this.state.nextFilterId;
+    this.setState(st => ({
+      customFilters: [...st.customFilters, {...d, id, name}],
+      nextFilterId: st.nextFilterId + 1,
+      showFilterForm: false, filter: id, page: 1,
+      draft: {name:'', statuses:[], referral:'any', text:'', location:'Any location', starred:'any'}
+    }));
+  }
+
+  rootRef = React.createRef();
+
+  scroller(){
+    let n = this.rootRef.current && this.rootRef.current.parentElement;
+    while (n && n !== document.body) {
+      const ov = getComputedStyle(n).overflowY;
+      if ((ov === 'auto' || ov === 'scroll') && n.scrollHeight > n.clientHeight + 4) return n;
+      n = n.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+  onScroll = () => {
+    const el = this.scroller();
+    const view = el === document.scrollingElement || el === document.documentElement ? window.innerHeight : el.clientHeight;
+    const remaining = el.scrollHeight - el.scrollTop - view;
+    const show = remaining > 100;
+    if (show !== this.state.showJump) this.setState({showJump: show});
+  };
+  jumpToBottom = () => {
+    const el = this.scroller();
+    el.scrollTo({top: el.scrollHeight, behavior:'smooth'});
+  };
+
+  onResize = () => {
+    const n = window.innerWidth < 760;
+    if (n !== this.state.narrow) this.setState({narrow: n});
+  };
+
+  validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v || '').trim()); }
+
+  authGo(screen, patch){ this.setState({screen, authError:'', authNotice:'', ...(patch || {})}); }
+
+  componentWillUnmount(){
+    window.removeEventListener('scroll', this.onScroll, true);
+    window.removeEventListener('resize', this.onResize);
+    clearInterval(this._poll);
+  }
+
+  componentDidMount(){
+    window.addEventListener('scroll', this.onScroll, true);
+    window.addEventListener('resize', this.onResize);
+    this._poll = setInterval(this.onScroll, 400);
+    this.onScroll(); this.applyAccent(); const s = this.props.startScreen; if (s && s !== 'login') this.setState({user:'Albert', screen: s === 'picker' ? 'picker' : s}); if (s === 'picker') this.setState({user:null, screen:'picker'}); }
+  componentDidUpdate(){ this.applyAccent(); }
+  applyAccent(){
+    const a = this.props.accent;
+    const r = document.documentElement;
+    if (a) { r.style.setProperty('--primary', a); } else { r.style.removeProperty('--primary'); }
+  }
+
+  apps(){ return (this.state.data[this.state.user] || []); }
+  setApps(fn){ this.setState(s => { const d = {...s.data}; d[s.user] = fn(d[s.user] || []); return {data:d}; }); }
+  sel(){ return this.apps().find(a => a.id === this.state.selectedId) || null; }
+  patch(p){ const id = this.state.selectedId; this.setApps(list => list.map(a => a.id === id ? {...a, ...p} : a)); }
+
+  fmt(iso){ if(!iso) return ''; const [y,m,d] = iso.split('-'); return `${+m}/${+d}/${y.slice(2)}`; }
+
+  tag(status, opts){
+    const [bg, fg] = TONE[status] || TONE.Applied;
+    return {borderRadius:'999px',padding:'2px 10px',fontSize:'12px',fontWeight:600,display:'inline-block',
+      background:bg, color:fg, border:'1px solid ' + (bg === 'transparent' ? 'var(--border)' : 'transparent'),
+      width:'fit-content', ...(opts||{})};
+  }
+  pill(active){
+    return {padding:'5px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:500,cursor:'pointer',
+      whiteSpace:'nowrap',
+      color: active ? 'var(--text)' : 'var(--soft)',
+      background: active ? 'var(--surface)' : 'transparent',
+      boxShadow: active ? '0 1px 2px oklch(0% 0 0 / 0.08)' : 'none'};
+  }
+  avatar(name, size){
+    const tint = name === 'Joyce' ? ['var(--lav)','var(--lav-ink)'] : ['var(--primary-100)','var(--primary-700)'];
+    const photo = (this.state.photos || {})[name];
+    return {width:size+'px',height:size+'px',borderRadius:'999px',display:'flex',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Quicksand',sans-serif",fontWeight:600,fontSize:Math.round(size*0.32)+'px',
+      background: photo ? 'center/cover no-repeat url('+photo+')' : tint[0],
+      color: photo ? 'transparent' : tint[1],border:'1px solid var(--border)',flex:'none',overflow:'hidden'};
+  }
+  pageBtn(disabled){
+    return {height:'36px',padding:'0 12px',display:'inline-flex',alignItems:'center',gap:'4px',
+      borderRadius:'0.5rem',border:'1px solid var(--border)',background:'var(--surface)',fontSize:'14px',
+      fontWeight:500,whiteSpace:'nowrap',cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.45 : 1, color:'var(--text)'};
+  }
+  navItem(active){
+    return {display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:500,cursor:'pointer',
+      color: active ? 'var(--primary-700)' : 'var(--soft)'};
+  }
+
+  go(screen){ this.setState({screen}); }
+
+  startAdd(){
+    const t = new Date();
+    const iso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    this.setState({screen:'add', formError:'', form:{date:iso,company:'',position:'',location:'',desc:'',notes:'',status:'Applied',referral:false,cl:true,file:''}});
+  }
+  saveApp(){
+    const f = this.state.form;
+    if (!f.company.trim() || !f.position.trim()) { this.setState({formError:'Company and position are required.'}); return; }
+    const id = this.state.nextId;
+    const app = {id, date:f.date, company:f.company.trim(), position:f.position.trim(),
+      location:this.normalizeLocation(f.location), status:f.status,
+      referral:f.referral, cl: f.cl ? (f.file || 'cover_letter.pdf') : '', desc:f.desc,
+      notes: f.notes.trim() ? [f.notes.trim()] : []};
+    this.setApps(list => [app, ...list]);
+    this.setState({nextId:id+1, screen:'dashboard', filter:'All', form:null, formError:''});
+  }
+
+  renderVals(){
+    const s = this.state;
+    const CTRL = s.narrow ? 44 : 36;
+    const apps = this.apps();
+    const counts = {All: apps.length};
+    STATUSES.forEach(k => counts[k] = apps.filter(a => a.status === k).length);
+    const q = s.query.trim().toLowerCase();
+    const cf = s.customFilters.find(c => c.id === s.filter) || null;
+    const matched = apps
+      .filter(a => cf ? this.matches(a, cf) : (s.filter === 'All' || a.status === s.filter))
+      .filter(a => !q || (a.company + ' ' + a.position + ' ' + (a.location || '')).toLowerCase().includes(q))
+      .sort((a,b) => s.sortDir === 'desc' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+    const pageCount = Math.max(1, Math.ceil(matched.length / s.pageSize));
+    const page = Math.min(s.page, pageCount);
+    const start = (page - 1) * s.pageSize;
+    const rows = matched
+      .slice(start, start + s.pageSize)
+      .map(a => ({
+        date: this.fmt(a.date), company: a.company, position: a.position, status: a.status,
+        location: a.location || '—',
+        starred: !!a.starred,
+        starStyle: {display:'flex',alignItems:'center',cursor:'pointer',
+          color: a.starred ? 'oklch(62% 0.15 85)' : 'oklch(65% 0.02 350)'},
+        starFill: a.starred ? 'currentColor' : 'none',
+        onStar: e => { e.stopPropagation();
+          this.setApps(list => list.map(x => x.id === a.id ? {...x, starred: !x.starred} : x)); },
+        cl: a.cl ? '📎' : '—', referral: a.referral ? 'Y' : 'N',
+        hasCL: !!a.cl, hasReferral: !!a.referral,
+        tagStyle: this.tag(a.status),
+        cardStyle: {display:'block',padding:'14px',borderBottom:'1px solid var(--border)',
+          cursor:'pointer',background:'var(--surface)'},
+        starTapStyle: {display:'flex',alignItems:'center',justifyContent:'center',
+          width:'44px',height:'44px',margin:'-10px -10px 0 0',flex:'none',cursor:'pointer',
+          color: a.starred ? 'oklch(62% 0.15 85)' : 'oklch(65% 0.02 350)'},
+        rowStyle: {display:'grid',gridTemplateColumns:'26px 82px 1.05fr 1.1fr 1fr 0.95fr 36px 58px 30px',gap:'8px',padding:'12px 14px',
+          alignItems:'center',borderBottom:'1px solid var(--border)',cursor:'pointer',
+          opacity: 1},
+        onOpen: () => this.setState({screen:'detail', selectedId:a.id, noteDraft:''})
+      }));
+
+    const d = this.sel();
+    const stageIdx = d ? STAGES.indexOf(d.status) : -1;
+    const f = s.form || {};
+
+    const interviewed = apps.filter(a => ['Interview','Callback','Offer'].includes(a.status)).length;
+    const callbacks = apps.filter(a => ['Callback','Offer'].includes(a.status)).length;
+    const offers = counts.Offer || 0;
+    const heardBack = apps.filter(a => a.status !== 'Applied' && a.status !== 'Withdrawn').length;
+    const pct = n => apps.length ? Math.round(n / apps.length * 100) + '%' : '0%';
+    const num = c => ({font:"600 24px 'Quicksand',sans-serif", color:c});
+
+    const breakdown = ['Applied','Interview','Callback','Offer','Rejected','Withdrawn']
+      .map(k => ({k, count: counts[k]}))
+      .filter(x => x.count > 0)
+      .map(x => {
+        const [bg] = TONE[x.k];
+        return {label:x.k, count:x.count,
+          style:{width:(apps.length ? x.count/apps.length*100 : 0)+'%',
+            background: bg === 'transparent' ? 'oklch(92% 0.015 350)' : bg}};
+      });
+
+    const profileList = names => names.map(n => ({
+      name:n, initial:n[0], avatarStyle:this.avatar(n,72),
+      onClick: () => this.setState({user:n, screen:'dashboard', filter:'All', query:''})
+    }));
+
+    return {
+      isAuth: AUTH_SCREENS.includes(s.screen),
+      isLogin: s.screen === 'login',
+      isSignup: s.screen === 'signup',
+      isVerify: s.screen === 'verify',
+      isForgot: s.screen === 'forgot',
+      isSent: s.screen === 'sent',
+      isReset: s.screen === 'reset',
+      isPicker: false,
+      isApp: !AUTH_SCREENS.includes(s.screen),
+      isDashboard: s.screen === 'dashboard',
+      isAdd: s.screen === 'add',
+      isDetail: s.screen === 'detail' && !!d,
+      isStats: s.screen === 'stats',
+      isProfile: s.screen === 'profile',
+      authSub: AUTH_SUB[s.screen] || '',
+
+      email: s.email, password: s.password, password2: s.password2,
+      authError: s.authError, authNotice: s.authNotice,
+      pendingEmail: s.pendingEmail || 'your email',
+      onEmail: e => this.setState({email:e.target.value, authError:''}),
+      onPassword: e => this.setState({password:e.target.value, authError:''}),
+      onPassword2: e => this.setState({password2:e.target.value, authError:''}),
+      signIn: () => {
+        if (!s.email.trim() || !s.password) { this.setState({authError:'Enter an email and password.'}); return; }
+        const name = s.email.trim().toLowerCase().startsWith('joyce') ? 'Joyce' : 'Albert';
+        this.setState({user:name, screen:'dashboard', filter:'All', query:'', authError:'', password:'', password2:''});
+      },
+      goLogin: () => this.authGo('login', {password:'', password2:''}),
+      goSignup: () => this.authGo('signup', {password:'', password2:''}),
+      goForgot: () => this.authGo('forgot', {password:'', password2:''}),
+      submitSignup: () => {
+        if (!this.validEmail(s.email)) { this.setState({authError:'Enter a valid email address.'}); return; }
+        if (s.password.length < 12) { this.setState({authError:'Password must be at least 12 characters.'}); return; }
+        if (s.password !== s.password2) { this.setState({authError:'Those passwords don\u2019t match.'}); return; }
+        this.authGo('verify', {pendingEmail: s.email.trim(), password:'', password2:'', resendCount:0});
+      },
+      submitForgot: () => {
+        if (!this.validEmail(s.email)) { this.setState({authError:'Enter a valid email address.'}); return; }
+        this.authGo('sent', {pendingEmail: s.email.trim()});
+      },
+      submitReset: () => {
+        if (s.password.length < 12) { this.setState({authError:'Password must be at least 12 characters.'}); return; }
+        if (s.password !== s.password2) { this.setState({authError:'Those passwords don\u2019t match.'}); return; }
+        this.authGo('login', {password:'', password2:'', authNotice:'Password updated. Sign in with your new password.'});
+      },
+      openResetLink: () => this.authGo('reset', {password:'', password2:''}),
+      confirmVerified: () => {
+        const name = (s.pendingEmail || '').toLowerCase().startsWith('joyce') ? 'Joyce' : 'Albert';
+        this.setState({user:name, screen:'dashboard', filter:'All', query:'', authError:'', authNotice:''});
+      },
+      resend: () => this.setState(st => ({resendCount: st.resendCount + 1,
+        authNotice: 'Verification email sent again. You can request another in 60 seconds.'})),
+      fieldStyle: {width:'100%',boxSizing:'border-box',border:'1px solid var(--border)',
+        borderRadius:'0.5rem',padding:'0 12px',height:CTRL+'px',background:'var(--surface)',fontSize:'14px'},
+      primaryBtnStyle: {width:'100%',height:CTRL+'px',border:'none',borderRadius:'0.5rem',
+        background:'var(--primary)',color:'var(--primary-ink)',fontWeight:500,cursor:'pointer',fontSize:'14px'},
+      secondaryBtnStyle: {width:'100%',height:CTRL+'px',border:'1px solid var(--border-strong)',
+        borderRadius:'0.5rem',background:'var(--surface)',fontWeight:500,cursor:'pointer',fontSize:'14px'},
+      authCardStyle: {width:'100%',maxWidth:'340px',background:'var(--surface)',border:'1px solid var(--border)',
+        borderRadius:'0.75rem',boxShadow:'0 1px 3px oklch(0% 0 0 / 0.06)',padding: s.narrow ? '22px 18px' : '26px'},
+      profiles: profileList(['Albert','Joyce']),
+      otherProfiles: profileList(['Albert','Joyce'].filter(n => n !== s.user)).map(p => ({...p, avatarStyle:this.avatar(p.name,34)})),
+
+      userName: s.user, userInitial: (s.user || 'A')[0],
+      hasPhoto: !!(s.photos || {})[s.user || 'Albert'],
+      onPhotoPick: e => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        const who = s.user || 'Albert';
+        r.onload = () => this.setState(st => ({photos: {...(st.photos || {}), [who]: r.result}}));
+        r.readAsDataURL(f);
+        e.target.value = '';
+      },
+      removePhoto: () => this.setState(st => {
+        const p = {...(st.photos || {})}; delete p[s.user || 'Albert']; return {photos:p};
+      }),
+      userAvatarStyle: this.avatar(s.user || 'Albert', 28),
+      bigAvatarStyle: this.avatar(s.user || 'Albert', 64),
+      userCount: apps.length + ' applications tracked',
+      navHomeStyle: this.navItem(['dashboard','detail','add'].includes(s.screen)),
+      navStatsStyle: this.navItem(s.screen === 'stats'),
+      goHome: () => this.setState({screen:'dashboard', formError:''}),
+      goStats: () => this.go('stats'),
+      goProfile: () => this.go('profile'),
+      signOut: () => this.setState({screen:'login', user:null, email:'', password:''}),
+
+      query: s.query,
+      onQuery: e => this.setState({query:e.target.value, page:1}),
+      tabs: ['All', ...STATUSES].map(k => ({
+        label: `${k} (${counts[k]})`, style: this.pill(s.filter === k),
+        onClick: () => this.setState({filter:k, page:1})
+      })),
+      customTabs: s.customFilters.map(c => ({
+        label: `${c.name} (${apps.filter(a => this.matches(a, c)).length})`,
+        style: {...this.pill(s.filter === c.id), display:'inline-flex', alignItems:'center', gap:'6px'},
+        onClick: () => this.setState({filter:c.id, page:1}),
+        onRemove: e => { e.stopPropagation(); this.setState(st => ({
+          customFilters: st.customFilters.filter(x => x.id !== c.id),
+          filter: st.filter === c.id ? 'All' : st.filter, page:1})); }
+      })),
+      showFilterForm: s.showFilterForm,
+      toggleFilterForm: () => this.setState(st => ({showFilterForm: !st.showFilterForm})),
+      addFilterStyle: {padding:'5px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:500,cursor:'pointer',
+        color:'var(--primary-700)',background: s.showFilterForm ? 'var(--surface)' : 'transparent',
+        whiteSpace:'nowrap'},
+      dName: s.draft.name, dText: s.draft.text,
+      onDName: e => this.setDraft({name:e.target.value}),
+      onDText: e => this.setDraft({text:e.target.value}),
+      dLocOpt: s.draft.location,
+      locationOpts: ['Any location', ...Array.from(new Set(apps.map(a => a.location).filter(Boolean))).sort()],
+      onDLocOpt: e => this.setDraft({location:e.target.value}),
+      draftStatusChips: STATUSES.map(k => {
+        const on = s.draft.statuses.includes(k);
+        return {label:k,
+          style: on ? {...this.tag(k), cursor:'pointer', outline:'2px solid var(--primary)', outlineOffset:'1px'}
+                    : {...this.tag(k), background:'transparent', color:'var(--text)', border:'1px solid var(--border)', cursor:'pointer'},
+          onClick: () => this.setDraft({statuses: on ? s.draft.statuses.filter(x => x !== k) : [...s.draft.statuses, k]})};
+      }),
+      draftReferralOpts: [['Any','any'],['Referral only','yes'],['No referral','no']].map(([label,v]) => ({
+        label, style: this.pill(s.draft.referral === v), onClick: () => this.setDraft({referral:v})
+      })),
+      saveFilter: () => this.saveFilter(),
+      toggleSort: () => this.setState(st => ({sortDir: st.sortDir === 'desc' ? 'asc' : 'desc', page:1})),
+      sortDesc: s.sortDir === 'desc',
+      sortAsc: s.sortDir === 'asc',
+      dStarredOpts: [['Any','any'],['Starred only','yes'],['Not starred','no']].map(([label,v]) => ({
+        label, style: this.pill(s.draft.starred === v), onClick: () => this.setDraft({starred:v})
+      })),
+      isNarrow: s.narrow, isWide: !s.narrow,
+      headerRowStyle: {maxWidth:'980px',margin:'0 auto',display:'flex',justifyContent:'space-between',
+        alignItems:'center',gap:'12px',padding: s.narrow ? '10px 14px' : '14px 22px'},
+      containerStyle: {maxWidth:'980px',margin:'0 auto',padding: s.narrow ? '16px 14px 80px' : '24px 22px 60px'},
+      dashHeadStyle: {display:'flex',justifyContent:'space-between',
+        alignItems: s.narrow ? 'stretch' : 'center', flexDirection: s.narrow ? 'column' : 'row',
+        marginBottom:'16px',gap:'12px',flexWrap:'wrap'},
+      dashActionsStyle: {display:'flex',gap:'10px',alignItems:'center',
+        flexDirection: s.narrow ? 'column' : 'row'},
+      searchStyle: {border:'1px solid var(--border)',borderRadius:'0.5rem',padding:'0 12px',
+        height:CTRL+'px',width: s.narrow ? '100%' : '220px', boxSizing:'border-box',
+        background:'var(--surface)',fontSize:'14px'},
+      addBtnStyle: {height:CTRL+'px',whiteSpace:'nowrap',border:'none',borderRadius:'0.5rem',
+        background:'var(--primary)',color:'var(--primary-ink)',fontWeight:500,padding:'0 16px',
+        cursor:'pointer',width: s.narrow ? '100%' : 'auto',fontSize:'14px'},
+      panelStyle: {maxWidth: s.narrow ? '100%' : '460px',margin:'0 auto',background:'var(--surface)',
+        border:'1px solid var(--border)',borderRadius:'0.75rem',boxShadow:'0 1px 3px oklch(0% 0 0 / 0.06)',
+        padding: s.narrow ? '18px 16px' : '26px'},
+      statsPanelStyle: {maxWidth: s.narrow ? '100%' : '620px',margin:'0 auto',background:'var(--surface)',
+        border:'1px solid var(--border)',borderRadius:'0.75rem',boxShadow:'0 1px 3px oklch(0% 0 0 / 0.06)',
+        padding: s.narrow ? '18px 16px' : '26px'},
+      detailWrapStyle: {maxWidth: s.narrow ? '100%' : '460px',margin:'0 auto'},
+      statGridStyle: {display:'grid',gridTemplateColumns:'repeat(' + (s.narrow ? 2 : 4) + ',minmax(0,1fr))',
+        gap:'10px',marginBottom:'16px'},
+      sortBtnStyle: {display:'inline-flex',alignItems:'center',gap:'6px',height:CTRL+'px',
+        padding:'0 12px',border:'1px solid var(--border-strong)',borderRadius:'0.5rem',
+        background:'var(--surface)',fontSize:'13px',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'},
+      sortLabel: s.sortDir === 'desc' ? 'Newest first' : 'Oldest first',
+
+      rows, isEmpty: rows.length === 0,
+      pageSize: String(s.pageSize),
+      pageSizeOpts: ['10','25','50'],
+      onPageSize: e => this.setState({pageSize: Number(e.target.value), page: 1}),
+      rangeLabel: matched.length
+        ? `${start + 1}–${Math.min(start + s.pageSize, matched.length)} of ${matched.length}`
+        : '0 of 0',
+      pageItems: (s.narrow ? [] : Array.from({length: pageCount}, (_, i) => i + 1)).map(n => ({
+        label: String(n),
+        style: {minWidth:'36px',height:'36px',padding:'0 10px',display:'inline-flex',alignItems:'center',
+          justifyContent:'center',borderRadius:'0.5rem',fontSize:'14px',fontWeight:500,cursor:'pointer',
+          border:'1px solid ' + (n === page ? 'var(--border)' : 'transparent'),
+          background: n === page ? 'var(--surface)' : 'transparent',
+          boxShadow: n === page ? '0 1px 2px oklch(0% 0 0 / 0.06)' : 'none',
+          color: n === page ? 'var(--text)' : 'var(--soft)'},
+        onClick: () => this.setState({page: n})
+      })),
+      prevStyle: this.pageBtn(page === 1),
+      nextStyle: this.pageBtn(page === pageCount),
+      onPrev: () => this.setState({page: Math.max(1, page - 1)}),
+      onNext: () => this.setState({page: Math.min(pageCount, page + 1)}),
+      rootRef: this.rootRef,
+      showJump: s.showJump,
+      jumpToBottom: this.jumpToBottom,
+      startAdd: () => this.startAdd(),
+
+      fLocation: f.location, onFLocation: e => this.setForm({location:e.target.value}),
+      dLocation: d ? (d.location || '') : '',
+      onDLocation: e => this.patch({location:e.target.value}),
+      onDLocationBlur: e => this.patch({location:this.normalizeLocation(e.target.value)}),
+      locationSuggestions: Array.from(new Set(apps.map(a => a.location).filter(Boolean))).sort(),
+      fDate: f.date, fCompany: f.company, fPosition: f.position, fDesc: f.desc, fNotes: f.notes, fCL: !!f.cl,
+      fFileLabel: f.file ? '📎 ' + f.file : '📎 click to attach cover_letter.pdf',
+      formError: s.formError,
+      onFDate: e => this.setForm({date:e.target.value}),
+      onFCompany: e => this.setForm({company:e.target.value}),
+      onFPosition: e => this.setForm({position:e.target.value}),
+      onFDesc: e => this.setForm({desc:e.target.value}),
+      onFNotes: e => this.setForm({notes:e.target.value}),
+      attachFile: () => this.setForm({file:'cover_letter.pdf'}),
+      referralOpts: [['Yes',true],['No',false]].map(([label,v]) => ({
+        label, style: this.pill(f.referral === v), onClick: () => this.setForm({referral:v})
+      })),
+      clOpts: [['Attach file',true],['No CL required',false]].map(([label,v]) => ({
+        label, style: this.pill(!!f.cl === v), onClick: () => this.setForm({cl:v})
+      })),
+      statusChips: STATUSES.map(k => ({
+        label:k,
+        style: f.status === k ? {...this.tag(k), cursor:'pointer', outline:'2px solid var(--primary)', outlineOffset:'1px'}
+                              : {...this.tag(k), background:'transparent', color:'var(--soft)', border:'1px solid var(--border)', cursor:'pointer'},
+        onClick: () => this.setForm({status:k})
+      })),
+      saveApp: () => this.saveApp(),
+
+      statusNames: STATUSES,
+      dCompany: d ? d.company : '', dPosition: d ? d.position : '', dStatus: d ? d.status : 'Applied',
+      dDate: d ? this.fmt(d.date) : '', dDesc: d ? d.desc : '',
+      dReferral: d && d.referral ? 'Yes' : 'No',
+      dNotes: d ? d.notes : [], dNoNotes: !!d && d.notes.length === 0,
+      dCLLabel: d && d.cl ? '📎 ' + d.cl : 'No cover letter attached',
+      dCLAction: d && d.cl ? 'replace' : 'attach',
+      dStatusStyle: d ? {...this.tag(d.status), padding:'4px 26px 4px 10px', height:'28px', cursor:'pointer', appearance:'none', WebkitAppearance:'none'} : {},
+      dStatusArrowStyle: {position:'absolute', right:'9px', display:'flex', pointerEvents:'none',
+        color: d ? (TONE[d.status] || TONE.Applied)[1] : 'var(--text)'},
+      dReferralStyle: {...this.tag('Applied'), cursor:'pointer'},
+      dProgressStyle: {width: (stageIdx >= 0 ? (stageIdx+1)/4*100 : 0) + '%', background:'var(--primary)', height:'100%'},
+      onDCompany: e => this.patch({company:e.target.value}),
+      onDPosition: e => this.patch({position:e.target.value}),
+      onDDesc: e => this.patch({desc:e.target.value}),
+      onDStatus: e => this.patch({status:e.target.value}),
+      toggleReferral: () => this.patch({referral: !(d && d.referral)}),
+      replaceCL: () => this.patch({cl: (d && d.cl) ? 'updated_cover_letter.pdf' : 'cover_letter.pdf'}),
+      noteDraft: s.noteDraft,
+      onNoteDraft: e => this.setState({noteDraft:e.target.value}),
+      onNoteKey: e => { if (e.key === 'Enter') this.addNote(); },
+      addNote: () => this.addNote(),
+      deleteApp: () => { const id = s.selectedId; this.setApps(list => list.filter(a => a.id !== id)); this.setState({screen:'dashboard', selectedId:null}); },
+
+      statCards: [
+        {value: apps.length, label:'Applications', numStyle: num('var(--primary-700)')},
+        {value: interviewed, label:'Interviews', numStyle: num('oklch(42% 0.12 250)')},
+        {value: callbacks, label:'Callbacks', numStyle: num('oklch(38% 0.09 155)')},
+        {value: pct(apps.filter(a => a.referral).length), label:'Via referral', numStyle: num('var(--primary-700)')}
+      ],
+      rateCards: [
+        {value: pct(heardBack), label:'Heard back', numStyle: {...num('var(--primary-700)'), fontSize:'20px'}},
+        {value: pct(interviewed), label:'Interview rate', numStyle: {...num('oklch(42% 0.12 250)'), fontSize:'20px'}},
+        {value: pct(callbacks), label:'Callback rate', numStyle: {...num('oklch(38% 0.09 155)'), fontSize:'20px'}},
+        {value: pct(offers), label:'Offer rate', numStyle: {...num('oklch(40% 0.11 155)'), fontSize:'20px'}}
+      ],
+      breakdown
+    };
+  }
+
+  setForm(p){ this.setState(st => ({form:{...st.form, ...p}, formError:''})); }
+  addNote(){
+    const t = this.state.noteDraft.trim();
+    if (!t) return;
+    const id = this.state.selectedId;
+    this.setApps(list => list.map(a => a.id === id ? {...a, notes:[...a.notes, t]} : a));
+    this.setState({noteDraft:''});
+  }
+}
+</script>
+</body>
+</html>

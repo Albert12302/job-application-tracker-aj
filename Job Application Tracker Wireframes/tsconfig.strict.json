@@ -1,0 +1,15 @@
+{
+  "//": "Extended by tsconfig.app.json after scaffolding. Options beyond Vite's default, each load-bearing for a rule in CLAUDE.md.",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  }
+}

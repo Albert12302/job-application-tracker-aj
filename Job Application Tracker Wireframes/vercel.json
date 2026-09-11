@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+
+  "//rewrites": "SPA fallback. Without it, a deep link like /applications/<id> 404s on refresh because no such file exists.",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+
+  "//headers": "SPEC §7.5. Update connect-src and img-src with the hosted Supabase project ref before enforcing the CSP.",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://YOUR_PROJECT_REF.supabase.co; font-src 'self'; connect-src 'self' https://YOUR_PROJECT_REF.supabase.co wss://YOUR_PROJECT_REF.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<meta name="design_doc_mode" content="canvas">
+<style>
+body{margin:0;background:#f7eef2;font-family:'Inter',sans-serif;color:#201e1d}
+.dv-turn{padding:40px 44px 32px;border-bottom:2px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 12px ui-monospace,Menlo,monospace;padding:3px 8px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 20px 'Quicksand',sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 12px ui-monospace,Menlo,monospace;padding:3px 8px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:14px 'Inter',sans-serif;color:rgba(0,0,0,.55)}
+.dv-next{margin:22px 0 0;font:14px/1.5 'Inter',sans-serif;color:rgba(0,0,0,.55)}
+.dv-opt:target .dv-oid{background:#c0392b;color:#fff}
+/* PastelPink theme, shadcn/ui component conventions */
+.pp{
+  --pp-bg:oklch(97% 0.018 350); --pp-surface:oklch(100% 0 0); --pp-text:oklch(24% 0.02 350);
+  --pp-text-soft:oklch(50% 0.02 350); --pp-primary:oklch(72% 0.12 350); --pp-primary-ink:oklch(99% 0.01 350);
+  --pp-primary-100:oklch(94% 0.03 350); --pp-primary-700:oklch(42% 0.1 350);
+  --pp-mint:oklch(88% 0.07 155); --pp-mint-ink:oklch(35% 0.08 155);
+  --pp-peach:oklch(90% 0.06 60); --pp-peach-ink:oklch(40% 0.08 55);
+  --pp-lav:oklch(89% 0.05 300); --pp-lav-ink:oklch(40% 0.07 300);
+  --pp-border:oklch(91% 0.015 350); --pp-radius:0.75rem; --pp-radius-sm:0.5rem;
+  font-family:'Inter',sans-serif; color:var(--pp-text); background:var(--pp-bg); font-size:14px;
+}
+.pp-hd{font:600 20px 'Quicksand',sans-serif;letter-spacing:-0.01em}
+.pp-sub{font:13px 'Inter',sans-serif;color:var(--pp-text-soft)}
+/* shadcn Card */
+.pp-card{background:var(--pp-surface);border:1px solid var(--pp-border);border-radius:var(--pp-radius);box-shadow:0 1px 3px oklch(0% 0 0 / 0.06)}
+/* shadcn Button */
+.pp-btn{border-radius:var(--pp-radius-sm);padding:0 16px;height:36px;line-height:36px;font:500 14px 'Inter',sans-serif;text-align:center;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;border:1px solid transparent}
+.pp-btn-primary{background:var(--pp-primary);color:var(--pp-primary-ink)}
+.pp-btn-primary:hover{background:var(--pp-primary-700)}
+.pp-btn-outline{border:1px solid var(--pp-border);color:var(--pp-text);background:var(--pp-surface)}
+.pp-btn-outline:hover{background:var(--pp-primary-100)}
+.pp-btn-ghost{color:var(--pp-text);background:transparent}
+/* shadcn Badge */
+.pp-tag{border-radius:999px;padding:2px 10px;font:600 12px 'Inter',sans-serif;display:inline-block;border:1px solid transparent}
+/* shadcn Input */
+.pp-input{border:1px solid var(--pp-border);border-radius:var(--pp-radius-sm);padding:0 12px;height:36px;line-height:36px;font:14px 'Inter',sans-serif;color:var(--pp-text);background:var(--pp-surface);box-shadow:0 1px 2px oklch(0% 0 0 / 0.04)}
+.pp-input.pp-textarea{height:auto;line-height:1.5;padding:8px 12px}
+.pp-input.placeholder{color:var(--pp-text-soft)}
+/* shadcn Tabs */
+.pp-tabs{display:inline-flex;background:var(--pp-primary-100);border-radius:var(--pp-radius-sm);padding:3px;gap:2px}
+.pp-tab{padding:5px 12px;border-radius:6px;font:500 13px 'Inter',sans-serif;color:var(--pp-text-soft);cursor:pointer}
+.pp-tab.active{background:var(--pp-surface);color:var(--pp-text);box-shadow:0 1px 2px oklch(0% 0 0 / 0.08)}
+/* shadcn Avatar */
+.pp-avatar{border-radius:999px;display:flex;align-items:center;justify-content:center;font:600 'Quicksand',sans-serif;border:1px solid var(--pp-border)}
+/* shadcn Progress */
+.pp-progress{background:var(--pp-primary-100);border-radius:999px;overflow:hidden}
+.pp-progress-fill{background:var(--pp-primary);height:100%}
+/* shadcn Table */
+.pp-table-hd{font:500 12px 'Inter',sans-serif;color:var(--pp-text-soft);border-bottom:1px solid var(--pp-border)}
+.pp-table-row{border-bottom:1px solid var(--pp-border);font-size:14px}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t4">
+  <div class="dv-thd"><a class="dv-tid" href="#t4">4</a><span class="dv-tname">All screens — PastelPink theme</span></div>
+  <div class="dv-opts">
+
+    <!-- 4a: who's using this -->
+    <div class="dv-opt" id="4a">
+      <div class="dv-olabel"><a class="dv-oid" href="#4a">4a</a>Who's using this</div>
+      <div class="pp pp-card" style="width:340px;padding:26px;">
+        <div class="pp-hd" style="text-align:center;margin-bottom:6px;">AJ's Hunt</div>
+        <div class="pp-sub" style="text-align:center;margin-bottom:24px;">who's applying today?</div>
+        <div style="display:flex;gap:20px;justify-content:center;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div class="pp-avatar" style="width:72px;height:72px;background:var(--pp-primary-100);color:var(--pp-primary-700);font-size:22px;">A</div>
+            <div class="pp-sub" style="font-weight:600;color:var(--pp-text);">Albert</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div class="pp-avatar" style="width:72px;height:72px;background:var(--pp-lav);color:var(--pp-lav-ink);font-size:22px;">J</div>
+            <div class="pp-sub" style="font-weight:600;color:var(--pp-text);">Joyce</div>
+          </div>
+        </div>
+        <div class="pp-sub" style="text-align:center;margin-top:20px;">tap a name → straight to their dashboard</div>
+      </div>
+    </div>
+
+    <!-- 4h: login (email/password via Supabase Auth) -->
+    <div class="dv-opt" id="4h">
+      <div class="dv-olabel"><a class="dv-oid" href="#4h">4h</a>Login</div>
+      <div class="pp pp-card" style="width:340px;padding:26px;">
+        <div class="pp-hd" style="text-align:center;margin-bottom:6px;">AJ's Hunt</div>
+        <div class="pp-sub" style="text-align:center;margin-bottom:22px;">sign in to your account</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Email</div>
+            <div class="pp-input">albert@email.com</div>
+          </div>
+          <div>
+            <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Password</div>
+            <div class="pp-input">••••••••</div>
+          </div>
+          <div class="pp-sub" style="text-align:right;color:var(--pp-primary-700);cursor:pointer;">Forgot password?</div>
+          <div class="pp-btn pp-btn-primary" style="width:100%;box-sizing:border-box;">Sign in</div>
+        </div>
+        <div class="pp-sub" style="text-align:center;margin-top:18px;">Don't have an account? <span style="color:var(--pp-primary-700);font-weight:600;">Sign up</span></div>
+      </div>
+    </div>
+
+    <!-- 4b: dashboard table -->
+    <div class="dv-opt" id="4b">
+      <div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>Dashboard</div>
+      <div class="pp pp-card" style="width:800px;padding:0;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-bottom:1px solid var(--pp-border);">
+          <div style="display:flex;align-items:center;gap:22px;">
+            <div style="font:600 15px 'Quicksand',sans-serif;">AJ's Hunt</div>
+            <div style="display:flex;gap:16px;">
+              <div style="display:flex;align-items:center;gap:6px;font:500 13px 'Inter',sans-serif;color:var(--pp-primary-700);cursor:pointer;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+                Home
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font:500 13px 'Inter',sans-serif;color:var(--pp-text-soft);cursor:pointer;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Stats
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <div class="pp-avatar" style="width:28px;height:28px;background:var(--pp-primary-100);color:var(--pp-primary-700);font-size:12px;">A</div>
+            <div class="pp-sub" style="font-weight:600;color:var(--pp-text);">Albert</div>
+          </div>
+        </div>
+        <div style="padding:22px 26px 26px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div class="pp-hd">My Applications</div>
+          <div class="pp-btn pp-btn-primary">+ Add Application</div>
+        </div>
+        <div class="pp-tabs" style="margin-bottom:16px;">
+          <div class="pp-tab active">All (12)</div>
+          <div class="pp-tab">Applied (4)</div>
+          <div class="pp-tab">Interview (2)</div>
+          <div class="pp-tab">Callback (1)</div>
+          <div class="pp-tab">Rejected (5)</div>
+          <div class="pp-tab">Withdrawn (1)</div>
+        </div>
+        <div style="border:1px solid var(--pp-border);border-radius:var(--pp-radius-sm);overflow:hidden;">
+          <div class="pp-table-hd" style="display:grid;grid-template-columns:90px 1.3fr 1.3fr 1fr 90px 70px 60px;padding:10px 14px;">
+            <div>Date</div><div>Company</div><div>Position</div><div>Status</div><div>CL</div><div>Referral</div><div>Details</div>
+          </div>
+          <div class="pp-table-row" style="display:grid;grid-template-columns:90px 1.3fr 1.3fr 1fr 90px 70px 60px;padding:12px 14px;align-items:center;">
+            <div class="pp-sub">9/2/26</div><div style="font-weight:600;">Acme Corp</div><div>Product Designer</div>
+            <div class="pp-tag" style="background:var(--pp-primary-100);color:var(--pp-primary-700);width:fit-content;">Applied</div><div>📎</div><div class="pp-sub">Y</div>
+            <a href="#4d" style="color:var(--pp-text-soft);display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></a>
+          </div>
+          <div class="pp-table-row" style="display:grid;grid-template-columns:90px 1.3fr 1.3fr 1fr 90px 70px 60px;padding:12px 14px;align-items:center;">
+            <div class="pp-sub">8/28/26</div><div style="font-weight:600;">Nimbus Inc</div><div>UX Researcher</div>
+            <div class="pp-tag" style="background:var(--pp-primary-100);color:var(--pp-primary-700);width:fit-content;">Applied</div><div>—</div><div class="pp-sub">N</div>
+            <a href="#4d" style="color:var(--pp-text-soft);display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></a>
+          </div>
+          <div class="pp-table-row" style="display:grid;grid-template-columns:90px 1.3fr 1.3fr 1fr 90px 70px 60px;padding:12px 14px;align-items:center;">
+            <div class="pp-sub">8/20/26</div><div style="font-weight:600;">Beacon Labs</div><div>Sr. Designer</div>
+            <div class="pp-tag" style="background:var(--pp-peach);color:var(--pp-peach-ink);width:fit-content;">Interview</div><div>📎</div><div class="pp-sub">Y</div>
+            <a href="#4d" style="color:var(--pp-text-soft);display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></a>
+          </div>
+          <div class="pp-table-row" style="display:grid;grid-template-columns:90px 1.3fr 1.3fr 1fr 90px 70px 60px;padding:12px 14px;align-items:center;opacity:.6;">
+            <div class="pp-sub">8/10/26</div><div style="font-weight:600;">Vertex Co</div><div>Designer</div>
+            <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);width:fit-content;">Rejected</div><div>—</div><div class="pp-sub">N</div>
+            <a href="#4d" style="color:var(--pp-text-soft);display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></a>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4c: add application form -->
+    <div class="dv-opt" id="4c">
+      <div class="dv-olabel"><a class="dv-oid" href="#4c">4c</a>Add application form</div>
+      <div class="pp pp-card" style="width:420px;padding:26px;">
+        <div class="pp-hd" style="margin-bottom:16px;">Add Application</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <div class="pp-sub" style="margin-bottom:5px;font-weight:600;">Date applied</div>
+            <div class="pp-input" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <span>9/6/2026</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--pp-text-soft);"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+          </div>
+          <div><div class="pp-sub" style="margin-bottom:5px;font-weight:600;">Company</div><div class="pp-input placeholder">e.g. Acme Corp</div></div>
+          <div>
+            <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Referral</div>
+            <div class="pp-tabs">
+              <div class="pp-tab">Yes</div>
+              <div class="pp-tab active">No</div>
+            </div>
+          </div>
+          <div><div class="pp-sub" style="margin-bottom:5px;font-weight:600;">Position</div><div class="pp-input placeholder">e.g. Product Designer</div></div>
+          <div><div class="pp-sub" style="margin-bottom:5px;font-weight:600;">Job description</div><div class="pp-input pp-textarea placeholder" style="height:56px;">paste or type description…</div></div>
+          <div>
+            <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Cover letter</div>
+            <div class="pp-tabs" style="margin-bottom:8px;">
+              <div class="pp-tab active">Attach file</div>
+              <div class="pp-tab">No CL required</div>
+            </div>
+            <div style="border:1.5px dashed var(--pp-border);border-radius:var(--pp-radius-sm);padding:12px;text-align:center;color:var(--pp-text-soft);font-size:13px;">📎 drop cover_letter.pdf</div>
+            <div class="pp-sub" style="margin-top:4px;">PDF only</div>
+          </div>
+          <div>
+            <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Status</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <div class="pp-tag" style="background:var(--pp-primary-100);color:var(--pp-primary-700);">Applied</div>
+              <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);">Interview</div>
+              <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);">Callback</div>
+              <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);">Offer</div>
+              <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);">Rejected</div>
+              <div class="pp-tag" style="border-color:var(--pp-border);color:var(--pp-text-soft);">Withdrawn</div>
+            </div>
+          </div>
+          <div><div class="pp-sub" style="margin-bottom:5px;font-weight:600;">Notes (optional)</div><div class="pp-input pp-textarea" style="height:40px;"></div></div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <div class="pp-btn pp-btn-primary" style="flex:1;">Save</div>
+            <div class="pp-btn pp-btn-outline" style="flex:1;">Cancel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4d: detail view, inline editable -->
+    <div class="dv-opt" id="4d">
+      <div class="dv-olabel"><a class="dv-oid" href="#4d">4d</a>Detail view — inline editable</div>
+      <div class="pp pp-card" style="width:420px;padding:26px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <div>
+            <div class="pp-hd" contenteditable="true" style="outline:none;">Beacon Labs</div>
+            <div class="pp-sub" contenteditable="true" style="outline:none;margin-top:2px;">Sr. Designer</div>
+          </div>
+          <div class="pp-tag" style="background:var(--pp-peach);color:var(--pp-peach-ink);">Interview ▾</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div class="pp-sub" contenteditable="true" style="outline:none;">Applied 8/20/2026</div>
+          <div class="pp-tag" style="background:var(--pp-primary-100);color:var(--pp-primary-700);cursor:pointer;">Referral: Yes ▾</div>
+        </div>
+        <div style="border:1px dashed var(--pp-border);border-radius:var(--pp-radius-sm);padding:14px;margin-bottom:14px;">
+          <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Job description</div>
+          <div style="font-size:14px;color:var(--pp-text);" contenteditable="true">Design end-to-end flows for the core product, partner with PM/eng, run user research…</div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div class="pp-sub" style="margin-bottom:6px;font-weight:600;">Cover letter</div>
+          <div style="border:1px solid var(--pp-border);border-radius:var(--pp-radius-sm);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:14px;box-shadow:0 1px 2px oklch(0% 0 0 / 0.04);">
+            <span>📎 beacon_cover_letter.pdf</span><span class="pp-sub">replace</span>
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div class="pp-sub" style="margin-bottom:8px;font-weight:600;">Progress</div>
+          <div class="pp-progress" style="display:flex;height:8px;">
+            <div class="pp-progress-fill" style="flex:2;"></div>
+            <div style="flex:2;background:var(--pp-border);"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;" class="pp-sub">
+            <span>Applied</span><span>Interview</span><span>Callback</span><span>Offer</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:18px;">
+          <div class="pp-sub" style="margin-bottom:8px;font-weight:600;">Notes</div>
+          <div style="border:1px solid var(--pp-border);border-radius:var(--pp-radius-sm);padding:10px 14px;font-size:14px;box-shadow:0 1px 2px oklch(0% 0 0 / 0.04);">
+            <div class="pp-sub">9/10 — phone screen w/ recruiter</div>
+            <div class="pp-sub">9/15 — onsite scheduled</div>
+          </div>
+        </div>
+        <div class="pp-btn pp-btn-outline" style="width:100%;box-sizing:border-box;color:oklch(55% 0.16 25);border-color:oklch(80% 0.1 25);">Delete application</div>
+      </div>
+    </div>
+
+    <!-- 4e: analytics -->
+    <div class="dv-opt" id="4e">
+      <div class="dv-olabel"><a class="dv-oid" href="#4e">4e</a>Analytics / stats overview</div>
+      <div class="pp pp-card" style="width:560px;padding:26px;">
+        <div class="pp-hd" style="margin-bottom:16px;">Your Stats</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+          <div class="pp-card" style="padding:12px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 24px 'Quicksand',sans-serif;color:var(--pp-primary-700);">12</div><div class="pp-sub">Applied</div></div>
+          <div class="pp-card" style="padding:12px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 24px 'Quicksand',sans-serif;color:var(--pp-peach-ink);">2</div><div class="pp-sub">Interviews</div></div>
+          <div class="pp-card" style="padding:12px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 24px 'Quicksand',sans-serif;color:var(--pp-lav-ink);">1</div><div class="pp-sub">Callbacks</div></div>
+          <div class="pp-card" style="padding:12px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 24px 'Quicksand',sans-serif;color:var(--pp-primary-700);">42%</div><div class="pp-sub">Via referral</div></div>
+        </div>
+        <div class="pp-sub" style="margin-bottom:8px;font-weight:600;">Response rate by stage</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+          <div class="pp-card" style="padding:10px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 20px 'Quicksand',sans-serif;color:var(--pp-peach-ink);">17%</div><div class="pp-sub">Interview rate</div></div>
+          <div class="pp-card" style="padding:10px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 20px 'Quicksand',sans-serif;color:var(--pp-lav-ink);">8%</div><div class="pp-sub">Callback rate</div></div>
+          <div class="pp-card" style="padding:10px;text-align:center;border:1px solid var(--pp-border);"><div style="font:600 20px 'Quicksand',sans-serif;color:var(--pp-mint-ink);">0%</div><div class="pp-sub">Offer rate</div></div>
+        </div>
+        <div class="pp-sub" style="margin-bottom:8px;font-weight:600;">Status breakdown</div>
+        <div class="pp-progress" style="display:flex;height:22px;">
+          <div style="background:var(--pp-primary-100);width:33%;"></div>
+          <div style="background:var(--pp-peach);width:17%;"></div>
+          <div style="background:var(--pp-lav);width:8%;"></div>
+          <div style="background:oklch(92% 0.02 350);width:42%;"></div>
+        </div>
+        <div class="pp-sub" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;">
+          <span><span style="color:var(--pp-primary-700);">■</span> Applied</span>
+          <span><span style="color:var(--pp-peach-ink);">■</span> Interview</span>
+          <span><span style="color:var(--pp-lav-ink);">■</span> Callback</span>
+          <span><span style="color:oklch(60% 0.02 350);">■</span> Rejected</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4f: mobile dashboard -->
+    <div class="dv-opt" id="4f">
+      <div class="dv-olabel"><a class="dv-oid" href="#4f">4f</a>Mobile dashboard</div>
+      <div class="pp pp-card" style="width:300px;padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div class="pp-hd" style="font-size:19px;">My Apps</div>
+          <div class="pp-btn pp-btn-primary" style="padding:0 9px;font-size:13px;height:26px;line-height:26px;">+</div>
+        </div>
+        <div class="pp-tabs" style="margin-bottom:14px;">
+          <div class="pp-tab active">Applied 4</div>
+          <div class="pp-tab">Interview 2</div>
+          <div class="pp-tab">More…</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="pp-card" style="padding:12px;">
+            <div style="font-weight:600;">Acme Corp</div>
+            <div class="pp-sub">Product Designer</div>
+            <div class="pp-sub">9/2/26 · Applied</div>
+          </div>
+          <div class="pp-card" style="padding:12px;">
+            <div style="font-weight:600;">Nimbus Inc</div>
+            <div class="pp-sub">UX Researcher</div>
+            <div class="pp-sub">8/28/26 · Applied</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;justify-content:space-around;padding:10px 0;border-top:1px solid var(--pp-border);">
+          <div class="pp-sub" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+            Home
+          </div>
+          <div class="pp-sub" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Stats
+          </div>
+          <div class="pp-sub" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4g: profile -->
+    <div class="dv-opt" id="4g">
+      <div class="dv-olabel"><a class="dv-oid" href="#4g">4g</a>Profile</div>
+      <div class="pp pp-card" style="width:300px;padding:22px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:22px;">
+          <div style="position:relative;">
+            <div class="pp-avatar" style="width:64px;height:64px;background:var(--pp-primary-100);color:var(--pp-primary-700);font-size:20px;">A</div>
+            <div class="pp-avatar" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;background:var(--pp-surface);color:var(--pp-text-soft);box-shadow:0 1px 3px oklch(0% 0 0 / 0.15);cursor:pointer;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            </div>
+          </div>
+          <div class="pp-hd" style="font-size:17px;">Albert</div>
+        </div>
+        <div class="pp-sub" style="font-weight:600;margin-bottom:8px;">Switch profile</div>
+        <div class="pp-card" style="border:1px solid var(--pp-border);padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:20px;cursor:pointer;">
+          <div class="pp-avatar" style="width:34px;height:34px;background:var(--pp-lav);color:var(--pp-lav-ink);font-size:14px;">J</div>
+          <div style="font-weight:600;">Joyce</div>
+        </div>
+        <div class="pp-btn pp-btn-outline" style="width:100%;box-sizing:border-box;color:oklch(55% 0.16 25);border-color:oklch(80% 0.1 25);">Sign out</div>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Full screen set now in one theme — dashboard (4b), add form (4c), inline-editable detail (4d), stats (4e), profile picker (4a), mobile (4f). Try next: "turn this into a working prototype"</p>
+</section>
+
+</x-dc>
+</body>
+</html>
