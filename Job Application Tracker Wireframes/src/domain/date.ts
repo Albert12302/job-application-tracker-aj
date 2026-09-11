@@ -25,6 +25,9 @@ export function toDateInputValue(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+/** The list's compact date, "9/2/26" in en-US (§4.2). */
+export const NUMERIC_DATE: Intl.DateTimeFormatOptions = { month: 'numeric', day: 'numeric', year: '2-digit' };
+
 /** Display a stored date_applied. Always UTC — never the viewer's zone (§5.4). */
 export function formatUtcDate(
   iso: string,
