@@ -355,9 +355,10 @@ supabase/
   auth-js's event order differs by browser and is not used. `useSignedInUser()` still answers
   during the redirect after sign-out, so screens never crash on the way out.
 - **Ids validate with `z.guid()`, not `z.string().uuid()`.** Zod 4's `uuid()` enforces the RFC
-  variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it. `applicationSchema`,
-  `noteSchema`, and `savedFilterSchema` still use `uuid()` and will reject seed rows — switch
-  them when step 2 first parses one.
+  variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it.
+- **Timestamps validate with `z.iso.datetime({ offset: true })`.** PostgREST sends
+  `2026-09-11T16:43:33.642123+00:00`; the default `datetime()` accepts only `Z` and rejects
+  every row.
 - **Zod runs `jitless`** (`z.config` at the top of `domain/schemas.ts`). Its JIT probes
   `new Function`, which the enforced CSP reports as a violation on every load. Any new
   dependency that needs `eval` or `new Function` is a CSP problem — check it with

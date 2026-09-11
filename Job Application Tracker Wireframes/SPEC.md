@@ -173,7 +173,7 @@ A floating **Jump to bottom** pill appears when more than ~100px of scroll remai
 Empty state when a filter or search matches nothing.
 
 ### 4.3 Add application
-Fields: date (defaults today), company*, position*, location (combobox — suggests existing
+Fields: date (defaults to today in the user's own zone, §5.4), company*, position*, location (combobox — suggests existing
 locations, accepts new), description, status (defaults Applied), referral toggle, cover-letter
 attach, first note.
 
@@ -254,6 +254,10 @@ Two rules make that storage safe, and they are not optional:
 2. **Format in UTC.** Every display, every group-by, every "last 30 days" boundary uses UTC.
    Formatting UTC midnight in the browser's zone shows the previous day for everyone west of
    Greenwich — the single most common version of this bug.
+
+The Add form's default is **today in the user's own zone** — the calendar day they are living
+in — which is then stored as UTC midnight of that day like any other choice. Taking "today"
+from UTC would default to tomorrow from late afternoon onwards on the US west coast.
 
 `created_at`, `updated_at`, `changed_at`, and note timestamps are genuine moments and stay
 plain `timestamptz` in real UTC, formatted in the viewer's local zone. Only `date_applied`
@@ -709,8 +713,8 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 ### 9.3 Notes
 - Notes are individually editable and deletable from the detail screen.
 - Edit is inline; save on blur or explicit Save, Escape cancels.
-- Delete asks for confirmation only if the note is longer than a line; otherwise delete with
-  an undo toast.
+- Delete asks for confirmation only if the note is longer than a line — over 80 characters, or
+  containing a line break; otherwise delete with an undo toast.
 - Editing a note updates `updated_at`; display order stays by `created_at`.
 
 ### 9.4 Cover letter
@@ -894,6 +898,11 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-11
+- **"Longer than a line" fixed at 80 characters or any line break (§9.3).** A rendered line
+  depends on screen width, so the note-delete rule needed an answer that does not.
+- **The Add form defaults to the user's local today, not UTC's (§4.3, §5.4).** The default was
+  computed in UTC, so from late afternoon on the US west coast the form offered tomorrow. The
+  prototype used the local day; the stored value is still UTC midnight of the chosen day.
 - **§7.8 check 5 corrected: a locked account answers with the lockout, not a fake wrong
   password.** It asked for a locked account to look exactly like a wrong password. That would
   tell a locked-out user typing the right password that it was wrong — for up to an hour under

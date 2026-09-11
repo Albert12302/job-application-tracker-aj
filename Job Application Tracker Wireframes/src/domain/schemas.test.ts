@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { applicationFormSchema, applicationsSearchSchema, signUpSchema } from './schemas';
+import {
+  applicationFormSchema,
+  applicationIdSchema,
+  applicationSchema,
+  applicationsSearchSchema,
+  noteSchema,
+  signUpSchema,
+} from './schemas';
 
 const valid = {
   date: '2026-09-10',
@@ -38,6 +45,64 @@ describe('applicationFormSchema', () => {
 
   it('accepts a real leap day', () => {
     expect(applicationFormSchema.safeParse({ ...valid, date: '2028-02-29' }).success).toBe(true);
+  });
+});
+
+describe('applicationFormSchema, first note and date', () => {
+  it('caps the first note at 2,000 characters', () => {
+    expect(applicationFormSchema.safeParse({ ...valid, note: 'x'.repeat(2001) }).success).toBe(false);
+    expect(applicationFormSchema.safeParse({ ...valid, note: 'x'.repeat(2000) }).success).toBe(true);
+  });
+
+  it('asks for a date rather than a format when the date is empty', () => {
+    const result = applicationFormSchema.safeParse({ ...valid, date: '' });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Enter the date you applied.');
+  });
+});
+
+describe('row schemas', () => {
+  // As PostgREST sends it: +00:00 offsets, microseconds, and the seed's fixed ids.
+  const row = {
+    id: 'a0000000-0000-0000-0000-000000000001',
+    user_id: '11111111-1111-1111-1111-111111111111',
+    date_applied: '2026-08-08T00:00:00+00:00',
+    company: 'Northwind Traders',
+    position: 'Senior Frontend Engineer',
+    location: 'Austin, TX',
+    description: null,
+    status: 'Callback',
+    referral: true,
+    starred: false,
+    cover_letter_path: null,
+    cover_letter_name: null,
+    created_at: '2026-09-11T16:43:33.642123+00:00',
+    updated_at: '2026-09-11T16:43:33.642123+00:00',
+  };
+
+  it('parses an application row as the database returns it', () => {
+    expect(applicationSchema.safeParse(row).success).toBe(true);
+  });
+
+  it('parses a note row as the database returns it', () => {
+    const note = {
+      id: '0f8fad5b-d9cb-469f-a165-70867728950e',
+      application_id: row.id,
+      body: 'Recruiter screen went well.',
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+    expect(noteSchema.safeParse(note).success).toBe(true);
+  });
+
+  it('rejects a status outside the six (§3)', () => {
+    expect(applicationSchema.safeParse({ ...row, status: 'Ghosted' }).success).toBe(false);
+  });
+
+  it('accepts only an id-shaped route param', () => {
+    expect(applicationIdSchema.safeParse(row.id).success).toBe(true);
+    expect(applicationIdSchema.safeParse('new').success).toBe(false);
+    expect(applicationIdSchema.safeParse("1' or '1'='1").success).toBe(false);
   });
 });
 
