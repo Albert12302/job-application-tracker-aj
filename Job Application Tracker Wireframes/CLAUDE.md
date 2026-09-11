@@ -18,8 +18,8 @@ single-file prototype with in-memory state and is not the architecture.
 
 ## Repo shape
 
-One repo, no workspaces. Everything ships together: one React app, one Supabase project, one
-edge function, one test suite — and workspaces earn their overhead when two deployables share
+One repo, no workspaces. Everything ships together: one React app, one Supabase project and
+its edge functions, one test suite — and workspaces earn their overhead when two deployables share
 a library. `src/domain/` imports nothing from the rest of `src/`, so if a second consumer ever
 appears it becomes `packages/domain` by moving it. Do not pre-build that.
 
@@ -91,6 +91,21 @@ Four more bootstrap settlements, for the same reason:
 - **`SIGN_IN_HASH_PEPPER` lives in `supabase/functions/.env.local`** (gitignored), not the
   app's `.env.local`, which `.env.example` forbids it from ever entering (§7.4). Serve
   with `--env-file supabase/functions/.env.local`.
+- **`ALLOWED_ORIGINS` lives beside the pepper** in `supabase/functions/.env.local`
+  (locally `http://localhost:5173,http://127.0.0.1:5173`; hosted, `supabase secrets set`).
+  Local Kong answers CORS with `*` on its own, so a missing allowlist only shows up hosted.
+- **`SIGN_IN_IP_MAX_FAILURES=200` in the local function env, never hosted.** Every local
+  request reaches the function from one Docker address, so the §7.1 value of 20 would block
+  the next e2e run for an hour. Unset (hosted) means 20.
+- **`functions serve` replaces the edge container `supabase start` made.** If it dies
+  mid-reload on a container-name conflict, `docker rm -f
+  supabase_edge_runtime_job-application-tracker` and serve again.
+- **Any write under `supabase/functions` recreates that container** — a README included.
+  Requests in flight fail, so don't edit there while the e2e suite runs.
+- **A function must read a request body to the end before answering, even to refuse it.**
+  The edge runtime (1.74) never completes a response sent over an unread body — `cancel()`
+  does not help — and the stuck worker stops that function starting again until the container
+  is recreated. `upload/index.ts` `readCapped` drains and discards past the cap.
 - **`src/lib/utils.ts` stays as shadcn generated it.** It is the `cn` helper every
   generated component imports, not a `utils.ts` junk drawer; moving it breaks
   `shadcn add`.
@@ -188,7 +203,7 @@ src/
     notes.ts
     saved-filters.ts
     status-history.ts         append-only
-    storage.ts                cover-letter upload / signed URL / delete
+    storage.ts                upload (via the upload function) / signed URL / delete
     profile.ts
 
   services/                   multi-table operations that must not live in a component
@@ -209,7 +224,8 @@ src/
 
   features/                   feature-owned UI. May import ui/, domain/, queries/, hooks/ —
                               never another feature's internals.
-    auth/                     SignInForm, useAuth, RequireAuth
+    auth/                     SignInScreen, SignInForm (guard: routes/authenticated.tsx)
+    shell/                    AppShell (header + skip link), RouteError, NotFound
     applications/
       ApplicationTable.tsx
       ApplicationRow.tsx
@@ -294,6 +310,9 @@ supabase/
     of authorization.
 - Route state via TanStack Router search params with `validateSearch`: `filter`, `q`, `sort`,
   `page`, `pageSize`. Derive the query key from those params so navigation and caching agree.
+  Give every search field `.default()` as well as `.catch()` — the router types links from the
+  schema's *input*, and without a default every link must spell out every param — and strip
+  defaults from the URL with `search: { middlewares: [stripSearchParams(schema.parse({}))] }`.
 - Data access lives in a thin typed layer (one module per table). Components do not call the
   Supabase client directly.
 - Server state through TanStack Query only. Rules that keep it sane:
@@ -311,15 +330,51 @@ supabase/
   other two.
 - **WCAG 2.2 AA is a requirement, not a polish pass** (SPEC.md §10). Semantic HTML first,
   keyboard operable, visible focus, labelled inputs. Build it in — retrofitting is worse.
+- **Anything clickable shows the pointer cursor**, so a user can tell by hovering that it does
+  something. `Button` has `cursor-pointer` in its base style (every variant, `link` included);
+  `<a>` and router `Link` get it from the browser. Anything else made clickable — a `<label>`
+  wrapping a file input, a card, a table row, a generated shadcn component (`shadcn add` output
+  often leaves the default arrow: select triggers, checkboxes, tabs, menu items) — needs
+  `cursor-pointer` added by hand. While disabled or pending, show `cursor-not-allowed` or
+  `cursor-wait` instead (see `AvatarUpload.tsx`). Check it by hovering, in the same pass as the
+  keyboard check.
 - Prefer small pure functions for business rules (filter matching, location normalization) and
   unit-test them; they are specified in SPEC.md §5.
+- **Errors reach `reportError()` through `queries/errors.ts`.** Every fetcher and mutation
+  runs inside `reporting(action, fn, isExpected)`: unexpected failures are reported once and
+  rethrown as `ReportedError`; outcomes the user can fix (wrong password, refused file) pass
+  through unreported. Components show `errorReference(error)` and never report themselves.
+  `ErrorAction` is a closed union — add a member, never a free-form string.
+- **The session is a store, not a query.** `data/auth.ts` owns it (supabase-js announces
+  changes); `useSession()` subscribes. Route guards read it from router context in
+  `beforeLoad`; `main.tsx` re-runs them on every change and clears the query cache on every
+  sign-out — but never while the session is still `loading`, because guards that see the
+  placeholder context redirect an expired session without saying it expired (Chromium only;
+  WebKit happened to win the race). "Expired" means the page load began with a session in
+  storage (`AUTH_STORAGE_KEY`, read synchronously at module load) that did not come back;
+  auth-js's event order differs by browser and is not used. `useSignedInUser()` still answers
+  during the redirect after sign-out, so screens never crash on the way out.
+- **Ids validate with `z.guid()`, not `z.string().uuid()`.** Zod 4's `uuid()` enforces the RFC
+  variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it. `applicationSchema`,
+  `noteSchema`, and `savedFilterSchema` still use `uuid()` and will reject seed rows — switch
+  them when step 2 first parses one.
+- **Zod runs `jitless`** (`z.config` at the top of `domain/schemas.ts`). Its JIT probes
+  `new Function`, which the enforced CSP reports as a violation on every load. Any new
+  dependency that needs `eval` or `new Function` is a CSP problem — check it with
+  `npm run build && npm run preview` before adopting it.
+- **Private-bucket images render as `data:` URLs** downloaded through the authenticated client
+  (`data/storage.ts`), not signed URLs: no fetchable link sits in the page, and nothing needs
+  revoking. Downloads the user clicks (cover letters) still use 60-second signed URLs (§7.3).
+- **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
+  measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
+  `ring-ring`. Re-check any newly generated primitive for `/50` rings.
 
 ## Hard rules
 
 - **RLS on every table**, policies for select/insert/update/delete separately. A new table
   without a policy is a bug, not a TODO.
 - The `service_role` key never appears in client code, in a client env var, or in git.
-- **`seed.sql` never runs against a hosted project.** It creates `dev-a` / `dev-b` with a
+- **`seed.sql` never runs against a hosted project.** It creates `dev-a` / `dev-b` / `dev-c` with a
   password and user ids that are public in this repo. Plain `npx supabase db push` does
   not seed — keep it that way: no `--include-seed`, no `db reset --linked`. The repo is
   public, so those credentials are an open door the moment they exist on the internet.
@@ -330,6 +385,9 @@ supabase/
 - No raw string-concatenated SQL. Parameterized queries or the client library only.
 - Cover letters go in a private Storage bucket, served via 60-second signed URLs generated on
   click. Verify file type by magic bytes, never by extension.
+- **Files enter Storage only through `supabase/functions/upload`** (`data/storage.ts`
+  `uploadFile`). Signed-in users have no insert or update policy on either bucket — never add
+  one back, or the server-side type check becomes optional. The function chooses the path.
 - Never `dangerouslySetInnerHTML` on user content. Descriptions and notes are free text.
 - Status changes always go through one code path that writes `status_history` — detail screen
   and edit form both.
@@ -375,13 +433,21 @@ same commit.
 Every limit in SPEC §7.1 has one home; do not add a second enforcement point for the same
 limit, and do not add a new limit without deciding where it lives:
 
-- `supabase/config.toml` — provider-side, per-IP: sign-in/sign-up, token refresh,
-  verifications, email sends. Version-controlled; **never change these in the dashboard**, the
-  same rule as migrations.
+- `supabase/config.toml` — provider-side, per-IP: sign-up, token refresh, verifications,
+  email sends. Version-controlled; **never change these in the dashboard**, the same rule as
+  migrations. Its sign-in limit is only a backstop: every sign-in reaches Auth from the
+  sign-in function's address, so there it is one bucket shared by everyone.
 - Postgres triggers calling `public.consume_rate_limit(bucket, limit, window)` — anything the
-  database can see: writes, uploads (trigger on `storage.objects`), error reports.
-- `supabase/functions/sign-in` — the per-account lockout, and the only place the service role
-  key exists. The client calls this function instead of `signInWithPassword`.
+  database can see: writes, error reports.
+- `supabase/functions/sign-in` — the per-account lockout **and** the per-IP sign-in limit
+  (the only code that sees the caller's address). The client calls this function instead of
+  `signInWithPassword`. Its limit decisions are pure functions in `limits.ts`, unit-tested;
+  keep Deno APIs in `index.ts`.
+- `supabase/functions/upload` — the 20-an-hour upload limit, via `consume_rate_limit` called
+  **as the user**. It is Storage's only writer and stores with the service role, whose
+  `auth.uid()` is null, so a trigger on `storage.objects` would count nothing.
+
+The two functions are the only places the service role key exists.
 
 `public.rate_limits` has RLS on and no policies at all. That is not an oversight; the definer
 functions and the service role are the only intended readers.

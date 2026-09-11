@@ -260,18 +260,21 @@ export type Database = {
           created_at: string
           email_hash: string
           id: string
+          ip_hash: string | null
           outcome: string
         }
         Insert: {
           created_at?: string
           email_hash: string
           id?: string
+          ip_hash?: string | null
           outcome: string
         }
         Update: {
           created_at?: string
           email_hash?: string
           id?: string
+          ip_hash?: string | null
           outcome?: string
         }
         Relationships: []

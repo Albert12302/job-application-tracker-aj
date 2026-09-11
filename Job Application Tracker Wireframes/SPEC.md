@@ -117,7 +117,9 @@ the detail screen. Rejected and Withdrawn are terminal and sit outside the funne
 ### 4.1 Sign in
 Email + password, both required; empty submit shows "Enter an email and password."
 Successful sign-in goes straight to the dashboard (no profile picker).
-Links to **Create one** (§4.1a) and **Forgot password?** (§4.1c).
+Links to **Create one** (§4.1a) and **Forgot password?** (§4.1c). Until those screens are
+built, the links are not rendered — a link to a screen that does not exist is a dead end
+(§8.1).
 
 ### 4.1a Sign up
 Email, password, confirm password. Validation, in order:
@@ -200,6 +202,18 @@ status (segments proportional to count, colored per §3, zero-count statuses omi
 ### 4.6 Profile
 Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, application
 count, sign out.
+
+A chosen photo is checked before upload, in this order, and the first failure is shown under
+the avatar (§7.3):
+- type, by magic bytes — "Choose a PNG, JPEG, or WebP image."
+- size — "Choose an image of 2 MB or less."
+- dimensions — "Choose an image no larger than 4000 × 4000 pixels."
+- over the upload rate limit (§7.1) — "You've uploaded a lot of files recently. Try again in an hour."
+
+A refused photo leaves the current one in place. Success shows a toast: "Photo updated." /
+"Photo removed." Replacing a photo deletes the old file after the new one is saved (§9.4).
+Sign out ends this device's session only; ending every session is the password-change path
+(§7.1).
 
 ---
 
@@ -315,9 +329,10 @@ without a home is not a limit, it is a wish:
 | limit | lives in | why there |
 |---|---|---|
 | Sign-in **per account** | `supabase/functions/sign-in` | must be recorded on a *failed* sign-in, which has no session and no trustworthy client |
-| Sign-in / sign-up per IP, token refresh, verifications | `supabase/config.toml` `[auth.rate_limit]` | provider-side, per-IP by nature |
+| Sign-in **per IP** | `supabase/functions/sign-in` | behind the function, Auth sees one caller — the function — so only the function sees the user's address |
+| Sign-up per IP, token refresh, verifications | `supabase/config.toml` `[auth.rate_limit]` | provider-side, per-IP by nature |
 | Password reset + verification sends | `config.toml` `email_sent` + `max_frequency` | Auth owns the send |
-| File uploads per user | trigger on `storage.objects` | a limit the client is asked to observe is not a limit |
+| File uploads per user | `supabase/functions/upload`, counted as the user | the function is Storage's only writer and stores with the service role, so a `storage.objects` trigger could not tell whose upload it was |
 | Write mutations per user | triggers on the four writable tables | the database sees every write, including ones the UI did not make |
 | Error reports per user | trigger on `app_errors` (§7.7) | same |
 
@@ -341,6 +356,23 @@ Failure counts key on a **SHA-256 of a peppered, lowercased email**, never the a
 
 Lockouts are per account **and** per IP — per-IP alone is trivially bypassed, per-account
 alone allows targeted denial of service.
+
+The per-account row, precisely: after one to four failures inside 15 minutes the sign-in
+function waits 250 ms, doubling per failure, before checking the password; five failures
+inside one 15-minute window lock the account for 15 minutes from the fifth. Only Auth
+rejecting the credentials counts. Auth being rate-limited or down returns "unavailable" and
+counts nothing, so an outage cannot lock anyone out; a failed read of the counter refuses
+the sign-in rather than skipping the check.
+
+The per-IP row, precisely: 20 failures from one address inside an hour block that address
+until the oldest of them is an hour old — whatever account it tries, the correct password
+included. Both counts are checked **before** Auth is called, so a blocked address never
+reaches Auth; that matters because Auth's own `sign_in_sign_ups` limit counts the function's
+address, making it one bucket shared by every user, which an attacker could otherwise drain
+to lock everyone out. The address is the gateway's `x-real-ip` (a client cannot set it);
+it is stored only as a peppered hash. A successful sign-in clears the account's failures but
+not the address's — one valid account must not reset an address that is spraying others.
+Blocked responses carry the wait in minutes, and the body never says which limit tripped.
 - Sessions expire; log out invalidates server-side, not just the cookie.
 - Rate-limit sign-in, sign-up, and password-reset endpoints — per IP and per account.
 
@@ -358,6 +390,10 @@ real database key; RLS is the only thing standing between a user and everyone el
   bundle, in `NEXT_PUBLIC_*`-style vars, or in git. Server-side only, or not at all.
 - Storage buckets have their own policies. Cover letters go in a **private** bucket, served via
   short-lived signed URLs — never a public bucket.
+- Signed-in users have **no** insert or update policy on either bucket, only select and delete
+  on their own folder. Every file enters through the `upload` edge function, which checks its
+  bytes first (§7.3) and chooses its path. A write policy added back would walk around that
+  check.
 - Enforce ownership at the data layer, not in the UI. Never trust an id from the client.
 - Admin routes (if any exist) sit behind a separate role check, not obscurity.
 - Secure every API endpoint by default: deny unless explicitly authorized.
@@ -393,7 +429,7 @@ single note can be a megabyte.
 | Cover letter max size | 10 MB |
 | Avatar types | PNG, JPEG, WebP |
 | Avatar max size | 2 MB, max 4000×4000 px |
-| Type check | verify magic bytes server-side — never trust the extension or the client's `Content-Type` |
+| Type check | verify magic bytes server-side — never trust the extension or the client's `Content-Type`. Done in `supabase/functions/upload`, Storage's only writer; each bucket's `allowed_mime_types` stays as a backstop, since it trusts the declared type |
 | Stored filename | generate a UUID; keep the original name only as a display label, escaped |
 | Storage path | prefixed with the owner's user id, e.g. `{user_id}/{uuid}.pdf` |
 | Serving | private bucket, signed URL with a **60-second** TTL, generated on click — never embedded in page HTML |
@@ -431,7 +467,23 @@ SVG is not an accepted type anywhere. It is a script execution vector.
 
   The Supabase origin must be in `connect-src` (and `wss:` if Realtime is used) or every
   request fails. Ship it in report-only mode first, then enforce — do not disable it when it
-  breaks something.
+  breaks something. Check it locally before deploying: `npm run build && npm run preview`
+  serves the build under the same policy, **enforced** (`vite.config.ts` reads it from
+  `vercel.json`, so the two cannot drift).
+- **Session tokens in localStorage — accepted risk.** supabase-js keeps the access and refresh
+  tokens in `localStorage`, where any script on the page can read them. A static app cannot
+  hold them in an `HttpOnly` cookie: the browser calls Supabase directly and has to attach the
+  token itself, so only a server in front of every Supabase call could keep it out of reach.
+  What that trade costs: script injected into the page (XSS, a compromised dependency) could
+  copy the refresh token and use it elsewhere until it expires or is revoked, instead of only
+  acting while the tab is open. Accepted for two users, on three conditions:
+  1. **The CSP ships enforced before any real user data exists.** Release blocker, not a
+     follow-up — it stops injected script from running at all, which is the actual defence.
+  2. The dependency tree stays small (§7.6) and no user content is rendered as HTML (§7.3).
+  3. Revisit before sign-up opens (§4.1d). The path then is server-side auth
+     (`@supabase/ssr`) behind Vercel functions.
+
+  The cookie rule in the first bullet still governs any cookie the app does set.
 - Also set: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
   `Permissions-Policy` denying camera/microphone/geolocation.
 - CORS restricted to known origins. No `*` on any authenticated endpoint, and no reflecting
@@ -532,7 +584,17 @@ The four checks worth doing by hand, because tooling misses them:
 4. Delete an application, then confirm its notes, history rows, and Storage object are all
    gone.
 5. Five wrong passwords on one account, then a sixth attempt with the *correct* password —
-   expect the lockout, and expect the same response body and timing as a wrong password.
+   expect the lockout. Repeat with an email that has no account: expect the identical response
+   — status, body, and timing. During the lock, the correct password and a wrong one must get
+   identical answers too. The lockout copy itself is fine (§8.2): it is shown for any address,
+   real or not, so it reveals nothing (§7.1). Automated in `e2e/sign-in-function.spec.ts`.
+6. Load the deployed app with the CSP header **enforced** (not `-Report-Only`), sign in, open
+   the profile, upload a photo. Expect no CSP violations in the console — the condition that
+   makes localStorage tokens acceptable (§7.5).
+7. From two different networks (home Wi-Fi, a phone on cellular), fail one sign-in on each.
+   `sign_in_attempts` should hold two distinct `ip_hash` values for them. One value means the
+   function is reading a proxy's address, not the caller's, and every user shares one
+   per-IP bucket again (§7.1).
 
 ### 7.9 Definition of done
 
@@ -558,7 +620,8 @@ one — if an item does not apply, say so in the pull request rather than skippi
 8. New table: RLS enabled and a separate policy per operation, in the same migration.
 9. New client-written column: no client-supplied `user_id`, a length cap in both the Zod schema
    and a Postgres constraint.
-10. New file path: private bucket, owner-prefixed path, magic-byte check, signed URL on click.
+10. New file path: private bucket, written only through `supabase/functions/upload` (which
+    brings the owner-prefixed path and the magic-byte check), signed URL on click.
 11. Nothing new is logged that §7.7 forbids. Errors go through `reportError()`.
 12. Cross-user check where the feature touches data: a test signing in as user B.
 
@@ -610,7 +673,8 @@ Nothing ships with an unhandled failure.
 | Cover letter upload | progress indicator on the row | n/a | "Upload failed." + Retry. Application saves without the file rather than losing the whole record |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
 | Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
-| Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists |
+| Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
+| Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
 | Offline | n/a | n/a | Persistent banner: "You're offline. Changes won't save." Disable mutations |
 
@@ -829,6 +893,57 @@ Newest first. One line per substantive decision — what changed and *why*, so a
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
 
+### 2026-09-11
+- **§7.8 check 5 corrected: a locked account answers with the lockout, not a fake wrong
+  password.** It asked for a locked account to look exactly like a wrong password. That would
+  tell a locked-out user typing the right password that it was wrong — for up to an hour under
+  an address block — and protect nothing: the lock is keyed on the email's hash, so an unknown
+  address locks identically, and "Too many attempts" reveals no more than the attacker already
+  knows. What must match is a real address against an unknown one, and, during the lock, the
+  correct password against a wrong one; a new e2e test checks both.
+- **Uploads go through an `upload` edge function; the buckets accept no direct writes (§7.2,
+  §7.3).** §7.3 required a server-side magic-byte check, but the browser wrote to Storage
+  directly, and the only server-side guard, `allowed_mime_types`, trusts the declared
+  `Content-Type` — any signed-in user could store an HTML page labelled `image/png`. Signed-in
+  users lost their insert and update policies on both buckets. The function checks the bytes
+  (for DOCX, that the zip holds a Word document; for avatars, the pixel size from the header),
+  chooses the `{user_id}/{uuid}` path, and stores with the service role. The 20-an-hour upload
+  limit moved with it (§7.1), since a `storage.objects` trigger cannot attribute a
+  service-role write. Settled before cover letters (§6 step 3), which use the same function.
+- **§6 step 1 built: sign-in, session, profile.** Sign-in goes through the `sign-in` edge
+  function only; the client never calls `signInWithPassword`.
+- **`security_events` owner trigger no longer erases the service role's `user_id`.** It forced
+  `user_id = auth.uid()` on every insert, and the service role's `auth.uid()` is null — so every
+  `sign_in_success` the function wrote had lost the one field it exists to record. Clients are
+  still forced to their own id; only the service role keeps what it sends.
+- **Per-account lockout brought in line with §7.1 (§7.1 now states it precisely).** As written,
+  the lock ended whenever the oldest of the five failures aged out of the window (as little as
+  a minute), the "exponential" backoff was a constant 250 ms applied only once locked, any Auth
+  error — rate limit or outage — was recorded as a wrong password and shown as one, and a failed
+  counter read skipped the lockout entirely.
+- **Sign-in response floor raised from 400 ms to 1 s (§7.1 timing).** The function's own work
+  takes ~500 ms locally, so a 400 ms floor padded nothing and the password-hash check that only
+  a real account costs was measurable — the §7.8 timing test caught it under parallel load.
+- **The sign-in function answers CORS for an allowlist (`ALLOWED_ORIGINS`), §7.5.** Hosted
+  Supabase adds no CORS headers to functions, so browser sign-in would have failed in production;
+  locally Kong answers with `*`, which hid it.
+- **Per-IP sign-in limit moved from `config.toml` into the sign-in function (§7.1).** Behind
+  the function, Auth's per-IP limit saw one address — the function's — for every sign-in: no
+  defence against one machine spraying many accounts, and a shared bucket anyone could drain
+  to lock every user out. The function now counts failures per address (a peppered hash of
+  the gateway's `x-real-ip`, which clients cannot set) and blocks before calling Auth. Blocked
+  responses state the wait, and the client shows it (§8.2), because an address block can last
+  up to an hour rather than the account lock's 15 minutes.
+- **Session tokens in localStorage accepted as a recorded risk (§7.5), with an enforced CSP as
+  the release gate.** §7.5 asked for `HttpOnly` cookies, which a static app talking directly to
+  Supabase cannot have. The alternative — a server in front of every Supabase call — is a
+  second backend for two users and still would not stop injected script acting in the open
+  tab. The enforced CSP addresses the cause (script injection) rather than the symptom (token
+  theft), so it is the condition; `npm run preview` now serves the build under it locally.
+- **Profile photo rules and copy specified (§4.6, §8.2)**, including that a refused photo
+  leaves the current one in place, and that sign-out is this device only.
+- **Sign-in links hidden until their screens exist (§4.1).** Both would be dead ends today.
+
 ### 2026-09-10
 - **Definition of done written (§7.9).** Nineteen items across behavior, correctness,
   security, accessibility, mobile, and documentation — checked per feature, not per commit.
@@ -922,5 +1037,3 @@ the prototype is the reference for those.
 - No alerting on `app_errors` — accepted at two users (§7.7), revisit before real ones.
 - The `rate_limits` fixed window allows up to 2x a limit across a boundary. Accepted; if abuse
   ever makes it matter, the table can hold one row per event instead.
-- Nothing else structural. Remaining decisions are build-time judgement calls, not gaps the
-  spec owes an answer to.

@@ -9,8 +9,8 @@ Personal tracker for job applications. One repo, one app.
 
 ## Why one repo and not a workspace monorepo
 
-Everything ships together: one React app, one Supabase project, one edge function, one test
-suite. Workspaces buy isolated dependency trees and independent versioning, which matter when
+Everything ships together: one React app, one Supabase project and its edge functions, one
+test suite. Workspaces buy isolated dependency trees and independent versioning, which matter when
 two deployables share a library. There is one deployable.
 
 `src/domain/` is written to import nothing from the rest of `src/` (enforced by review — see
@@ -45,7 +45,7 @@ npx playwright install --with-deps
 npx supabase start
 npx supabase db reset
 cp .env.example .env.local        # paste the local URL + anon key that `start` printed
-npx supabase functions serve sign-in --env-file .env.local
+npx supabase functions serve --env-file supabase/functions/.env.local   # every function; pepper + ALLOWED_ORIGINS, never the app's .env.local
 
 # 6. Point tsconfig.app.json at the strict options:
 #    "extends": "./tsconfig.strict.json"
@@ -70,11 +70,13 @@ Add these to the generated `package.json`. CLAUDE.md and CI both assume all eigh
 
 ## Local accounts
 
-`seed.sql` creates two, both with password `devpassword1234`:
+`seed.sql` creates three, all with password `devpassword1234`:
 
 - `dev-a@example.test` — applications, notes, and status history
 - `dev-b@example.test` — owns one application, and exists so the §7.8 cross-user isolation
   tests have a second account without a manual setup step
+- `dev-c@example.test` — owns nothing; `e2e/sign-in-function.spec.ts` locks it out on purpose.
+  A lockout lasts 15 minutes, so no other test may sign in as it. `db:reset` unlocks it.
 
 Signup is disabled in `config.toml` (`enable_signup = false`), matching the launch decision in
 SPEC §4.1d. Create accounts via seed or Studio.
@@ -102,7 +104,10 @@ Vercel's `vercel.json` handles all of it; Cloudflare Pages and Netlify do the sa
 npx supabase link --project-ref <ref>
 npx supabase db push                       # applies migrations/ to the hosted project
 npx supabase functions deploy sign-in
+npx supabase functions deploy upload       # the only way files reach Storage (§7.3)
 npx supabase secrets set SIGN_IN_HASH_PEPPER="$(openssl rand -hex 32)"
+npx supabase secrets set ALLOWED_ORIGINS="https://<your-app>.vercel.app"   # without it, browser sign-in fails CORS
+# Never set SIGN_IN_IP_MAX_FAILURES here — it is local-only; unset means the §7.1 limit of 20.
 ```
 
 Then, in the dashboard: add the Vercel URL to **Auth → URL Configuration** (site URL and
@@ -112,7 +117,7 @@ Do **not** run `db reset` against the hosted project — it drops everything. `d
 applies what is new.
 
 **Never pass `--include-seed` to `db push`, and never `db reset --linked`.** Both run
-`seed.sql` against the hosted project, creating `dev-a` / `dev-b` with a password,
+`seed.sql` against the hosted project, creating `dev-a` / `dev-b` / `dev-c` with a password,
 emails, and user ids that are published in this repo for anyone to read. Plain
 `db push` applies migrations only and is the only form you need. Your own account goes
 in by hand in the dashboard, with a password from a password manager.
@@ -135,6 +140,23 @@ means anything:
 2. The CSP ships as `Content-Security-Policy-Report-Only` (§7.5: report-only first). Rename
    the key to `Content-Security-Policy` once the console is clean. Do not disable it when it
    breaks something — fix the directive.
+
+   **Enforcing it is a release blocker, not a follow-up:** session tokens live in
+   localStorage (an accepted risk, SPEC §7.5), and the enforced CSP is the condition that
+   makes that acceptable. No real user data goes in while the header still says
+   `-Report-Only`.
+
+   Check the policy locally before each deploy — it catches most breakage without a round
+   trip to Vercel:
+
+   ```bash
+   npm run build && npm run preview     # http://localhost:4173, CSP enforced
+   ```
+
+   `vite.config.ts` reads the policy straight out of this file and swaps the hosted Supabase
+   origin for the local one, so the preview enforces exactly what ships. Sign in, open the
+   profile, upload a photo, and watch the console for `Refused to …` errors. (The dev server
+   cannot run under it: hot reload injects inline scripts the policy blocks.)
 
 Environment variables in the Vercel project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
 and `VITE_RELEASE` (set to `$VERCEL_GIT_COMMIT_SHA`). Nothing else. `SIGN_IN_HASH_PEPPER` and

@@ -39,6 +39,7 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-link: var(--link);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -48,25 +49,39 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The audited palette (SPEC §3, §10.1), from the prototype, wired into the
+ * shadcn tokens. Measured WCAG ratios — re-measure on any change:
+ *   foreground on background / card        15.1 / 16.6
+ *   primary-foreground on primary (button)  4.9
+ *   ring vs card / background (focus)       5.1 / 4.6   — ≥4.5 vs white per §10.1
+ *   link on card / background / accent      9.0 / 8.1 / 7.4
+ *   muted-foreground on card / background   7.5 / 6.9
+ *   destructive on card / background        5.3 / 4.8
+ *   input border vs card                    3.3         — control boundary, 3:1
+ *   border vs card                          1.3         — decorative only, never meaning
+ * The status colours (§3) join when StatusTag does (§6 step 2).
+ */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    --background: oklch(0.97 0.018 350);
+    --foreground: oklch(0.24 0.02 350);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.24 0.02 350);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --popover-foreground: oklch(0.24 0.02 350);
+    --primary: oklch(0.56 0.16 350);
+    --primary-foreground: oklch(0.99 0.01 350);
+    --secondary: oklch(0.94 0.03 350);
+    --secondary-foreground: oklch(0.42 0.1 350);
+    --muted: oklch(0.93 0.015 350);
+    --muted-foreground: oklch(0.45 0.02 350);
+    --accent: oklch(0.94 0.03 350);
+    --accent-foreground: oklch(0.42 0.1 350);
+    --destructive: oklch(0.55 0.16 25);
+    --border: oklch(0.91 0.015 350);
+    --input: oklch(0.65 0.02 350);
+    --ring: oklch(0.56 0.16 350);
+    --link: oklch(0.42 0.1 350);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -83,6 +98,7 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Unaudited and unused: nothing sets .dark. Audit before enabling (§10.1). */
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
@@ -102,6 +118,7 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
+    --link: oklch(0.85 0.08 350);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -119,7 +136,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
     }
   body {
     @apply bg-background text-foreground;
@@ -127,4 +144,19 @@
   html {
     @apply font-sans;
     }
+  /* Visible focus on everything (§10.2). Components that draw their own ring
+     (outline-none + ring-*) override this from the utilities layer. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* §10.4: no non-essential motion for users who opt out. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

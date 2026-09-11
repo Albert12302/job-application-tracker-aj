@@ -1,56 +1,103 @@
-// Per-account sign-in lockout (SPEC §7.1).
+// Sign-in limits per account AND per IP (SPEC §7.1).
 //
-// Why this exists as an edge function: every other limit in §7.1 is either
-// per-IP (Supabase Auth owns those, see config.toml) or counts something the
-// database itself sees (writes, uploads — triggers own those). A per-ACCOUNT
-// failure count is neither. It has to be recorded on a failed sign-in, and a
-// failed sign-in produces no authenticated session, so there is no trustworthy
-// client to record it. The counter has to sit behind the credential check.
+// Why this exists as an edge function: every other limit in §7.1 counts
+// something another component already sees — writes (triggers own those),
+// uploads (the upload function, Storage's only writer). A sign-in failure count
+// is neither. It has to be recorded on a failed sign-in,
+// and a failed sign-in produces no authenticated session, so there is no
+// trustworthy client to record it. The counter has to sit behind the credential
+// check.
+//
+// Both limits live here, not in config.toml: behind this function, Supabase
+// Auth sees one caller for every sign-in — the function — so Auth's own per-IP
+// limit is a single bucket shared by everyone. Only this function sees the
+// caller's address, and it checks both counts before Auth is ever called, so a
+// blocked caller cannot drain that shared bucket either.
 //
 // The client calls this instead of supabase.auth.signInWithPassword.
 // It never sees the service role key, and it never learns whether an email
 // exists (§7.1: no account enumeration on any surface).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { corsHeaders, parseOrigins } from '../_shared/cors.ts';
+import {
+  ACCOUNT_LOCKOUT_MS,
+  ACCOUNT_MAX_FAILURES,
+  ACCOUNT_WINDOW_MS,
+  accountLockout,
+  backoffMs,
+  clientIp,
+  IP_DEFAULT_MAX_FAILURES,
+  IP_WINDOW_MS,
+  ipBlockedUntil,
+  parseLimit,
+  retryAfterMinutes,
+} from './limits.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PEPPER = Deno.env.get('SIGN_IN_HASH_PEPPER')!;
+// §7.5 — see _shared/cors.ts.
+const ALLOWED_ORIGINS = parseOrigins(Deno.env.get('ALLOWED_ORIGINS'));
 
-const MAX_FAILURES = 5;
-const WINDOW_MINUTES = 15;
-const LOCKOUT_MINUTES = 15;
-const MIN_RESPONSE_MS = 400; // §7.1: response timing must not differ
+// 20 by default (§7.1). Raised only in the local env file: every local request
+// reaches the function from one Docker address, so a single e2e run would block
+// the next one for an hour. Never set it on the hosted project.
+const IP_MAX_FAILURES = parseLimit(Deno.env.get('SIGN_IN_IP_MAX_FAILURES'), IP_DEFAULT_MAX_FAILURES);
 
-// Same generic copy for bad credentials, unknown email, and lockout (§8.2).
+// §7.1: response timing must not differ. The floor has to sit above the real
+// work (the counter queries, the Auth call, the inserts — ~500 ms locally), or
+// it pads nothing and the password hash check a real account costs shows through.
+const MIN_RESPONSE_MS = 1000;
+
+// One generic message for bad credentials and unknown email (§8.2). One for
+// every block, account or IP alike — the body never says which.
 const GENERIC = 'That email and password combination is incorrect.';
-const LOCKED = 'Too many attempts. Try again in about 15 minutes.';
+const LOCKED = 'Too many attempts.';
+const UNAVAILABLE = 'Sign-in is unavailable right now. Try again shortly.';
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-/** SHA-256 of pepper + lowercased email. The address itself is never stored (§7.7). */
-async function hashEmail(email: string): Promise<string> {
-  const bytes = new TextEncoder().encode(PEPPER + email.trim().toLowerCase());
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
-  });
+/** Peppered hashes: lookup keys, never the address or email itself (§7.7). */
+const hashEmail = (email: string) => sha256(PEPPER + email.trim().toLowerCase());
+const hashIp = (ip: string) => sha256(`${PEPPER}ip:${ip}`);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const times = (rows: { created_at: string }[] | null) => (rows ?? []).map((r) => Date.parse(r.created_at));
+
+/** Recent failures for one key, newest first. */
+function recentFailures(column: 'email_hash' | 'ip_hash', hash: string, sinceMs: number, limit: number) {
+  return admin
+    .from('sign_in_attempts')
+    .select('created_at')
+    .eq(column, hash)
+    .eq('outcome', 'failure')
+    .gte('created_at', new Date(sinceMs).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(limit);
 }
 
 Deno.serve(async (req) => {
   const startedAt = Date.now();
+  const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
+
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
   // Constant-ish response time, so a locked or unknown account is not
   // distinguishable by how fast it answers.
   const settle = async (body: unknown, status: number) => {
     const elapsed = Date.now() - startedAt;
-    if (elapsed < MIN_RESPONSE_MS) await new Promise((r) => setTimeout(r, MIN_RESPONSE_MS - elapsed));
-    return json(body, status);
+    if (elapsed < MIN_RESPONSE_MS) await sleep(MIN_RESPONSE_MS - elapsed);
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
+    });
   };
 
   if (req.method !== 'POST') return settle({ error: GENERIC }, 405);
@@ -66,37 +113,52 @@ Deno.serve(async (req) => {
   }
   if (email.length > 254 || password.length > 128) return settle({ error: GENERIC }, 400);
 
-  const emailHash = await hashEmail(email);
-  const since = new Date(Date.now() - WINDOW_MINUTES * 60_000).toISOString();
+  const [emailHash, ipHash] = await Promise.all([hashEmail(email), hashIp(clientIp(req.headers))]);
+  const now = Date.now();
 
-  const { count: failures } = await admin
-    .from('sign_in_attempts')
-    .select('id', { count: 'exact', head: true })
-    .eq('email_hash', emailHash)
-    .eq('outcome', 'failure')
-    .gte('created_at', since);
+  const [byIp, byAccount] = await Promise.all([
+    recentFailures('ip_hash', ipHash, now - IP_WINDOW_MS, IP_MAX_FAILURES),
+    recentFailures('email_hash', emailHash, now - ACCOUNT_WINDOW_MS - ACCOUNT_LOCKOUT_MS, ACCOUNT_MAX_FAILURES),
+  ]);
 
-  if ((failures ?? 0) >= MAX_FAILURES) {
+  // Fail closed: if a counter cannot be read, its limit cannot be enforced.
+  if (byIp.error || byAccount.error) return settle({ error: UNAVAILABLE }, 503);
+
+  const ipUntil = ipBlockedUntil(times(byIp.data), now, IP_MAX_FAILURES);
+  const { inWindow, lockedUntil } = accountLockout(times(byAccount.data), now);
+  const blockedUntil = Math.max(ipUntil, lockedUntil);
+
+  if (blockedUntil) {
+    // Nothing is recorded while blocked: the counts stop growing, so the block
+    // ends on schedule instead of extending with every retry.
     await admin.from('security_events').insert({ event_type: 'rate_limit_trip', outcome: 'denied' });
-    // Exponential backoff on top of the window, then the flat lockout.
-    const backoff = Math.min(2 ** ((failures ?? 0) - MAX_FAILURES), 8) * 250;
-    await new Promise((r) => setTimeout(r, backoff));
-    return settle({ error: LOCKED, retryAfterMinutes: LOCKOUT_MINUTES }, 429);
+    return settle({ error: LOCKED, retryAfterMinutes: retryAfterMinutes(blockedUntil, now) }, 429);
   }
+
+  // Keyed on the hash, so an unknown email backs off exactly like a real one.
+  await sleep(backoffMs(inWindow));
 
   const auth = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
   const { data, error } = await auth.auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    await admin.from('sign_in_attempts').insert({ email_hash: emailHash, outcome: 'failure' });
+    // Only a credential rejection counts. Auth being rate limited or down is
+    // not the user's wrong password, and must neither count against them nor
+    // tell them their password is wrong.
+    const status = error?.status ?? 500;
+    if (status === 429) return settle({ error: LOCKED, retryAfterMinutes: 5 }, 429);
+    if (status >= 500) return settle({ error: UNAVAILABLE }, 503);
+
+    await admin.from('sign_in_attempts').insert({ email_hash: emailHash, ip_hash: ipHash, outcome: 'failure' });
     await admin.from('security_events').insert({ event_type: 'sign_in_failure', outcome: 'failure' });
     return settle({ error: GENERIC }, 401);
   }
 
-  // Clear the account's failure history on success, so a legitimate user who
-  // fumbled twice is not one typo away from a lockout.
+  // Clear the account's failures on success, so a legitimate user who fumbled
+  // twice is not one typo away from a lockout. The IP's failures stay: one
+  // valid account must not be a way to reset an address that is spraying others.
   await admin.from('sign_in_attempts').delete().eq('email_hash', emailHash).eq('outcome', 'failure');
-  await admin.from('sign_in_attempts').insert({ email_hash: emailHash, outcome: 'success' });
+  await admin.from('sign_in_attempts').insert({ email_hash: emailHash, ip_hash: ipHash, outcome: 'success' });
   await admin
     .from('security_events')
     .insert({ user_id: data.user!.id, event_type: 'sign_in_success', outcome: 'success' });
