@@ -25,6 +25,16 @@ export function normalizeLocation(
   return cleaned.split(', ').map(titleCasePart).join(', ');
 }
 
+/**
+ * The locations this user has already used, in order, each once: the
+ * suggestions under the location field (§4.3) and what a typed location is
+ * matched against (§5.2).
+ */
+export function uniqueLocations(applications: readonly { location: string | null }[] | undefined): string[] {
+  const used = (applications ?? []).map((application) => application.location).filter((location) => location !== null);
+  return [...new Set(used)].sort((a, b) => a.localeCompare(b));
+}
+
 function tidy(value: string): string {
   return value
     .split(',')

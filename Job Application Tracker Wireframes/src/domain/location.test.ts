@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLocation } from './location';
+import { normalizeLocation, uniqueLocations } from './location';
 
 describe('normalizeLocation', () => {
   it('title-cases each part and uppercases two-letter parts', () => {
@@ -52,11 +52,32 @@ describe('normalizeLocation', () => {
     expect(normalizeLocation('zürich', [])).toBe('Zürich');
   });
 
+  it('feeds on the suggestions uniqueLocations produces', () => {
+    const applications = [{ location: 'Austin, TX' }, { location: null }, { location: 'Austin, TX' }];
+    expect(normalizeLocation('austin, tx', uniqueLocations(applications))).toBe('Austin, TX');
+  });
+
   it('returns null for nothing at all', () => {
     expect(normalizeLocation('', [])).toBeNull();
     expect(normalizeLocation('   ', [])).toBeNull();
     expect(normalizeLocation(' , ', [])).toBeNull();
     expect(normalizeLocation(undefined, [])).toBeNull();
     expect(normalizeLocation(null, ['Remote'])).toBeNull();
+  });
+});
+
+describe('uniqueLocations', () => {
+  it('lists each location once, alphabetically, ignoring the ones with none', () => {
+    const applications = [
+      { location: 'Remote' },
+      { location: null },
+      { location: 'Austin, TX' },
+      { location: 'Remote' },
+    ];
+    expect(uniqueLocations(applications)).toEqual(['Austin, TX', 'Remote']);
+  });
+
+  it('copes with a list that has not loaded', () => {
+    expect(uniqueLocations(undefined)).toEqual([]);
   });
 });
