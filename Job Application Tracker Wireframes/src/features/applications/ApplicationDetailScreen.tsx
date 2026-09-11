@@ -9,11 +9,11 @@ import { errorReference } from '@/queries/errors';
 import { useToggleStar } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { FunnelIndicator } from './FunnelIndicator';
-import { PANEL } from './panel';
+import { NotesSection } from './NotesSection';
+import { PANEL, SECTION_HEADING } from './panel';
 import { StarToggle } from './StarToggle';
 import { StatusSelect } from './StatusSelect';
 
-const SECTION_HEADING = 'text-[13px] font-semibold text-muted-foreground';
 const BACK = 'inline-flex w-fit items-center gap-1.5 rounded-sm text-[13px] text-muted-foreground';
 
 function BackLink() {
@@ -140,6 +140,8 @@ export function ApplicationDetailScreen() {
             {found.cover_letter_name ?? <span className="text-muted-foreground">No cover letter attached.</span>}
           </p>
         </div>
+
+        <NotesSection applicationId={found.id} />
       </section>
     </div>
   );

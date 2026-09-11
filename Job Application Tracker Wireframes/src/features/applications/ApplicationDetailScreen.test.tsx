@@ -20,6 +20,12 @@ vi.mock('@/queries/use-session', () => ({
   isSignedInNow: () => true,
 }));
 
+// The notes have their own tests; here they only need to load and be empty.
+vi.mock('@/data/notes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/notes')>()),
+  listNotes: () => Promise.resolve([]),
+}));
+
 vi.mock('@/data/applications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/applications')>()),
   getApplication: (...args: unknown[]) => getApplication(...args),
