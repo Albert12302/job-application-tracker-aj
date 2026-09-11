@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { apiSession, startSignedIn } from './session';
+import { apiSession, startSignedIn } from './session.js';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.

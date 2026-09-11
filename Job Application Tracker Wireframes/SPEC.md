@@ -901,6 +901,14 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-11
+- **§6 step 2 built: applications CRUD.** Add, list, detail, edit, delete, and notes, against
+  the schema that already existed. Status changes from the detail selector and from the edit
+  form both go through `services/change-status.ts`, so `status_history` has been written from
+  the first commit rather than backfilled — it cannot be. Deliberately not here: cover-letter
+  attach and replace (step 3), search, filter tabs, saved filters, sort and pagination (steps
+  5–6), and Undo on an application delete, which §9.2 says to leave out rather than fake.
+  There is no stats surface yet, so nothing displays the hardcoded zero step 2 mentions;
+  stats arrive with step 4, computed from the history now being recorded.
 - **A status change, and a creation, are each one Postgres transaction (§2, §9.1).**
   `change_application_status` locks the row, reads its current status, updates it, and appends
   the `status_history` row; `create_application` inserts the application, its creation row, and

@@ -158,6 +158,14 @@ Three layers, each with a job:
   Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
   exact application count, and the suites run in parallel.
 
+  **A test that is not about signing in starts signed in** — `e2e/session.ts` takes a session
+  straight from Auth and puts it in storage. Every sign-in through the form reaches Auth from
+  the sign-in function's one address, so they all share a single provider-side bucket
+  (§7.1, `config.toml` `sign_in_sign_ups`); a suite that signs in through the form everywhere
+  spends that budget on tests that are testing something else, and the later ones are refused
+  and fail for reasons of their own. `auth.spec.ts` and `sign-in-function.spec.ts` still use
+  the form, because that is their subject.
+
   `e2e/security.spec.ts` exists already and fails until the features do. Two standing rules for
   it: get it green by fixing policies, **never** by softening an assertion; and its delete test
   currently calls the tables directly — **rewire it to `services/delete-application.ts` the
@@ -233,15 +241,31 @@ src/
     auth/                     SignInScreen, SignInForm (guard: routes/authenticated.tsx)
     shell/                    AppShell (header + skip link), RouteError, NotFound
     applications/
-      ApplicationTable.tsx
+      ApplicationsScreen.tsx      the list and its three states (§8.2)
+      ApplicationTable.tsx        at 760px and wider
+      ApplicationTableHeader.tsx  shared with the loading skeleton
       ApplicationRow.tsx
+      ApplicationCards.tsx        below 760px (§11)
+      ApplicationCard.tsx
+      ApplicationListSkeleton.tsx
+      AddApplicationLink.tsx
+      NoneMark.tsx                a dash to see, a word to hear
       StatusTag.tsx
       StarToggle.tsx
-      ApplicationForm.tsx     shared by new + edit
-      DeleteApplicationDialog.tsx
-      NotesList.tsx
+      use-open-application.ts     row click, without a second tab stop
+      AddApplicationScreen.tsx
+      EditApplicationScreen.tsx
+      ApplicationForm.tsx         shared by add + edit (§9.1)
+      DiscardChangesDialog.tsx
+      ApplicationDetailScreen.tsx
+      StatusSelect.tsx            the one status-change control (§4.4)
+      FunnelIndicator.tsx
+      NotesSection.tsx
       NoteItem.tsx
-      CoverLetterField.tsx
+      DeleteApplicationDialog.tsx
+      delete-summary.ts           what a delete takes with it (§9.2)
+      panel.ts                    the shared card and section headings
+      CoverLetterField.tsx        step 3
     filters/
       FilterTabs.tsx
       FilterBuilder.tsx

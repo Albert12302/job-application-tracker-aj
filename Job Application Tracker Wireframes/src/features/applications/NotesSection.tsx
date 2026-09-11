@@ -73,8 +73,10 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
           {ordered.map((note) => (
             <NoteItem key={note.id} note={note} applicationId={applicationId} />
           ))}
+          {/* Muted by colour and italics, at full strength: at 70% opacity this
+              measured 3.57:1, under the 4.5:1 normal text needs (§10.1). */}
           {add.isPending && add.variables !== undefined ? (
-            <li className="p-3 text-sm break-words whitespace-pre-wrap text-muted-foreground opacity-70">
+            <li className="p-3 text-sm break-words whitespace-pre-wrap text-muted-foreground italic">
               {add.variables}
               <span className="sr-only"> (saving)</span>
             </li>

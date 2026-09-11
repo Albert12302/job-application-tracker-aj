@@ -1,7 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { apiSession, PASSWORD, startSignedIn } from './session';
+import { apiSession, PASSWORD, startSignedIn } from './session.js';
 
 /**
  * SPEC §6 step 2 end to end: add → appears in the list → detail → status →
@@ -217,4 +217,22 @@ test('keyboard alone: reach a row, star it, and open it', async ({ page, browser
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/applications\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('link', { name: 'Back to applications' })).toBeVisible();
+
+  // The detail screen's own controls, by keyboard: the status selector opens,
+  // takes a value, and saves; the delete dialog traps Escape rather than
+  // deleting anything (§10.2).
+  const status = page.getByRole('combobox', { name: 'Status' });
+  const before = (await status.textContent())?.trim();
+  await status.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(status).not.toHaveText(before ?? '');
+
+  await page.getByRole('button', { name: 'Delete application' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/applications\/[0-9a-f-]{36}$/);
 });
