@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.
@@ -24,6 +24,17 @@ async function signIn(email: string) {
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
   expect(error, 'seed user missing — run npm run db:reset').toBeNull();
   return client;
+}
+
+/** The only way into Storage: the upload function, as the app calls it (§7.3). */
+async function uploadThroughFunction(
+  client: SupabaseClient,
+  kind: 'avatar' | 'cover-letter',
+  body: BlobPart,
+): Promise<string> {
+  const { data, error } = await client.functions.invoke(`upload/${kind}`, { body: new Blob([body]) });
+  expect(error, 'upload function refused the file or is not being served').toBeNull();
+  return (data as { path: string }).path;
 }
 
 test.describe('7.8.1 cross-user isolation', () => {
@@ -140,10 +151,7 @@ test.describe('7.8.4 delete leaves nothing behind', () => {
       .from('status_history')
       .insert({ application_id: id, from_status: null, to_status: 'Applied' });
 
-    const path = `${userId}/${id}.pdf`;
-    await a.storage
-      .from('cover-letters')
-      .upload(path, new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }));
+    const path = await uploadThroughFunction(a, 'cover-letter', '%PDF-1.4 test');
     await a
       .from('applications')
       .update({ cover_letter_path: path, cover_letter_name: 'test.pdf' })
@@ -155,8 +163,10 @@ test.describe('7.8.4 delete leaves nothing behind', () => {
     // app's own delete path cleans up, which is the thing SPEC §7.8.4 is actually
     // asking about. Deleting by hand here and calling it covered is the failure
     // mode this comment exists to prevent.
-    await a.storage.from('cover-letters').remove([path]);
-    await a.from('applications').delete().eq('id', id);
+    const { error: removeError } = await a.storage.from('cover-letters').remove([path]);
+    expect(removeError).toBeNull();
+    const { error: deleteError } = await a.from('applications').delete().eq('id', id);
+    expect(deleteError, 'the delete itself failed — the checks below would blame the cascade').toBeNull();
 
     const { data: notes } = await a.from('notes').select('id').eq('application_id', id);
     expect(notes ?? []).toEqual([]);
@@ -165,6 +175,65 @@ test.describe('7.8.4 delete leaves nothing behind', () => {
     expect(history ?? []).toEqual([]);
 
     const { data: files } = await a.storage.from('cover-letters').list(userId);
-    expect((files ?? []).some((f) => f.name === `${id}.pdf`)).toBe(false);
+    expect((files ?? []).some((f) => path.endsWith(`/${f.name}`))).toBe(false);
+  });
+});
+
+test.describe('7.8.1 cross-user isolation — profile and photo (§6 step 1)', () => {
+  const USER_B = '22222222-2222-2222-2222-222222222222';
+  const PNG = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+    (c) => c.charCodeAt(0),
+  );
+
+  test('user B cannot read or rewrite user A profile', async () => {
+    const b = await signIn('dev-b@example.test');
+
+    const { data: read, error: readError } = await b.from('profiles').select('*').eq('id', USER_A);
+    expect(readError).toBeNull();
+    expect(read).toEqual([]);
+
+    const { data: updated } = await b
+      .from('profiles')
+      .update({ avatar_path: `${USER_B}/pointed-at-mine.png` })
+      .eq('id', USER_A)
+      .select();
+    expect(updated ?? []).toEqual([]);
+
+    // data/profile.ts upserts; the insert half's WITH CHECK is what refuses this.
+    const { error: upsertError } = await b.from('profiles').upsert({ id: USER_A, avatar_path: null });
+    expect(upsertError).not.toBeNull();
+  });
+
+  test('user B cannot read, list, overwrite, or delete user A photo', async () => {
+    const a = await signIn('dev-a@example.test');
+    const path = await uploadThroughFunction(a, 'avatar', PNG);
+    expect(path.startsWith(`${USER_A}/`)).toBe(true);
+
+    try {
+      const b = await signIn('dev-b@example.test');
+
+      const { data: downloaded } = await b.storage.from('avatars').download(path);
+      expect(downloaded).toBeNull();
+
+      const { data: listed } = await b.storage.from('avatars').list(USER_A);
+      expect(listed ?? []).toEqual([]);
+
+      // Refused twice over: no user writes to Storage directly (upload-function.spec.ts),
+      // and the path is not B's.
+      const { error: forgeError } = await b.storage
+        .from('avatars')
+        .upload(`${USER_A}/${crypto.randomUUID()}.png`, new Blob([PNG], { type: 'image/png' }));
+      expect(forgeError).not.toBeNull();
+
+      const { data: removed } = await b.storage.from('avatars').remove([path]);
+      expect(removed ?? []).toEqual([]);
+
+      // Still there for its owner: the delete above was refused, not merely unreported.
+      const { data: stillThere } = await a.storage.from('avatars').list(USER_A);
+      expect((stillThere ?? []).some((f) => path.endsWith(f.name))).toBe(true);
+    } finally {
+      await a.storage.from('avatars').remove([path]);
+    }
   });
 });

@@ -67,13 +67,19 @@ create trigger app_errors_clamp
   before insert on public.app_errors
   for each row execute function public.clamp_app_error();
 
+-- A client's user_id is always replaced by its own auth.uid(). The service role
+-- is the exception: the sign-in edge function writes sign_in_success for a user
+-- who has no session yet, and its auth.uid() is null — forcing it would erase
+-- the one thing the row is for.
 create or replace function public.force_security_event_owner()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-  new.user_id = auth.uid();
+  if auth.role() is distinct from 'service_role' then
+    new.user_id = auth.uid();
+  end if;
   return new;
 end;
 $$;

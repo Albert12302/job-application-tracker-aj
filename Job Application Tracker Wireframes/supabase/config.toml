@@ -65,6 +65,9 @@ max_frequency = "60s"                 # per-address resend floor
 # lockout §7.1 also requires is not expressible here and lives in the sign-in
 # edge function (supabase/functions/sign-in).
 email_sent = 10                       # per hour, covers verify + reset sends
+# Sign-ins all arrive from the sign-in function, so for sign-in this is one
+# bucket shared by every user — a backstop only. The real per-IP sign-in limit
+# lives in the function (§7.1), which sees the caller's address.
 sign_in_sign_ups = 20                 # per 5 min per IP
 token_refresh = 150                   # per 5 min per IP
 token_verifications = 30              # per 5 min per IP
@@ -80,3 +83,6 @@ policy = "oneshot"
 
 [functions.sign-in]
 verify_jwt = false                    # it is the pre-auth endpoint
+
+[functions.upload]
+verify_jwt = true                     # signed-in users only; the function then asks Auth who

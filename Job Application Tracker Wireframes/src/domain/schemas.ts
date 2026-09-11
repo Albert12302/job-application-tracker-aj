@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { STATUSES } from './status';
 
+// No JIT. Zod 4 probes `new Function` to compile faster validators, and the
+// enforced CSP (SPEC §7.5, script-src 'self') reports that probe as a
+// violation on every page load even though Zod catches it. The interpreted
+// path is plenty for forms this size. Set here, not in main.tsx: this module is
+// where every schema comes from, so it runs before anything can parse — some
+// routes parse at import time.
+z.config({ jitless: true });
+
 /**
  * One schema per shape, used by the form, the route params, and anything parsed
  * from outside the app (CLAUDE.md). Messages are the copy SPEC §8 specifies —
@@ -118,6 +126,44 @@ export const signInSchema = z.object({
   password: z.string().min(1, 'Enter an email and password.').max(128),
 });
 
+export type SignInValues = z.infer<typeof signInSchema>;
+
+/** /sign-in URL state. `redirect` is untrusted — domain/redirect.ts decides
+ *  whether it is followed. Both fall back rather than fail (§8). */
+export const signInSearchSchema = z.object({
+  redirect: z.string().max(2000).optional().catch(undefined),
+  expired: z.boolean().optional().catch(undefined),
+});
+
+/** The sign-in edge function's 200 body. Only the two tokens setSession needs
+ *  are checked; the rest of the session object is Auth's business. */
+export const signInResponseSchema = z.object({
+  session: z.object({
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1),
+  }),
+});
+
+/** The sign-in function's 429 body. Only the wait is read; the copy is the client's own. */
+export const signInLockedBodySchema = z.object({
+  retryAfterMinutes: z.number().int().min(1).max(24 * 60).optional(),
+});
+
+/** A profiles row (§2 User, §4.6). guid(), not uuid(): uuid() enforces the RFC
+ *  variant bits, and ids such as the seed's 1111… fail it. */
+export const profileSchema = z.object({
+  id: z.guid(),
+  name: z.string().max(120).nullable(),
+  avatar_path: z.string().max(512).nullable(),
+});
+
+export type Profile = z.infer<typeof profileSchema>;
+
+/** The upload function's 201 body: the path it chose, `{user_id}/{uuid}.ext` (§7.3). */
+export const uploadResponseSchema = z.object({
+  path: z.string().min(1).max(512),
+});
+
 /** Sign-up (§4.1a). Validation order matters: email, then length, then match. */
 export const signUpSchema = z
   .object({
@@ -134,17 +180,21 @@ export const signUpSchema = z
   });
 
 /** The dashboard's URL state (§4.2). Every field has a fallback, so a malformed
- *  link degrades to the default view instead of a blank screen (§8). */
+ *  link degrades to the default view instead of a blank screen (§8).
+ *  `.default()` as well as `.catch()`: the router reads the schema's input
+ *  type, and only a default makes a field optional there — without it every
+ *  link to /applications would have to spell out all five params. */
 export const applicationsSearchSchema = z.object({
-  filter: z.string().catch('all'),
-  q: z.string().catch(''),
-  sort: z.enum(['date-desc', 'date-asc']).catch('date-desc'),
-  page: z.coerce.number().int().min(1).catch(1),
+  filter: z.string().default('all').catch('all'),
+  q: z.string().default('').catch(''),
+  sort: z.enum(['date-desc', 'date-asc']).default('date-desc').catch('date-desc'),
+  page: z.coerce.number().int().min(1).default(1).catch(1),
   pageSize: z
     .coerce
     .number()
     .int()
     .pipe(z.union([z.literal(10), z.literal(25), z.literal(50)]))
+    .default(25)
     .catch(25),
 });
 
