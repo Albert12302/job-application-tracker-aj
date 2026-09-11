@@ -14,3 +14,12 @@ supabase/.temp/
 
 .DS_Store
 *.log
+
+# Real user data must never reach this repo — it is public (§7.4).
+# §9.8 exports the user's own applications as a zip; a screenshot of the running
+# app shows live records; a .har from the network tab carries request bodies.
+# Test data stays fictional — see seed.sql.
+*.zip
+*.har
+screenshots/
+*.local.png
