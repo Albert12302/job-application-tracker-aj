@@ -17,7 +17,7 @@ import { CoverLetterPicker } from './CoverLetterPicker';
 import { CoverLetterSize } from './CoverLetterSize';
 import { SECTION_HEADING } from './panel';
 import { RemoveCoverLetterDialog } from './RemoveCoverLetterDialog';
-import { startDownload } from './start-download';
+import { saveFile } from './save-file';
 
 const ACTION = 'h-9 max-[760px]:h-11';
 
@@ -66,8 +66,14 @@ export function CoverLetterSection({ application }: { application: Application }
   };
 
   const fetchDownload = () => {
-    if (!file || !name) return;
-    download.mutate({ path: file.path, name }, { onSuccess: (url) => startDownload(url) });
+    if (!file) return;
+    const { path: from, label } = file;
+    download.mutate(from, {
+      onSuccess: (bytes) => {
+        saveFile(bytes, label);
+        download.reset(); // the bytes are saved; nothing needs to keep them
+      },
+    });
   };
 
   return (

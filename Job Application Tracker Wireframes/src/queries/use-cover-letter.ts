@@ -1,6 +1,5 @@
 import { useMutation, useMutationState, useQuery, useQueryClient, type MutationState } from '@tanstack/react-query';
-import { coverLetterDownloadUrl, coverLetterSize } from '@/data/storage';
-import { coverLetterLabel } from '@/domain/cover-letter';
+import { coverLetterSize, downloadCoverLetter } from '@/data/storage';
 import type { Application } from '@/domain/schemas';
 import { attachCoverLetter, coverLetterFileProblem, CoverLetterRejectedError } from '@/services/attach-cover-letter';
 import { removeCoverLetter } from '@/services/remove-cover-letter';
@@ -86,16 +85,16 @@ export function useRemoveCoverLetter(applicationId: string) {
 }
 
 /**
- * A signed URL for one download, made on click (§7.3). The caller uses it at
- * once; it is never rendered. A file another tab changed first is a failure
- * like any other, and the refreshed detail shows what the row holds now.
+ * The file, through a signed URL made on click (§7.3). The caller saves it and
+ * resets the mutation, so the bytes are not held after. A file another tab
+ * removed first is a failure like any other, and the refreshed detail shows
+ * what the row holds now.
  */
 export function useDownloadCoverLetter(applicationId: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, name }: { path: string; name: string }) =>
-      reporting('download_cover_letter', () => coverLetterDownloadUrl(path, coverLetterLabel(name))),
+    mutationFn: (path: string) => reporting('download_cover_letter', () => downloadCoverLetter(path)),
     onError: () => queryClient.invalidateQueries({ queryKey: keys.application(user.id, applicationId) }),
   });
 }

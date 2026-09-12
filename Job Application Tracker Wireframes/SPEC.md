@@ -211,8 +211,10 @@ checked before upload, and the first failure is shown under the row (§7.3):
 - over the upload rate limit (§7.1) — "You've uploaded a lot of files recently. Try again in an hour."
 
 Success shows a toast: "Cover letter attached." / "Cover letter replaced." / "Cover letter
-removed." Download asks for a signed URL when clicked and hands it straight to the browser
-(§7.3); the file saves under its original name.
+removed." Download asks for a 60-second signed URL when clicked, fetches the file through it,
+and saves it under its original name (§7.3). The signed URL is never put in the page, and the
+saved copy is typed `application/octet-stream`, so it can only be saved, never opened as part
+of the app.
 
 ### 4.5 Stats
 Computed live from the current application set:
@@ -952,6 +954,13 @@ the prototype is the reference for those.
   the application saves without the file rather than losing the record, so the record goes
   first. A failed upload lands on the new application's detail screen rather than the list,
   because that is where Retry lives — the same upload state, carried across the navigation.
+- **Cover letter downloads are fetched through the signed URL and saved by the app, not opened
+  as a link (§4.4).** Storage's `Content-Disposition` puts the name percent-encoded in its plain
+  `filename` parameter, and WebKit reads that one: on iOS, `Café letter.pdf` saved as
+  `Caf%C3%A9%20letter.pdf`. Fetching lets the app name the file in every browser, turns an
+  expired or failed URL into the §8.2 error state instead of a tab showing a JSON error, and
+  keeps the original name out of the URL. The URL still asks Storage for an attachment, in case
+  it is ever opened directly.
 - **Cover letters on the detail screen: attach, replace, remove, download (§4.4, §8.2, §9.4).**
   Refusal copy follows the profile photo's, because both come from the same upload function. The
   row write is guarded on the file it replaces, so a second tab cannot make a replace delete a
@@ -1130,6 +1139,13 @@ the prototype is the reference for those.
   from the first status-change feature.
 
 ### Open questions
+- **Storage's download responses carry no `X-Content-Type-Options: nosniff` (§7.3).** Checked
+  locally: the Storage server sets `Content-Disposition: attachment` but never `nosniff` on an
+  object. Not yet checked hosted. The app itself never loads a signed URL as a document (it
+  fetches the bytes, §4.4), and every stored file is typed by its bytes as PDF or Word, so the
+  exposure is a signed URL opened directly within its 60 seconds. Closing it fully would mean
+  serving downloads through a function that sets the header. Needs a decision: accept and amend
+  §7.3, or build that function.
 - No alerting on `app_errors` — accepted at two users (§7.7), revisit before real ones.
 - The `rate_limits` fixed window allows up to 2x a limit across a boundary. Accepted; if abuse
   ever makes it matter, the table can hold one row per event instead.

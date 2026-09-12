@@ -17,9 +17,9 @@ const getApplication = vi.fn();
 const setCoverLetter = vi.fn();
 const uploadFile = vi.fn();
 const coverLetterSize = vi.fn();
-const coverLetterDownloadUrl = vi.fn();
+const downloadCoverLetter = vi.fn();
 const removeCoverLetterObject = vi.fn();
-const startDownload = vi.fn();
+const saveFile = vi.fn();
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -49,17 +49,17 @@ vi.mock('@/data/storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/storage')>()),
   uploadFile: (...args: unknown[]) => uploadFile(...args),
   coverLetterSize: (...args: unknown[]) => coverLetterSize(...args),
-  coverLetterDownloadUrl: (...args: unknown[]) => coverLetterDownloadUrl(...args),
+  downloadCoverLetter: (...args: unknown[]) => downloadCoverLetter(...args),
   removeCoverLetterObject: (...args: unknown[]) => removeCoverLetterObject(...args),
 }));
 
-vi.mock('./start-download', () => ({ startDownload: (...args: unknown[]) => startDownload(...args) }));
+vi.mock('./save-file', () => ({ saveFile: (...args: unknown[]) => saveFile(...args) }));
 
 const ID = 'a0000000-0000-0000-0000-000000000001';
 const USER = '11111111-1111-1111-1111-111111111111';
 const OLD = `${USER}/0b9c3c5e-0000-4000-8000-000000000001.pdf`;
 const NEW = `${USER}/0b9c3c5e-0000-4000-8000-000000000002.docx`;
-const SIGNED = 'http://127.0.0.1:54321/storage/v1/object/sign/cover-letters/x?token=secret-token&download=a.pdf';
+const BYTES = new Blob(['%PDF-1.4 letter']);
 
 const pdf = (name = 'Northwind letter.pdf') => new File(['%PDF-1.4 letter'], name);
 
@@ -76,9 +76,9 @@ beforeEach(() => {
   });
   uploadFile.mockReset().mockResolvedValue(NEW);
   coverLetterSize.mockReset().mockResolvedValue(1_468_006);
-  coverLetterDownloadUrl.mockReset().mockResolvedValue(SIGNED);
+  downloadCoverLetter.mockReset().mockResolvedValue(BYTES);
   removeCoverLetterObject.mockReset().mockResolvedValue(undefined);
-  startDownload.mockReset();
+  saveFile.mockReset();
 });
 
 const withFile = (name = 'Northwind letter.pdf') => {
@@ -191,31 +191,34 @@ describe('CoverLetterSection', () => {
     expect(removeCoverLetterObject).not.toHaveBeenCalled();
   });
 
-  it('makes a signed URL only when Download is clicked, and never puts it in the page', async () => {
-    withFile();
-    const { user, container } = renderDetail();
+  it('fetches the file only when Download is clicked, and saves it under the cleaned name', async () => {
+    withFile('Northwind\u202e letter.pdf');
+    const { user } = renderDetail();
 
-    await user.click(await screen.findByRole('button', { name: 'Download cover letter' }));
-    await waitFor(() => expect(startDownload).toHaveBeenCalledWith(SIGNED));
-    expect(coverLetterDownloadUrl).toHaveBeenCalledTimes(1);
-    expect(coverLetterDownloadUrl).toHaveBeenCalledWith(OLD, 'Northwind letter.pdf');
-    expect(container.innerHTML).not.toContain('secret-token');
-    expect(document.body.innerHTML).not.toContain('/object/sign/');
+    await screen.findByRole('button', { name: 'Download cover letter' });
+    expect(downloadCoverLetter).not.toHaveBeenCalled(); // nothing is signed on render (§7.3)
+
+    await user.click(screen.getByRole('button', { name: 'Download cover letter' }));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Northwind letter.pdf'));
+    expect(downloadCoverLetter).toHaveBeenCalledTimes(1);
+    expect(downloadCoverLetter).toHaveBeenCalledWith(OLD);
   });
 
-  it('says when a download cannot start, and Retry asks for a new URL', async () => {
+  it('says when a download fails, and Retry fetches it again', async () => {
     withFile();
-    coverLetterDownloadUrl.mockRejectedValueOnce(new Error('network'));
+    downloadCoverLetter.mockRejectedValueOnce(new Error('network'));
     const { user } = renderDetail();
 
     await user.click(await screen.findByRole('button', { name: 'Download cover letter' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain("Couldn't download the cover letter.");
-    expect(startDownload).not.toHaveBeenCalled();
+    expect(alert.textContent).toMatch(/Error reference [0-9a-f]{8}/);
+    expect(saveFile).not.toHaveBeenCalled();
 
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(startDownload).toHaveBeenCalledWith(SIGNED));
-    expect(coverLetterDownloadUrl).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Northwind letter.pdf'));
+    expect(downloadCoverLetter).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Couldn't download the cover letter.")).toBeNull();
   });
 
   it('asks before removing, names the file, and does nothing when kept (§9.4)', async () => {
