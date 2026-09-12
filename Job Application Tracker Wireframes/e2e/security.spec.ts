@@ -297,6 +297,72 @@ test.describe('7.8.4 delete leaves nothing behind', () => {
   });
 });
 
+test.describe('7.8.1 cross-user isolation — cover letters (§6 step 3)', () => {
+  /**
+   * The path on a row is only text: nothing stops user B writing user A's path
+   * into B's own application. What must stop B is Storage, whatever the row
+   * says — no signed URL, no download, no size, no listing, no delete.
+   *
+   * Owner dev-d, whose uploads no photo test counts; one stored file per run.
+   */
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  test('user B cannot sign, read, list, or delete user A cover letter, even through a row pointing at it', async () => {
+    const d = await signIn('dev-d@example.test');
+    const { data: owner } = await d.auth.getUser();
+    const ownerId = owner.user!.id;
+    const path = await uploadThroughFunction(d, 'cover-letter', '%PDF-1.4 private');
+    expect(path.startsWith(`${ownerId}/`)).toBe(true);
+
+    const b = await signIn('dev-b@example.test');
+    const { data: created, error: createError } = await b.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: `Pointer ${crypto.randomUUID().slice(0, 8)}`,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+    });
+    expect(createError).toBeNull();
+    const bApplication = (created as { id: string }).id;
+
+    try {
+      const letters = b.storage.from('cover-letters');
+
+      const { data: signed, error: signError } = await letters.createSignedUrl(path, 60);
+      expect(signed).toBeNull();
+      expect(signError).not.toBeNull();
+
+      const { data: downloaded } = await letters.download(path);
+      expect(downloaded).toBeNull();
+
+      const { data: info } = await letters.info(path);
+      expect(info).toBeNull();
+
+      const { data: listed } = await letters.list(ownerId);
+      expect(listed ?? []).toEqual([]);
+
+      // B's own row, pointed at A's file: allowed as text, useless as access.
+      const { error: pointError } = await b
+        .from('applications')
+        .update({ cover_letter_path: path, cover_letter_name: 'not mine.pdf' })
+        .eq('id', bApplication);
+      expect(pointError).toBeNull();
+      const { data: stillSigned } = await letters.createSignedUrl(path, 60);
+      expect(stillSigned).toBeNull();
+
+      // Deleting B's application removes "its" file as B — which Storage refuses.
+      const { data: removed } = await letters.remove([path]);
+      expect(removed ?? []).toEqual([]);
+
+      const { data: stillThere } = await d.storage.from('cover-letters').list(ownerId, { search: path.split('/').pop()! });
+      expect((stillThere ?? []).some((f) => path.endsWith(f.name))).toBe(true);
+    } finally {
+      await b.from('applications').delete().eq('id', bApplication);
+      await d.storage.from('cover-letters').remove([path]);
+    }
+  });
+});
+
 test.describe('7.8.1 cross-user isolation — profile and photo (§6 step 1)', () => {
   const USER_B = '22222222-2222-2222-2222-222222222222';
   const PNG = Uint8Array.from(
