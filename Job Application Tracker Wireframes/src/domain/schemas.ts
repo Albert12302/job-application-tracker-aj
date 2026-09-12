@@ -176,6 +176,23 @@ export const uploadResponseSchema = z.object({
   path: z.string().min(1).max(512),
 });
 
+/**
+ * A cover letter as an application row holds it (§2): the stored path and the
+ * original name, set together or not at all. The name is a display label
+ * (domain/cover-letter.ts `coverLetterLabel`), capped as the column is.
+ */
+export const coverLetterSchema = z.object({
+  path: z.string().min(1).max(512),
+  name: z.string().min(1).max(255),
+});
+
+export type CoverLetter = z.infer<typeof coverLetterSchema>;
+
+/** Storage's object info, as far as the app reads it: the size in bytes. */
+export const storageObjectInfoSchema = z.object({
+  size: z.number().int().nonnegative(),
+});
+
 /** Sign-up (§4.1a). Validation order matters: email, then length, then match. */
 export const signUpSchema = z
   .object({

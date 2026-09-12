@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { uploadResponseSchema } from '@/domain/schemas';
+import { storageObjectInfoSchema, uploadResponseSchema } from '@/domain/schemas';
 import { supabase } from './client';
 
 /**
@@ -8,7 +8,7 @@ import { supabase } from './client';
  *
  * Writes go through the `upload` edge function: the buckets accept none from
  * the client (§7.3). The function reads the bytes, chooses the path, and stores
- * the file; the client only reads and deletes. Cover letters land here in step 3.
+ * the file; the client only reads and deletes.
  */
 
 const AVATARS = 'avatars';
@@ -61,6 +61,32 @@ export async function downloadAvatarDataUrl(path: string): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('avatar_read_failed'));
     reader.readAsDataURL(data);
   });
+}
+
+/** §7.3: long enough to start the download it was made for, and no longer. */
+export const SIGNED_URL_TTL_SECONDS = 60;
+
+/** The stored file's size in bytes, from Storage's own record of the object. */
+export async function coverLetterSize(path: string): Promise<number> {
+  const { data, error } = await supabase.storage.from(COVER_LETTERS).info(path);
+  if (error) throw error;
+  return storageObjectInfoSchema.parse(data).size;
+}
+
+/**
+ * A 60-second signed URL that downloads the cover letter under `label`.
+ * Made when the user asks for the file and used at once — never rendered into
+ * the page (§7.3).
+ *
+ * `download` makes Storage answer with `Content-Disposition: attachment`, so
+ * the file is saved rather than opened in the app's tab. It is appended here
+ * rather than passed as createSignedUrl's `download` option, which
+ * percent-encodes the name twice: `é` would arrive as the literal `%C3%A9`.
+ */
+export async function coverLetterDownloadUrl(path: string, label: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(COVER_LETTERS).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error) throw error;
+  return `${data.signedUrl}&download=${encodeURIComponent(label)}`;
 }
 
 async function removeObject(bucket: string, path: string): Promise<void> {

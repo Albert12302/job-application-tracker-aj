@@ -44,7 +44,7 @@ async function patchCached(
 }
 
 /** Put a saved row into the caches — the database's answer, so no refetch is needed to show it. */
-function storeSaved(queryClient: QueryClient, userId: string, row: Application) {
+export function storeSaved(queryClient: QueryClient, userId: string, row: Application) {
   queryClient.setQueryData(keys.application(userId, row.id), row);
   queryClient.setQueryData<Application[]>(keys.applicationList(userId), (rows) =>
     rows ? [...rows.filter((existing) => existing.id !== row.id), row].sort(newestFirst) : rows,
