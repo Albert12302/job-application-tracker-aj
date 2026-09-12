@@ -161,13 +161,13 @@ export function ApplicationDetailScreen() {
         <NotesSection applicationId={found.id} />
 
         {/* The record's own actions, kept off the notes form above: three actions in a
-            stack read as one group otherwise (§8). Filled, outlined, and red — the
-            weight says which is which before the words do. */}
+            stack read as one group otherwise (§8). Filled for the edit, light red for
+            the delete — colour says which is which before the words do. */}
         <div className="flex flex-wrap gap-2.5 border-t border-border pt-5">
           <Link
             to="/applications/$id/edit"
             params={{ id: found.id }}
-            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
+            className={buttonVariants({ className: 'h-9 max-[760px]:h-11' })}
           >
             Edit application
           </Link>
