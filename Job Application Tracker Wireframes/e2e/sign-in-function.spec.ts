@@ -53,8 +53,14 @@ test('an unknown email and a wrong password are indistinguishable', async ({ req
     expect(r.status).toBe(401);
     expect(r.body).toEqual({ error: 'That email and password combination is incorrect.' });
   }
-  const mean = (rs: { ms: number }[]) => rs.reduce((sum, r) => sum + r.ms, 0) / rs.length;
-  expect(Math.abs(mean(wrong) - mean(unknown))).toBeLessThan(100);
+  // Medians, not means: a timing leak is systematic and shows in every sample,
+  // while one request delayed by a busy machine moves a three-sample mean by
+  // more than the whole threshold.
+  const median = (rs: { ms: number }[]) => {
+    const sorted = rs.map((r) => r.ms).sort((a, b) => a - b);
+    return sorted[(sorted.length - 1) >> 1]!;
+  };
+  expect(Math.abs(median(wrong) - median(unknown))).toBeLessThan(100);
 });
 
 test('five wrong passwords lock the account; the sixth fails even when correct', async ({ request }) => {

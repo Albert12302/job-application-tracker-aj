@@ -1,7 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
-import { apiSession, PASSWORD, startSignedIn } from './session.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { apiActor, startSignedIn } from './session.js';
 
 /**
  * SPEC §6 step 2 end to end: add → appears in the list → detail → status →
@@ -13,8 +13,6 @@ import { apiSession, PASSWORD, startSignedIn } from './session.js';
  * projects never read each other's rows.
  */
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-const ANON = process.env.VITE_SUPABASE_ANON_KEY!;
 const EMAIL = 'dev-d@example.test';
 
 test.describe.configure({ mode: 'serial' });
@@ -22,14 +20,28 @@ test.describe.configure({ mode: 'serial' });
 // One session for the whole spec: signing in is e2e/auth.spec.ts's subject,
 // not this one's, and the provider-side budget is shared (e2e/session.ts).
 let session: string;
+let client: SupabaseClient;
+const made: string[] = [];
 
 test.beforeAll(async () => {
-  session = await apiSession(EMAIL);
+  ({ client, session } = await apiActor(EMAIL));
+});
+
+test.afterAll(async () => {
+  if (made.length > 0) await client.from('applications').delete().in('id', made);
 });
 
 test.beforeEach(async ({ page }) => {
   await startSignedIn(page, session);
 });
+
+/**
+ * A company name no other test, browser project, or rerun will use: two tests
+ * that share a name fight over each other's rows.
+ */
+function unique(prefix: string, project: string): string {
+  return `${prefix} ${project} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
 
 async function openList(page: Page) {
   await page.goto('/applications');
@@ -41,10 +53,31 @@ async function expectAxeClean(page: Page) {
   expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
 }
 
+/**
+ * A row of this run's own, made through the same function the app calls.
+ *
+ * dev-d starts with no applications, so a test that acts on "the first row"
+ * is really acting on whatever an earlier run or e2e/security.spec.ts — which
+ * also creates and deletes rows as dev-d, at the same time — happened to leave
+ * behind. Each test that needs a row makes one and names it.
+ */
+async function makeApplication(company: string): Promise<string> {
+  const { data, error } = await client.rpc('create_application', {
+    // Midnight UTC, which the column's check constraint requires (§5.4).
+    p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
+    p_company: company,
+    p_position: 'Frontend Engineer',
+    p_status: 'Applied',
+    p_referral: false,
+  });
+  expect(error).toBeNull();
+  const id = (data as { id: string }).id;
+  made.push(id);
+  return id;
+}
+
 /** The history rows an application has, oldest first — what §2 says must exist. */
 async function historyFor(applicationId: string) {
-  const client = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
-  await client.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
   const { data } = await client
     .from('status_history')
     .select('from_status, to_status')
@@ -54,7 +87,7 @@ async function historyFor(applicationId: string) {
 }
 
 test('add, open, restatus, edit, note, and delete an application', async ({ page }, testInfo) => {
-  const company = `Northwind ${testInfo.project.name} ${Date.now()}`;
+  const company = unique('Northwind', testInfo.project.name);
   await openList(page);
   await expectAxeClean(page);
 
@@ -158,7 +191,9 @@ test('add, open, restatus, edit, note, and delete an application', async ({ page
   await expect(page.getByRole('link', { name: company })).toHaveCount(0);
 });
 
-test('the list says when it cannot load, and Retry brings it back (§8.2)', async ({ page }) => {
+test('the list says when it cannot load, and Retry brings it back (§8.2)', async ({ page }, testInfo) => {
+  // Retry has to land on the table, not the empty state, so this needs a row.
+  await makeApplication(unique('Retry', testInfo.project.name));
   await page.route('**/rest/v1/applications*', (route) =>
     route.request().method() === 'GET' ? route.fulfill({ status: 500, body: '{"message":"boom"}' }) : route.fallback(),
   );
@@ -174,7 +209,9 @@ test('the list says when it cannot load, and Retry brings it back (§8.2)', asyn
   await expect(page.getByRole('table')).toBeVisible();
 });
 
-test('360px: cards instead of a table, no sideways scroll, 44px controls (§11)', async ({ page }) => {
+test('360px: cards instead of a table, no sideways scroll, 44px controls (§11)', async ({ page }, testInfo) => {
+  const company = unique('Narrow', testInfo.project.name);
+  await makeApplication(company);
   await page.setViewportSize({ width: 360, height: 740 });
   await openList(page);
 
@@ -184,18 +221,20 @@ test('360px: cards instead of a table, no sideways scroll, 44px controls (§11)'
 
   const add = page.getByRole('link', { name: 'Add application' }).first();
   expect((await add.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-  const star = page.getByRole('button', { name: /^Star / }).first();
+  const star = page.getByRole('button', { name: `Star ${company}` });
   const starBox = await star.boundingBox();
   expect(starBox?.height).toBeGreaterThanOrEqual(44);
   expect(starBox?.width).toBeGreaterThanOrEqual(44);
 });
 
-test('keyboard alone: reach a row, star it, and open it', async ({ page, browserName }) => {
+test('keyboard alone: reach a row, star it, and open it', async ({ page, browserName }, testInfo) => {
+  const company = unique('Keys', testInfo.project.name);
+  await makeApplication(company);
   await openList(page);
 
-  const row = page.getByRole('row').nth(1); // nth(0) is the header
-  const star = row.getByRole('button', { name: /^Star / });
-  const link = row.getByRole('link');
+  const row = page.getByRole('row').filter({ hasText: company });
+  const star = row.getByRole('button', { name: `Star ${company}` });
+  const link = row.getByRole('link', { name: company });
 
   const pressed = await star.getAttribute('aria-pressed');
   await star.focus();
@@ -222,12 +261,18 @@ test('keyboard alone: reach a row, star it, and open it', async ({ page, browser
   // takes a value, and saves; the delete dialog traps Escape rather than
   // deleting anything (§10.2).
   const status = page.getByRole('combobox', { name: 'Status' });
-  const before = (await status.textContent())?.trim();
+  await expect(status).toContainText('Applied'); // where makeApplication starts it
   await status.focus();
   await page.keyboard.press('Enter');
+  // The popup takes the keyboard a frame or two after it appears — WebKit is the
+  // slow one — and arrows sent into that gap land on the trigger and are lost.
+  // So wait for the selected option to hold focus, not merely for the list to show.
+  const options = page.getByRole('option');
+  await expect(options.first()).toBeFocused();
   await page.keyboard.press('ArrowDown');
+  await expect(options.nth(1)).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(status).not.toHaveText(before ?? '');
+  await expect(status).toContainText('Interview');
 
   await page.getByRole('button', { name: 'Delete application' }).focus();
   await page.keyboard.press('Enter');

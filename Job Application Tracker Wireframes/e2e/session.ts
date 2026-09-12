@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * A signed-in browser for tests that are not about signing in.
@@ -23,12 +23,21 @@ export const PASSWORD = 'devpassword1234';
 /** src/data/client.ts AUTH_STORAGE_KEY — where supabase-js keeps the session. */
 const STORAGE_KEY = 'aj-hunt-auth';
 
-/** The stored session for `email`, as JSON. Call once per spec, in beforeAll. */
-export async function apiSession(email: string): Promise<string> {
+/**
+ * One sign-in, giving both halves a spec needs: a client for the rows it sets
+ * up or reads back, and the stored session that starts the browser signed in.
+ * Signing in twice per spec spends the same budget twice for nothing.
+ */
+export async function apiActor(email: string): Promise<{ client: SupabaseClient; session: string }> {
   const client = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
   const { data, error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
   expect(error, `could not sign in as ${email} — run npm run db:reset`).toBeNull();
-  return JSON.stringify(data.session);
+  return { client, session: JSON.stringify(data.session) };
+}
+
+/** The stored session for `email`, as JSON. Call once per spec, in beforeAll. */
+export async function apiSession(email: string): Promise<string> {
+  return (await apiActor(email)).session;
 }
 
 /** Puts that session in storage before the page loads, so the app starts signed in. */
