@@ -184,6 +184,16 @@ Validation: company and position required → "Company and position are required
 Save prepends the new application to the list and returns to the dashboard with filter reset
 to All.
 
+Cover letter attach: **Attach cover letter** picks a file, which is checked on choosing (the
+§4.4 copy, shown under the field) and then shown with its name and size, **Choose a different
+file**, and **Remove file**. Nothing is uploaded until Save, so clearing a chosen file needs no
+confirmation. On Save the application is created first, then the file is uploaded and attached,
+with "Uploading…" on the file's row and "Saving…" in the button. If the upload fails, the
+application stays saved without it: the form goes to the new application's detail screen, where
+"Upload failed." and Retry are shown (§8.2), with the toast "Application added, but the cover
+letter didn't upload." Cancel with a chosen file asks before discarding, as it does for typed
+changes (§9.1).
+
 ### 4.4 Application detail
 Header: company, position, location, date, status tag, star.
 Funnel indicator showing position across Applied → Interview → Callback → Offer.
@@ -710,7 +720,8 @@ untouched. Never leave the UI showing a state the database does not have.
 ## 9. Edit and delete
 
 ### 9.1 Edit an application
-Reached from the detail screen. Same fields and validation as Add (§4.3), pre-filled.
+Reached from the detail screen. Same fields and validation as Add (§4.3), pre-filled — except the
+cover letter, which is attached, replaced, and removed on the detail screen itself (§4.4, §9.4).
 - Location re-normalizes on save (§5.2).
 - Changing status here writes a `status_history` row exactly as the detail-screen status
   selector does — one code path, not two.
@@ -937,6 +948,10 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-12
+- **The add form attaches a cover letter after the application saves (§4.3, §8.2).** §8.2 says
+  the application saves without the file rather than losing the record, so the record goes
+  first. A failed upload lands on the new application's detail screen rather than the list,
+  because that is where Retry lives — the same upload state, carried across the navigation.
 - **Cover letters on the detail screen: attach, replace, remove, download (§4.4, §8.2, §9.4).**
   Refusal copy follows the profile photo's, because both come from the same upload function. The
   row write is guarded on the file it replaces, so a second tab cannot make a replace delete a
