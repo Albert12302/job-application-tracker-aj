@@ -16,6 +16,9 @@ export function StatusSelect({ application }: { application: Application }) {
   const labelId = useId();
   const change = useChangeStatus(application.id);
   const tone = STATUS_TOKENS[application.status];
+  // The chevron takes the tone's own foreground rather than the muted grey the plain
+  // select uses: grey measures 1.2:1 on the Offer fill and 1.3:1 on Rejected, under the
+  // 3:1 a control affordance needs (§10.1). --select-chevron is the primitive's hook.
 
   return (
     <div className="flex items-center gap-2">
@@ -25,7 +28,11 @@ export function StatusSelect({ application }: { application: Application }) {
       <Select value={application.status} onValueChange={(value) => change.mutate(value as Status)}>
         <SelectTrigger
           aria-labelledby={labelId}
-          className={cn('h-8 w-[150px] border-transparent font-semibold max-[760px]:h-11', tone.bg, tone.fg)}
+          className={cn(
+            'h-8 w-[150px] border-transparent font-semibold [--select-chevron:currentColor] max-[760px]:h-11',
+            tone.bg,
+            tone.fg,
+          )}
         >
           <SelectValue />
         </SelectTrigger>
