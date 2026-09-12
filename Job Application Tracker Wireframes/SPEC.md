@@ -80,7 +80,10 @@ it cannot be backfilled, and without it stats can only ever describe the present
 
 Rules:
 - Written by exactly one code path (§9.1) — the detail-screen selector and the edit form both
-  call it. Two writers means one will be forgotten.
+  call it. Two writers means one will be forgotten. In the build that path is
+  `services/change-status.ts`, calling the Postgres function `change_application_status`, which
+  updates the status and appends the row in one transaction. The creation row comes from
+  `create_application`, which inserts the application, that row, and any first note together.
 - A row is written when the application is created, with `from_status = null`.
 - No row when a save leaves the status unchanged.
 - Never updated or deleted except by the application's cascade. No RLS update or delete policy
@@ -173,7 +176,7 @@ A floating **Jump to bottom** pill appears when more than ~100px of scroll remai
 Empty state when a filter or search matches nothing.
 
 ### 4.3 Add application
-Fields: date (defaults today), company*, position*, location (combobox — suggests existing
+Fields: date (defaults to today in the user's own zone, §5.4), company*, position*, location (combobox — suggests existing
 locations, accepts new), description, status (defaults Applied), referral toggle, cover-letter
 attach, first note.
 
@@ -254,6 +257,10 @@ Two rules make that storage safe, and they are not optional:
 2. **Format in UTC.** Every display, every group-by, every "last 30 days" boundary uses UTC.
    Formatting UTC midnight in the browser's zone shows the previous day for everyone west of
    Greenwich — the single most common version of this bug.
+
+The Add form's default is **today in the user's own zone** — the calendar day they are living
+in — which is then stored as UTC midnight of that day like any other choice. Taking "today"
+from UTC would default to tomorrow from late afternoon onwards on the US west coast.
 
 `created_at`, `updated_at`, `changed_at`, and note timestamps are genuine moments and stay
 plain `timestamptz` in real UTC, formatted in the viewer's local zone. Only `date_applied`
@@ -709,8 +716,8 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 ### 9.3 Notes
 - Notes are individually editable and deletable from the detail screen.
 - Edit is inline; save on blur or explicit Save, Escape cancels.
-- Delete asks for confirmation only if the note is longer than a line; otherwise delete with
-  an undo toast.
+- Delete asks for confirmation only if the note is longer than a line — over 80 characters, or
+  containing a line break; otherwise delete with an undo toast.
 - Editing a note updates `updated_at`; display order stays by `created_at`.
 
 ### 9.4 Cover letter
@@ -779,6 +786,9 @@ screen is a release requirement, checked the same way as §7.
     outline**, so it must clear 4.5:1 against white — a light tint cannot do both jobs;
   - form-control borders and icon-only state indicators (the star) carry meaning and need
     3:1, which is darker than a decorative card border.
+- One accepted exception to the 3:1 boundary rule: the delete button’s light red fill, which
+  measures 1.6:1 against the card. A red light enough to read as light cannot clear 3:1, and
+  the control is identified by its label and shape rather than its edge; its text is at 10.2:1.
 - Status is never communicated by color alone: every tag carries its text label, and the stats
   breakdown bar has a text legend with counts.
 - All images and icon-only controls have text alternatives. The star, paperclip, chevrons, and
@@ -894,6 +904,34 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-11
+- **Detail-screen actions separated by weight, and the button contrast results recorded.**
+  Add note and Edit application are the filled action and delete is light red under the page’s
+  own near-black, because three tinted buttons in a stack read as one control. Measuring them
+  found two hover states that failed §10.1 outright — the filled button faded to 3.45:1 under
+  white text, the destructive tint put its text at 3.93:1 — and both darken now instead. The
+  delete fill’s own 1.6:1 against the card is the exception now recorded in §10.1.
+- **§6 step 2 built: applications CRUD.** Add, list, detail, edit, delete, and notes, against
+  the schema that already existed. Status changes from the detail selector and from the edit
+  form both go through `services/change-status.ts`, so `status_history` has been written from
+  the first commit rather than backfilled — it cannot be. Deliberately not here: cover-letter
+  attach and replace (step 3), search, filter tabs, saved filters, sort and pagination (steps
+  5–6), and Undo on an application delete, which §9.2 says to leave out rather than fake.
+  There is no stats surface yet, so nothing displays the hardcoded zero step 2 mentions;
+  stats arrive with step 4, computed from the history now being recorded.
+- **A status change, and a creation, are each one Postgres transaction (§2, §9.1).**
+  `change_application_status` locks the row, reads its current status, updates it, and appends
+  the `status_history` row; `create_application` inserts the application, its creation row, and
+  the first note. As separate requests from the browser, a dropped connection or a write-limit
+  trip between them would leave a status with no history row — which cannot be backfilled — and
+  a second tab could record the wrong `from_status`. Both run with the caller's rights, so RLS
+  and the rate limit still apply, and `services/change-status.ts` is still the one client path.
+- **A fourth local seed user, `dev-d`, for the tests that add and delete applications.** They
+  run in parallel with the auth test that asserts `dev-a`'s exact application count.
+- **"Longer than a line" fixed at 80 characters or any line break (§9.3).** A rendered line
+  depends on screen width, so the note-delete rule needed an answer that does not.
+- **The Add form defaults to the user's local today, not UTC's (§4.3, §5.4).** The default was
+  computed in UTC, so from late afternoon on the US west coast the form offered tomorrow. The
+  prototype used the local day; the stored value is still UTC midnight of the chosen day.
 - **§7.8 check 5 corrected: a locked account answers with the lockout, not a fake wrong
   password.** It asked for a locked account to look exactly like a wrong password. That would
   tell a locked-out user typing the right password that it was wrong — for up to an hour under

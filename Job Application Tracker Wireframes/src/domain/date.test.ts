@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoment, formatUtcDate, toDateInputValue, toUtcMidnight } from './date';
+import { formatMoment, formatUtcDate, toDateInputValue, todayDateInputValue, toUtcMidnight } from './date';
 
 describe('toUtcMidnight', () => {
   it('appends UTC midnight to a date input value', () => {
@@ -32,6 +32,24 @@ describe('formatUtcDate', () => {
   it('round-trips through the input value unchanged', () => {
     expect(toDateInputValue(toUtcMidnight('2026-01-01'))).toBe('2026-01-01');
     expect(toDateInputValue(toUtcMidnight('2026-12-31'))).toBe('2026-12-31');
+  });
+});
+
+describe('todayDateInputValue', () => {
+  // Each case is inert on one side of Greenwich, so between the TZ=UTC and
+  // TZ=PST8PDT runs (plus any eastern developer machine) both directions are
+  // covered: late evening is already tomorrow in UTC for the west, and just
+  // after midnight is still yesterday in UTC for the east.
+  it('is the local calendar day late in the evening', () => {
+    expect(todayDateInputValue(new Date(2026, 8, 10, 23, 30))).toBe('2026-09-10');
+  });
+
+  it('is the local calendar day just after midnight', () => {
+    expect(todayDateInputValue(new Date(2026, 8, 10, 0, 30))).toBe('2026-09-10');
+  });
+
+  it('pads single-digit months and days', () => {
+    expect(todayDateInputValue(new Date(2026, 0, 5, 12))).toBe('2026-01-05');
   });
 });
 

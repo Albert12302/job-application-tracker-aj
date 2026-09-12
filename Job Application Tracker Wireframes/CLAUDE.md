@@ -155,6 +155,17 @@ Three layers, each with a job:
   1. user B cannot read or write user A's application by id;
   2. deleting an application removes its notes, history rows, and Storage object.
 
+  Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
+  exact application count, and the suites run in parallel.
+
+  **A test that is not about signing in starts signed in** — `e2e/session.ts` takes a session
+  straight from Auth and puts it in storage. Every sign-in through the form reaches Auth from
+  the sign-in function's one address, so they all share a single provider-side bucket
+  (§7.1, `config.toml` `sign_in_sign_ups`); a suite that signs in through the form everywhere
+  spends that budget on tests that are testing something else, and the later ones are refused
+  and fail for reasons of their own. `auth.spec.ts` and `sign-in-function.spec.ts` still use
+  the form, because that is their subject.
+
   `e2e/security.spec.ts` exists already and fails until the features do. Two standing rules for
   it: get it green by fixing policies, **never** by softening an assertion; and its delete test
   currently calls the tables directly — **rewire it to `services/delete-application.ts` the
@@ -202,7 +213,8 @@ src/
     applications.ts           list / get / create / update / remove
     notes.ts
     saved-filters.ts
-    status-history.ts         append-only
+    status-history.ts         reads, when stats need them (§6 step 4); rows are written only
+                              by the two SQL functions, never from the client
     storage.ts                upload (via the upload function) / signed URL / delete
     profile.ts
 
@@ -220,22 +232,40 @@ src/
     use-notes.ts
     use-saved-filters.ts
     use-stats.ts
-    use-mutations.ts
+    use-mutations.ts          sign-in, sign-out, avatar
+    use-application-mutations.ts   add, edit, status, star, delete
+    use-note-mutations.ts     add, edit, delete, restore
 
   features/                   feature-owned UI. May import ui/, domain/, queries/, hooks/ —
                               never another feature's internals.
     auth/                     SignInScreen, SignInForm (guard: routes/authenticated.tsx)
     shell/                    AppShell (header + skip link), RouteError, NotFound
     applications/
-      ApplicationTable.tsx
+      ApplicationsScreen.tsx      the list and its three states (§8.2)
+      ApplicationTable.tsx        at 760px and wider
+      ApplicationTableHeader.tsx  shared with the loading skeleton
       ApplicationRow.tsx
+      ApplicationCards.tsx        below 760px (§11)
+      ApplicationCard.tsx
+      ApplicationListSkeleton.tsx
+      AddApplicationLink.tsx
+      NoneMark.tsx                a dash to see, a word to hear
       StatusTag.tsx
       StarToggle.tsx
-      ApplicationForm.tsx     shared by new + edit
-      DeleteApplicationDialog.tsx
-      NotesList.tsx
+      use-open-application.ts     row click, without a second tab stop
+      AddApplicationScreen.tsx
+      EditApplicationScreen.tsx
+      ApplicationForm.tsx         shared by add + edit (§9.1)
+      DiscardChangesDialog.tsx
+      ApplicationDetailScreen.tsx
+      StatusSelect.tsx            the one status-change control (§4.4)
+      FunnelIndicator.tsx
+      NotesSection.tsx
       NoteItem.tsx
-      CoverLetterField.tsx
+      DeleteApplicationDialog.tsx
+      delete-summary.ts           what a delete takes with it (§9.2)
+      panel.ts                    the shared card and section headings
+      CoverLetterField.tsx        step 3
     filters/
       FilterTabs.tsx
       FilterBuilder.tsx
@@ -355,9 +385,10 @@ supabase/
   auth-js's event order differs by browser and is not used. `useSignedInUser()` still answers
   during the redirect after sign-out, so screens never crash on the way out.
 - **Ids validate with `z.guid()`, not `z.string().uuid()`.** Zod 4's `uuid()` enforces the RFC
-  variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it. `applicationSchema`,
-  `noteSchema`, and `savedFilterSchema` still use `uuid()` and will reject seed rows — switch
-  them when step 2 first parses one.
+  variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it.
+- **Timestamps validate with `z.iso.datetime({ offset: true })`.** PostgREST sends
+  `2026-09-11T16:43:33.642123+00:00`; the default `datetime()` accepts only `Z` and rejects
+  every row.
 - **Zod runs `jitless`** (`z.config` at the top of `domain/schemas.ts`). Its JIT probes
   `new Function`, which the enforced CSP reports as a violation on every load. Any new
   dependency that needs `eval` or `new Function` is a CSP problem — check it with
@@ -390,7 +421,9 @@ supabase/
   one back, or the server-side type check becomes optional. The function chooses the path.
 - Never `dangerouslySetInnerHTML` on user content. Descriptions and notes are free text.
 - Status changes always go through one code path that writes `status_history` — detail screen
-  and edit form both.
+  and edit form both. That path is `services/change-status.ts` → the `change_application_status`
+  Postgres function; the creation row comes from `create_application`. Never write `status` in
+  a plain update, and never insert into `status_history` from the client.
 - Deleting an application deletes its notes, history, and Storage objects. No orphaned files.
 - Debug mode and verbose errors off in production builds.
 - **Every error is reported through `reportError()`** — never a direct insert or SDK call from
@@ -406,9 +439,11 @@ supabase/
   Every other timestamp is a real moment and formats in the viewer's zone.
 - **Migrations are already written for the whole schema** (`supabase/migrations/`). They have
   been applied nowhere but locally, so fixing one in place is still correct; once anything is
-  hosted, write a new one. The two that repay reading before you touch them:
+  hosted, write a new one. The three that repay reading before you touch them:
   `20260910090400_status_history.sql` (append-only via the *absence* of update and delete
-  policies) and `20260910090700_log_tables.sql` (`auth.uid()` defaults, insert-only, clamped).
+  policies), `20260911165950_status_change_functions.sql` (the only writers of that table, one
+  transaction each, invoker rights), and `20260910090700_log_tables.sql` (`auth.uid()`
+  defaults, insert-only, clamped).
 - Browser support is SPEC §12. iOS Safari 17+ is a first-class target, not an afterthought —
   every browser on iOS is WebKit.
 - **Security headers live in `vercel.json`**, the one place (SPEC §7.5). Hosting is Vercel

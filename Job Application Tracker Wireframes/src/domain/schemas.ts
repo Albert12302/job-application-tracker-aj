@@ -23,8 +23,18 @@ const CAPS = { shortText: 120, description: 5000, noteBody: 2000, filterName: 60
 
 export const statusSchema = z.enum(STATUSES);
 
+/** Ids: guid(), not uuid() — uuid() enforces the RFC variant bits, and seed ids such as 1111… fail it. */
+const id = z.guid();
+
+/** A timestamptz as PostgREST sends it: an offset (`+00:00`), not always `Z`. */
+const timestamp = z.iso.datetime({ offset: true });
+
+/** An application id from outside the app — a route param (§8.2 "Application not found"). */
+export const applicationIdSchema = id;
+
 const dateInput = z
   .string()
+  .min(1, 'Enter the date you applied.')
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a date as YYYY-MM-DD.')
   .refine((v) => {
     const [y, m, d] = v.split('-').map(Number);
@@ -33,7 +43,8 @@ const dateInput = z
   }, 'That date does not exist.');
 
 /** What the Add and Edit forms validate. `date` is the raw input value;
- *  toUtcMidnight() converts it on submit (§5.4). */
+ *  toUtcMidnight() converts it on submit (§5.4). `note` is the Add form's
+ *  first note (§4.3); Edit does not render it. */
 export const applicationFormSchema = z.object({
   date: dateInput,
   company: z
@@ -54,15 +65,16 @@ export const applicationFormSchema = z.object({
     .optional(),
   status: statusSchema,
   referral: z.boolean(),
+  note: z.string().trim().max(CAPS.noteBody, 'Notes are limited to 2,000 characters.').optional(),
 });
 
 export type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 /** A row as the app uses it. date_applied is always UTC midnight (§5.4). */
 export const applicationSchema = z.object({
-  id: z.string().uuid(),
-  user_id: z.string().uuid(),
-  date_applied: z.string().datetime(),
+  id,
+  user_id: id,
+  date_applied: timestamp,
   company: z.string(),
   position: z.string(),
   location: z.string().nullable(),
@@ -72,8 +84,8 @@ export const applicationSchema = z.object({
   starred: z.boolean(),
   cover_letter_path: z.string().nullable(),
   cover_letter_name: z.string().nullable(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  created_at: timestamp,
+  updated_at: timestamp,
 });
 
 export type Application = z.infer<typeof applicationSchema>;
@@ -89,11 +101,11 @@ export const noteFormSchema = z.object({
 export type NoteFormValues = z.infer<typeof noteFormSchema>;
 
 export const noteSchema = z.object({
-  id: z.string().uuid(),
-  application_id: z.string().uuid(),
+  id,
+  application_id: id,
   body: z.string(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  created_at: timestamp,
+  updated_at: timestamp,
 });
 
 export type Note = z.infer<typeof noteSchema>;
@@ -112,9 +124,9 @@ export const savedFilterFormSchema = z.object({
 export type SavedFilterFormValues = z.infer<typeof savedFilterFormSchema>;
 
 export const savedFilterSchema = savedFilterFormSchema.extend({
-  id: z.string().uuid(),
-  user_id: z.string().uuid(),
-  created_at: z.string().datetime(),
+  id,
+  user_id: id,
+  created_at: timestamp,
 });
 
 export type SavedFilter = z.infer<typeof savedFilterSchema>;

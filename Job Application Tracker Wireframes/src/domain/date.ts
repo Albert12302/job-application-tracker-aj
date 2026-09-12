@@ -25,6 +25,9 @@ export function toDateInputValue(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+/** The list's compact date, "9/2/26" in en-US (§4.2). */
+export const NUMERIC_DATE: Intl.DateTimeFormatOptions = { month: 'numeric', day: 'numeric', year: '2-digit' };
+
 /** Display a stored date_applied. Always UTC — never the viewer's zone (§5.4). */
 export function formatUtcDate(
   iso: string,
@@ -43,7 +46,15 @@ export function formatMoment(iso: string): string {
   );
 }
 
-/** Today as an <input type="date"> value, in UTC — the Add form's default (§4.3). */
-export function todayDateInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * Today as an <input type="date"> value — the Add form's default (§4.3).
+ *
+ * The user's own calendar day, not UTC's: at 8pm in California it is already
+ * tomorrow in UTC, and "applied today" means the day the user is living in.
+ * Once chosen, it is stored as UTC midnight of that day like any other (§5.4).
+ */
+export function todayDateInputValue(now: Date = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
 }

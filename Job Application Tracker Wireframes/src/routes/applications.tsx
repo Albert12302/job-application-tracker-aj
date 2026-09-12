@@ -1,6 +1,6 @@
 import { createRoute, stripSearchParams } from '@tanstack/react-router';
 import { applicationsSearchSchema } from '@/domain/schemas';
-import { ApplicationsPlaceholder } from '@/features/applications/ApplicationsPlaceholder';
+import { ApplicationsScreen } from '@/features/applications/ApplicationsScreen';
 import { authenticatedRoute } from './authenticated';
 
 export const applicationsRoute = createRoute({
@@ -10,5 +10,5 @@ export const applicationsRoute = createRoute({
   // Params at their default stay out of the URL: the default view is plain
   // /applications, and a shared link carries only what was actually chosen.
   search: { middlewares: [stripSearchParams(applicationsSearchSchema.parse({}))] },
-  component: ApplicationsPlaceholder,
+  component: ApplicationsScreen,
 });

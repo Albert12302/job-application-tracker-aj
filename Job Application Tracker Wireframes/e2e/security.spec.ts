@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { apiSession, startSignedIn } from './session.js';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.
@@ -108,13 +109,17 @@ test.describe('7.8.1 cross-user isolation', () => {
 
   test('status_history rejects update and delete', async () => {
     const a = await signIn('dev-a@example.test');
-    const { data: rows } = await a
+    const { data: rows, error } = await a
       .from('status_history')
       .select('id')
       .eq('application_id', USER_A_APPLICATION)
       .limit(1);
+    // Asserted, not skipped: seed.sql always writes these, so an empty answer
+    // means the read failed — and a security check that skips itself when it
+    // cannot read is a check that never runs.
+    expect(error).toBeNull();
     const id = rows?.[0]?.id as string | undefined;
-    test.skip(!id, 'no history rows seeded');
+    expect(id, 'seeded history rows missing — run npm run db:reset').toBeTruthy();
 
     const { data: updated } = await a
       .from('status_history')
@@ -128,53 +133,166 @@ test.describe('7.8.1 cross-user isolation', () => {
   });
 });
 
-test.describe('7.8.4 delete leaves nothing behind', () => {
-  test('deleting an application removes its notes, history, and file', async () => {
+test.describe('7.8.1 cross-user isolation — the status functions (§6 step 2)', () => {
+  test('user B cannot change user A status through change_application_status', async () => {
     const a = await signIn('dev-a@example.test');
-    const { data: user } = await a.auth.getUser();
+    const history = async () =>
+      (await a.from('status_history').select('id').eq('application_id', USER_A_APPLICATION)).data ?? [];
+    const before = await history();
+
+    const b = await signIn('dev-b@example.test');
+    const { data, error } = await b.rpc('change_application_status', {
+      p_application_id: USER_A_APPLICATION,
+      p_status: 'Offer',
+    });
+    // The function's "no such application": RLS hid the row, so B learns nothing more.
+    expect(data).toBeNull();
+    expect(error?.code).toBe('P0002');
+
+    const { data: still } = await a.from('applications').select('status').eq('id', USER_A_APPLICATION).single();
+    expect(still?.status).toBe('Callback');
+    expect(await history()).toHaveLength(before.length);
+  });
+
+  test('signed-out callers cannot run either function', async () => {
+    const anon = createClient(URL, ANON, { auth: { persistSession: false } });
+
+    const { error: changeError } = await anon.rpc('change_application_status', {
+      p_application_id: USER_A_APPLICATION,
+      p_status: 'Offer',
+    });
+    expect(changeError).not.toBeNull();
+
+    const { error: createError } = await anon.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: 'Anon',
+      p_position: 'Anon',
+      p_status: 'Applied',
+      p_referral: false,
+    });
+    expect(createError).not.toBeNull();
+  });
+});
+
+test.describe('§2 status history — written with the status, atomically', () => {
+  test('creation writes one row from null; a change, one row from the real status; no change, none', async () => {
+    const d = await signIn('dev-d@example.test');
+    const { data: created, error } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: `History ${crypto.randomUUID()}`,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'first note',
+    });
+    expect(error).toBeNull();
+    const id = (created as { id: string }).id;
+
+    const history = async () =>
+      (
+        await d
+          .from('status_history')
+          .select('from_status, to_status')
+          .eq('application_id', id)
+          .order('changed_at', { ascending: true })
+      ).data ?? [];
+
+    try {
+      expect(await history()).toEqual([{ from_status: null, to_status: 'Applied' }]);
+      const { data: notes } = await d.from('notes').select('body').eq('application_id', id);
+      expect(notes).toEqual([{ body: 'first note' }]);
+
+      const { error: changeError } = await d.rpc('change_application_status', { p_application_id: id, p_status: 'Interview' });
+      expect(changeError).toBeNull();
+      // Unchanged: §2 says no row, and the table's check constraint would refuse one anyway.
+      const { error: sameError } = await d.rpc('change_application_status', { p_application_id: id, p_status: 'Interview' });
+      expect(sameError).toBeNull();
+
+      expect(await history()).toEqual([
+        { from_status: null, to_status: 'Applied' },
+        { from_status: 'Applied', to_status: 'Interview' },
+      ]);
+    } finally {
+      await d.from('applications').delete().eq('id', id);
+    }
+  });
+
+  test('a creation that fails part-way writes nothing at all', async () => {
+    const d = await signIn('dev-d@example.test');
+    const company = `Atomic ${crypto.randomUUID()}`;
+
+    // The first note breaks its 2,000-character cap (§7.3), after the
+    // application row has been inserted — so the whole transaction must go.
+    const { error } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: company,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'x'.repeat(2001),
+    });
+    expect(error).not.toBeNull();
+
+    const { data } = await d.from('applications').select('id').eq('company', company);
+    expect(data).toEqual([]);
+  });
+});
+
+test.describe('7.8.4 delete leaves nothing behind', () => {
+  /**
+   * Driven through the screen rather than the tables: the delete this checks
+   * has to be services/delete-application.ts, the path that ships. Deleting by
+   * hand here would prove the cascade works and nothing about the app.
+   *
+   * As dev-d, whose applications no other suite counts.
+   */
+  test('deleting an application removes its notes, history, and file', async ({ page }) => {
+    const d = await signIn('dev-d@example.test');
+    const { data: user } = await d.auth.getUser();
     const userId = user.user!.id;
 
-    const { data: created, error: createError } = await a
-      .from('applications')
-      .insert({
-        company: 'Doomed Co',
-        position: 'Tester',
-        date_applied: '2026-09-10T00:00:00.000Z',
-      })
-      .select()
-      .single();
+    const company = `Doomed ${crypto.randomUUID().slice(0, 8)}`;
+    const { data: created, error: createError } = await d.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: company,
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+      p_first_note: 'note that should not survive',
+    });
     expect(createError).toBeNull();
-    const id = created!.id as string;
+    const id = (created as { id: string }).id;
 
-    await a.from('notes').insert({ application_id: id, body: 'note that should not survive' });
-    await a
-      .from('status_history')
-      .insert({ application_id: id, from_status: null, to_status: 'Applied' });
-
-    const path = await uploadThroughFunction(a, 'cover-letter', '%PDF-1.4 test');
-    await a
+    const path = await uploadThroughFunction(d, 'cover-letter', '%PDF-1.4 test');
+    await d
       .from('applications')
       .update({ cover_letter_path: path, cover_letter_name: 'test.pdf' })
       .eq('id', id);
 
-    // TODO(delete-application): replace these two calls with
-    // services/delete-application.ts as soon as that file exists. Right now this
-    // test proves the cascade and the Storage policy work; it does NOT prove the
-    // app's own delete path cleans up, which is the thing SPEC §7.8.4 is actually
-    // asking about. Deleting by hand here and calling it covered is the failure
-    // mode this comment exists to prevent.
-    const { error: removeError } = await a.storage.from('cover-letters').remove([path]);
-    expect(removeError).toBeNull();
-    const { error: deleteError } = await a.from('applications').delete().eq('id', id);
-    expect(deleteError, 'the delete itself failed — the checks below would blame the cascade').toBeNull();
+    // Signed in without the form: this test is about what a delete leaves
+    // behind, and sign-in has its own suite and its own budget (e2e/session.ts).
+    await startSignedIn(page, await apiSession('dev-d@example.test'));
+    await page.goto(`/applications/${id}`);
+    await expect(page.getByRole('heading', { level: 1, name: company })).toBeVisible();
 
-    const { data: notes } = await a.from('notes').select('id').eq('application_id', id);
+    await page.getByRole('button', { name: 'Delete application' }).click();
+    await expect(page.getByText(`Delete your application to ${company}?`)).toBeVisible();
+    await expect(page.getByText(/This also deletes 1 note and 1 attached file/)).toBeVisible();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete application' }).click();
+
+    await expect(page).toHaveURL(/\/applications$/);
+    await expect(page.getByText('Application deleted.')).toBeVisible();
+
+    const { data: gone } = await d.from('applications').select('id').eq('id', id);
+    expect(gone ?? [], 'the application itself survived the delete').toEqual([]);
+
+    const { data: notes } = await d.from('notes').select('id').eq('application_id', id);
     expect(notes ?? []).toEqual([]);
 
-    const { data: history } = await a.from('status_history').select('id').eq('application_id', id);
+    const { data: history } = await d.from('status_history').select('id').eq('application_id', id);
     expect(history ?? []).toEqual([]);
 
-    const { data: files } = await a.storage.from('cover-letters').list(userId);
+    const { data: files } = await d.storage.from('cover-letters').list(userId);
     expect((files ?? []).some((f) => path.endsWith(`/${f.name}`))).toBe(false);
   });
 });
