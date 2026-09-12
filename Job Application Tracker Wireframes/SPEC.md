@@ -786,6 +786,9 @@ screen is a release requirement, checked the same way as §7.
     outline**, so it must clear 4.5:1 against white — a light tint cannot do both jobs;
   - form-control borders and icon-only state indicators (the star) carry meaning and need
     3:1, which is darker than a decorative card border.
+- One accepted exception to the 3:1 boundary rule: the delete button’s light red fill, which
+  measures 1.6:1 against the card. A red light enough to read as light cannot clear 3:1, and
+  the control is identified by its label and shape rather than its edge; its text is at 10.2:1.
 - Status is never communicated by color alone: every tag carries its text label, and the stats
   breakdown bar has a text legend with counts.
 - All images and icon-only controls have text alternatives. The star, paperclip, chevrons, and
@@ -901,6 +904,12 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-11
+- **Detail-screen actions separated by weight, and the button contrast results recorded.**
+  Add note and Edit application are the filled action and delete is light red under the page’s
+  own near-black, because three tinted buttons in a stack read as one control. Measuring them
+  found two hover states that failed §10.1 outright — the filled button faded to 3.45:1 under
+  white text, the destructive tint put its text at 3.93:1 — and both darken now instead. The
+  delete fill’s own 1.6:1 against the card is the exception now recorded in §10.1.
 - **§6 step 2 built: applications CRUD.** Add, list, detail, edit, delete, and notes, against
   the schema that already existed. Status changes from the detail selector and from the edit
   form both go through `services/change-status.ts`, so `status_history` has been written from
