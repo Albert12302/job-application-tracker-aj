@@ -192,6 +192,18 @@ counts and the stats screen live.
 Description, cover-letter file, referral flag, notes list with an add-note field.
 Actions: edit fields, delete application (confirm first).
 
+Cover letter: the original filename as a label, with the file's size, and **Download**,
+**Replace**, and **Remove** — or "No cover letter attached." and **Attach cover letter** when
+there is none. Help text under the actions: "PDF, DOC, or DOCX, up to 10 MB." A chosen file is
+checked before upload, and the first failure is shown under the row (§7.3):
+- type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
+- size — "Choose a file of 10 MB or less."
+- over the upload rate limit (§7.1) — "You've uploaded a lot of files recently. Try again in an hour."
+
+Success shows a toast: "Cover letter attached." / "Cover letter replaced." / "Cover letter
+removed." Download asks for a signed URL when clicked and hands it straight to the browser
+(§7.3); the file saves under its original name.
+
 ### 4.5 Stats
 Computed live from the current application set:
 - total applications
@@ -677,7 +689,10 @@ Nothing ships with an unhandled failure.
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
 | Add / edit form | disable submit, spinner in the button, keep fields editable | n/a | Inline error above the form, field-level errors on the fields, **entered values preserved** — never clear the form on failure |
-| Cover letter upload | progress indicator on the row | n/a | "Upload failed." + Retry. Application saves without the file rather than losing the whole record |
+| Cover letter upload | progress indicator on the row: a spinner and "Uploading *name*…", the file controls disabled | n/a | "Upload failed." + error reference + Retry, which sends the same file again; a file being replaced stays in place. Application saves without the file rather than losing the whole record. A refused file (§4.4) shows its reason instead, with no Retry |
+| Cover letter file (detail) | skeleton where the size goes | "No cover letter attached." + Attach cover letter | Size: "Couldn't load the file size." + Retry, name and actions still usable |
+| Cover letter download | spinner and "Preparing…" in the button | n/a | "Couldn't download the cover letter." + error reference + Retry, which asks for a new URL |
+| Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
 | Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
@@ -723,6 +738,24 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 ### 9.4 Cover letter
 - Replace: upload a new file, the old one is deleted from Storage after the new one commits.
 - Remove: confirmation, then delete from Storage and clear the field.
+
+How the build does it — attach and replace are one path (`services/attach-cover-letter.ts`),
+remove another (`services/remove-cover-letter.ts`):
+- The row is written only if it still holds the file the change started from. The old object is
+  deleted on the strength of that write, so if another tab replaced or removed the file first,
+  the write fails and nothing is deleted.
+- If the row write fails after the upload, the new object is deleted: nothing points at it.
+- Remove clears the field **first**, then deletes the object — a row pointing at a deleted file
+  is a broken record, a file no row points at is an orphan. The confirmation dialog names the
+  file: "Remove the cover letter? This deletes *name* from this application. This cannot be
+  undone."
+- A failed delete of the old or removed object does not fail the change that has already
+  committed: it is reported for cleanup, as in §9.2.
+- The filename stored as the label drops any path segments, control characters, and
+  bidirectional-override characters (which can disguise an extension), collapses whitespace,
+  and is shortened to the column's 255 characters keeping its extension. React escapes it on
+  render; nothing else about it is trusted.
+- The size shown is read from Storage's own record of the object, not stored on the row.
 
 ### 9.5 Saved filters
 - Deleting a saved filter (the × on its tab) is immediate, no confirmation — it destroys no
@@ -902,6 +935,16 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-12
+- **Cover letters on the detail screen: attach, replace, remove, download (§4.4, §8.2, §9.4).**
+  Refusal copy follows the profile photo's, because both come from the same upload function. The
+  row write is guarded on the file it replaces, so a second tab cannot make a replace delete a
+  file it never replaced. The size comes from Storage's object record rather than a new column —
+  an object at a path never changes, so there is nothing to keep in sync.
+- **The filename label is cleaned before it is stored and again before it is shown (§9.4).**
+  §7.3 said "escaped", which React does; escaping does not stop a right-to-left override making
+  `invoice`, a right-to-left override, then `fdp.exe`, read as a PDF, so those characters are dropped too.
 
 ### 2026-09-11
 - **Detail-screen actions separated by weight, and the button contrast results recorded.**
