@@ -160,7 +160,10 @@ export function ApplicationDetailScreen() {
 
         <NotesSection applicationId={found.id} />
 
-        <div className="flex flex-wrap gap-2.5">
+        {/* The record's own actions, kept off the notes form above: three actions in a
+            stack read as one group otherwise (§8). Filled, outlined, and red — the
+            weight says which is which before the words do. */}
+        <div className="flex flex-wrap gap-2.5 border-t border-border pt-5">
           <Link
             to="/applications/$id/edit"
             params={{ id: found.id }}

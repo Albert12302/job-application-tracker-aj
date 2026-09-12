@@ -133,7 +133,7 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
             )}
           </FieldError>
         </Field>
-        <Button type="submit" variant="outline" className="h-9 w-fit max-[760px]:h-11" disabled={add.isPending}>
+        <Button type="submit" className="h-9 w-fit max-[760px]:h-11" disabled={add.isPending}>
           Add note
         </Button>
       </form>
