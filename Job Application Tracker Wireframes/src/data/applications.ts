@@ -1,5 +1,5 @@
 import type { ApplicationInput } from '@/domain/application-input';
-import { applicationSchema, type Application } from '@/domain/schemas';
+import { applicationSchema, coverLetterSchema, type Application, type CoverLetter } from '@/domain/schemas';
 import type { Status } from '@/domain/status';
 import { supabase } from './client';
 
@@ -98,6 +98,42 @@ export async function changeApplicationStatus(id: string, status: Status): Promi
     if (error.code === 'P0002') throw new ApplicationNotFoundError({ cause: error });
     throw error;
   }
+  return applicationSchema.parse(data);
+}
+
+/**
+ * The row is gone, or its cover letter is no longer the one this change started
+ * from — another tab replaced or removed it first.
+ */
+export class CoverLetterChangedError extends Error {
+  constructor() {
+    super('cover_letter_changed');
+    this.name = 'CoverLetterChangedError';
+  }
+}
+
+/**
+ * Point the application at a new cover letter, or at none (§9.4).
+ *
+ * Only if it still holds `current`: the caller deletes `current`'s object once
+ * this commits, so the write has to be the one that actually let go of it. Had
+ * another tab swapped the file in the meantime, an unguarded write would leave
+ * that tab's file orphaned and this one would delete a file nothing replaced.
+ */
+export async function setCoverLetter(
+  id: string,
+  next: CoverLetter | null,
+  current: string | null,
+): Promise<Application> {
+  const file = next ? coverLetterSchema.parse(next) : null;
+  const update = supabase
+    .from('applications')
+    .update({ cover_letter_path: file?.path ?? null, cover_letter_name: file?.name ?? null })
+    .eq('id', id);
+  const guarded = current === null ? update.is('cover_letter_path', null) : update.eq('cover_letter_path', current);
+  const { data, error } = await guarded.select('*').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new CoverLetterChangedError();
   return applicationSchema.parse(data);
 }
 

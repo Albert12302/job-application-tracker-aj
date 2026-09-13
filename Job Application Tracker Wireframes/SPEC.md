@@ -184,6 +184,16 @@ Validation: company and position required → "Company and position are required
 Save prepends the new application to the list and returns to the dashboard with filter reset
 to All.
 
+Cover letter attach: **Attach cover letter** picks a file, which is checked on choosing (the
+§4.4 copy, shown under the field) and then shown with its name, size, and an **×** that clears
+it, with **Choose a different file** below. Nothing is uploaded until Save, so clearing a chosen file needs no
+confirmation. On Save the application is created first, then the file is uploaded and attached,
+with "Uploading…" on the file's row and "Saving…" in the button. If the upload fails, the
+application stays saved without it: the form goes to the new application's detail screen, where
+"Upload failed." and Retry are shown (§8.2), with the toast "Application added, but the cover
+letter didn't upload." Cancel with a chosen file asks before discarding, as it does for typed
+changes (§9.1).
+
 ### 4.4 Application detail
 Header: company, position, location, date, status tag, star.
 Funnel indicator showing position across Applied → Interview → Callback → Offer.
@@ -191,6 +201,20 @@ Status selector — changing it updates the record immediately, which recalculat
 counts and the stats screen live.
 Description, cover-letter file, referral flag, notes list with an add-note field.
 Actions: edit fields, delete application (confirm first).
+
+Cover letter: the original filename as a label, with the file's size and an **×** at the right
+of that row that removes it (confirming first, §9.4), then **Download** and **Replace** — or "No
+cover letter attached." and **Attach cover letter** when there is none. A chosen file is
+checked before upload, and the first failure is shown under the row (§7.3):
+- type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
+- size — "Choose a file of 10 MB or less."
+- over the upload rate limit (§7.1) — "You've uploaded a lot of files recently. Try again in an hour."
+
+Success shows a toast: "Cover letter attached." / "Cover letter replaced." / "Cover letter
+removed." Download asks for a 60-second signed URL when clicked, fetches the file through it,
+and saves it under its original name (§7.3). The signed URL is never put in the page, and the
+saved copy is typed `application/octet-stream`, so it can only be saved, never opened as part
+of the app.
 
 ### 4.5 Stats
 Computed live from the current application set:
@@ -420,7 +444,7 @@ single note can be a megabyte.
 | field | limit |
 |---|---|
 | company, position, location | 120 characters each |
-| description | 5,000 characters |
+| description | 15,000 characters |
 | note body | 2,000 characters |
 | saved filter name | 60 characters |
 | email | 254 characters |
@@ -440,7 +464,7 @@ single note can be a megabyte.
 | Stored filename | generate a UUID; keep the original name only as a display label, escaped |
 | Storage path | prefixed with the owner's user id, e.g. `{user_id}/{uuid}.pdf` |
 | Serving | private bucket, signed URL with a **60-second** TTL, generated on click — never embedded in page HTML |
-| Download response | `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` |
+| Download response | `Content-Disposition: attachment`, and the `Content-Type` the upload function sniffed from the bytes. The app fetches the file and saves it as `application/octet-stream` rather than opening the URL (§4.4). `X-Content-Type-Options: nosniff` is wanted but not required: Supabase Storage does not send it, and the rows above already do its job — see the 2026-09-12 changelog |
 
 SVG is not an accepted type anywhere. It is a script execution vector.
 
@@ -587,7 +611,9 @@ The four checks worth doing by hand, because tooling misses them:
    rows and a rejected write.
 2. Grep the built client bundle for `service_role` and for any key that is not the anon key.
 3. Request a cover-letter signed URL, wait for it to expire, confirm it stops working — then
-   confirm the bucket is not publicly listable.
+   confirm the bucket is not publicly listable. While it is live, check the hosted response's
+   headers: `Content-Disposition: attachment` and a `Content-Type` of PDF or Word. If either is
+   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it.
 4. Delete an application, then confirm its notes, history rows, and Storage object are all
    gone.
 5. Five wrong passwords on one account, then a sixth attempt with the *correct* password —
@@ -677,7 +703,10 @@ Nothing ships with an unhandled failure.
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
 | Add / edit form | disable submit, spinner in the button, keep fields editable | n/a | Inline error above the form, field-level errors on the fields, **entered values preserved** — never clear the form on failure |
-| Cover letter upload | progress indicator on the row | n/a | "Upload failed." + Retry. Application saves without the file rather than losing the whole record |
+| Cover letter upload | progress indicator on the row: a spinner and "Uploading *name*…", the file controls disabled | n/a | "Upload failed." + error reference + Retry, which sends the same file again; a file being replaced stays in place. Application saves without the file rather than losing the whole record. A refused file (§4.4) shows its reason instead, with no Retry |
+| Cover letter file (detail) | skeleton where the size goes | "No cover letter attached." + Attach cover letter | Size: "Couldn't load the file size." + Retry, name and actions still usable |
+| Cover letter download | spinner and "Preparing…" in the button | n/a | "Couldn't download the cover letter." + error reference + Retry, which asks for a new URL |
+| Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
 | Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
@@ -695,7 +724,8 @@ untouched. Never leave the UI showing a state the database does not have.
 ## 9. Edit and delete
 
 ### 9.1 Edit an application
-Reached from the detail screen. Same fields and validation as Add (§4.3), pre-filled.
+Reached from the detail screen. Same fields and validation as Add (§4.3), pre-filled — except the
+cover letter, which is attached, replaced, and removed on the detail screen itself (§4.4, §9.4).
 - Location re-normalizes on save (§5.2).
 - Changing status here writes a `status_history` row exactly as the detail-screen status
   selector does — one code path, not two.
@@ -723,6 +753,24 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 ### 9.4 Cover letter
 - Replace: upload a new file, the old one is deleted from Storage after the new one commits.
 - Remove: confirmation, then delete from Storage and clear the field.
+
+How the build does it — attach and replace are one path (`services/attach-cover-letter.ts`),
+remove another (`services/remove-cover-letter.ts`):
+- The row is written only if it still holds the file the change started from. The old object is
+  deleted on the strength of that write, so if another tab replaced or removed the file first,
+  the write fails and nothing is deleted.
+- If the row write fails after the upload, the new object is deleted: nothing points at it.
+- Remove clears the field **first**, then deletes the object — a row pointing at a deleted file
+  is a broken record, a file no row points at is an orphan. The confirmation dialog names the
+  file: "Remove the cover letter? This deletes *name* from this application. This cannot be
+  undone."
+- A failed delete of the old or removed object does not fail the change that has already
+  committed: it is reported for cleanup, as in §9.2.
+- The filename stored as the label drops any path segments, control characters, and
+  bidirectional-override characters (which can disguise an extension), collapses whitespace,
+  and is shortened to the column's 255 characters keeping its extension. React escapes it on
+  render; nothing else about it is trusted.
+- The size shown is read from Storage's own record of the object, not stored on the row.
 
 ### 9.5 Saved filters
 - Deleting a saved filter (the × on its tab) is immediate, no confirmation — it destroys no
@@ -902,6 +950,44 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-12
+- **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —
+  duties, requirements, benefits, the company blurb — runs past 5,000 often enough to be refused
+  in ordinary use. Still capped, so one description cannot be megabytes. Changed in the Zod
+  schema and by a new migration (`20260913001336_raise_description_cap.sql`), not by editing
+  the original, so a local database keeps its data.
+- **A closed application's progress line reads "Rejected" or "Withdrawn"**, not "Closed —
+  rejected." The status already says it is closed; the extra word said nothing (§4.4).
+- **Cover-letter downloads accepted without `nosniff` (§7.3).** Supabase Storage never sends
+  the header on an object (checked in its server code), and adding it would mean serving every
+  download through a function. `nosniff` stops a browser guessing that a file is HTML or script
+  when its declared type is vague. Here the type is never vague: the upload function stores a
+  PDF or Word type taken from the bytes, and browsers do not reinterpret those. On top of that,
+  the response is an attachment, so it is saved rather than shown; it comes from Storage's
+  origin, not the app's, so even a rendered file could not reach the app's session; and the
+  app itself never opens the URL — it saves the bytes as `application/octet-stream`. What is
+  left is a signed URL someone already holds, opened within 60 seconds, for a document they
+  could download anyway. Not yet confirmed hosted: §7.8 check 3 now includes the headers.
+- **The add form attaches a cover letter after the application saves (§4.3, §8.2).** §8.2 says
+  the application saves without the file rather than losing the record, so the record goes
+  first. A failed upload lands on the new application's detail screen rather than the list,
+  because that is where Retry lives — the same upload state, carried across the navigation.
+- **Cover letter downloads are fetched through the signed URL and saved by the app, not opened
+  as a link (§4.4).** Storage's `Content-Disposition` puts the name percent-encoded in its plain
+  `filename` parameter, and WebKit reads that one: on iOS, `Café letter.pdf` saved as
+  `Caf%C3%A9%20letter.pdf`. Fetching lets the app name the file in every browser, turns an
+  expired or failed URL into the §8.2 error state instead of a tab showing a JSON error, and
+  keeps the original name out of the URL. The URL still asks Storage for an attachment, in case
+  it is ever opened directly.
+- **Cover letters on the detail screen: attach, replace, remove, download (§4.4, §8.2, §9.4).**
+  Refusal copy follows the profile photo's, because both come from the same upload function. The
+  row write is guarded on the file it replaces, so a second tab cannot make a replace delete a
+  file it never replaced. The size comes from Storage's object record rather than a new column —
+  an object at a path never changes, so there is nothing to keep in sync.
+- **The filename label is cleaned before it is stored and again before it is shown (§9.4).**
+  §7.3 said "escaped", which React does; escaping does not stop a right-to-left override making
+  `invoice`, a right-to-left override, then `fdp.exe`, read as a PDF, so those characters are dropped too.
 
 ### 2026-09-11
 - **Detail-screen actions separated by weight, and the button contrast results recorded.**

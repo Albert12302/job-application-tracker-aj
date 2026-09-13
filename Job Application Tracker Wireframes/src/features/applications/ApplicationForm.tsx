@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { Controller, useForm, type FieldError as FieldErrorType } from 'react-hook-form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,8 @@ export function ApplicationForm({
   defaultValues,
   locations,
   showFirstNote = false,
+  coverLetter,
+  coverLetterChosen = false,
   submitLabel,
   pending,
   error,
@@ -40,6 +42,10 @@ export function ApplicationForm({
   defaultValues: ApplicationFormValues;
   locations: readonly string[];
   showFirstNote?: boolean;
+  /** The add form's cover letter field (§4.3). The file is not a form value: it is uploaded, not validated by the schema. */
+  coverLetter?: ReactNode;
+  /** A chosen file counts as a change worth confirming before Cancel discards it (§9.1). */
+  coverLetterChosen?: boolean;
   submitLabel: string;
   pending: boolean;
   error: unknown;
@@ -201,6 +207,8 @@ export function ApplicationForm({
               <FieldError id={field('description-error')}>{fieldMessage(errors.description)}</FieldError>
             </Field>
 
+            {coverLetter}
+
             {showFirstNote ? (
               <Field data-invalid={!!errors.note}>
                 <FieldLabel htmlFor={field('note')}>First note (optional)</FieldLabel>
@@ -231,7 +239,7 @@ export function ApplicationForm({
               type="button"
               variant="outline"
               className={`flex-1 ${CONTROL}`}
-              onClick={() => (isDirty ? setConfirmDiscard(true) : onCancel())}
+              onClick={() => (isDirty || coverLetterChosen ? setConfirmDiscard(true) : onCancel())}
             >
               Cancel
             </Button>

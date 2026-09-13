@@ -158,6 +158,21 @@ Three layers, each with a job:
   Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
   exact application count, and the suites run in parallel.
 
+  **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
+  A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
+  three — so a third run inside the hour trips the limit. Simulate failures at the network
+  (`page.route`) rather than spending uploads on them; refused files cost nothing. Locally,
+  `delete from public.rate_limits;` resets the count.
+
+  **`getByText('…')` is a case-insensitive substring match.** "Cover letter attached." matches
+  "No cover letter attached.", and a filename matches "Uploading *name*…" — either passes before
+  the thing it waits for has happened. Use `{ exact: true }` for any text that can appear inside
+  other text.
+
+  **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
+  about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
+  random.
+
   **A test that is not about signing in starts signed in** — `e2e/session.ts` takes a session
   straight from Auth and puts it in storage. Every sign-in through the form reaches Auth from
   the sign-in function's one address, so they all share a single provider-side bucket
@@ -395,7 +410,10 @@ supabase/
   `npm run build && npm run preview` before adopting it.
 - **Private-bucket images render as `data:` URLs** downloaded through the authenticated client
   (`data/storage.ts`), not signed URLs: no fetchable link sits in the page, and nothing needs
-  revoking. Downloads the user clicks (cover letters) still use 60-second signed URLs (§7.3).
+  revoking. Downloads the user clicks (cover letters) are fetched through a 60-second signed URL
+  made on the click (§7.3) and saved from a blob (`features/applications/save-file.ts`) — never
+  handed to the browser as a link: Storage percent-encodes the name in `Content-Disposition`'s
+  plain `filename`, which WebKit uses, and storage-js's own `download` option encodes it twice.
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

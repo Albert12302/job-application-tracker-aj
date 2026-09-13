@@ -38,6 +38,13 @@ describe('applicationFormSchema', () => {
     expect(applicationFormSchema.safeParse({ ...valid, company: 'x'.repeat(120) }).success).toBe(true);
   });
 
+  it('caps the job description at 15,000 characters, with that number in the message', () => {
+    expect(applicationFormSchema.safeParse({ ...valid, description: 'x'.repeat(15000) }).success).toBe(true);
+    const over = applicationFormSchema.safeParse({ ...valid, description: 'x'.repeat(15001) });
+    expect(over.success).toBe(false);
+    if (!over.success) expect(over.error.issues[0]?.message).toBe('Descriptions are limited to 15,000 characters.');
+  });
+
   it('rejects a date that does not exist', () => {
     expect(applicationFormSchema.safeParse({ ...valid, date: '2026-02-30' }).success).toBe(false);
     expect(applicationFormSchema.safeParse({ ...valid, date: '2026-13-01' }).success).toBe(false);

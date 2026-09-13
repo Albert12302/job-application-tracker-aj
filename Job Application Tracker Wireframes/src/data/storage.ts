@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { uploadResponseSchema } from '@/domain/schemas';
+import { storageObjectInfoSchema, uploadResponseSchema } from '@/domain/schemas';
 import { supabase } from './client';
 
 /**
@@ -8,7 +8,7 @@ import { supabase } from './client';
  *
  * Writes go through the `upload` edge function: the buckets accept none from
  * the client (§7.3). The function reads the bytes, chooses the path, and stores
- * the file; the client only reads and deletes. Cover letters land here in step 3.
+ * the file; the client only reads and deletes.
  */
 
 const AVATARS = 'avatars';
@@ -61,6 +61,49 @@ export async function downloadAvatarDataUrl(path: string): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('avatar_read_failed'));
     reader.readAsDataURL(data);
   });
+}
+
+/** §7.3: long enough to start the download it was made for, and no longer. */
+export const SIGNED_URL_TTL_SECONDS = 60;
+
+/** The stored file's size in bytes, from Storage's own record of the object. */
+export async function coverLetterSize(path: string): Promise<number> {
+  const { data, error } = await supabase.storage.from(COVER_LETTERS).info(path);
+  if (error) throw error;
+  return storageObjectInfoSchema.parse(data).size;
+}
+
+/**
+ * The cover letter's bytes, fetched through a 60-second signed URL made for
+ * this one request and never put in the page (§7.3).
+ *
+ * Fetched rather than handed to the browser as a link, so the app names the
+ * saved file: Storage's `Content-Disposition` percent-encodes the name in its
+ * plain `filename` parameter, which WebKit uses — on iOS a letter would save as
+ * `Caf%C3%A9%20letter.pdf`. A failed or expired URL is then an error the
+ * screen can show, not a tab navigated to a JSON error.
+ *
+ * `download` with no name still makes Storage answer as an attachment, should
+ * the URL ever be opened directly, and keeps the original name out of the
+ * request.
+ */
+export async function downloadCoverLetter(path: string): Promise<Blob> {
+  const { data, error } = await supabase.storage.from(COVER_LETTERS).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error) throw error;
+  const response = await fetch(`${data.signedUrl}&download`);
+  if (!response.ok) throw new StorageDownloadError(response.status);
+  return response.blob();
+}
+
+/** Storage refused a signed URL's download; the status is kept for the error code, the body is not. */
+export class StorageDownloadError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super('storage_download_failed');
+    this.name = 'StorageDownloadError';
+    this.status = status;
+  }
 }
 
 async function removeObject(bucket: string, path: string): Promise<void> {

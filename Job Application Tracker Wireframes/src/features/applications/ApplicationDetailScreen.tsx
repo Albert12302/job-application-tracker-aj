@@ -15,6 +15,7 @@ import {
 } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { useNotes } from '@/queries/use-notes';
+import { CoverLetterSection } from './CoverLetterSection';
 import { DeleteApplicationDialog } from './DeleteApplicationDialog';
 import { FunnelIndicator } from './FunnelIndicator';
 import { NotesSection } from './NotesSection';
@@ -151,12 +152,7 @@ export function ApplicationDetailScreen() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <h2 className={SECTION_HEADING}>Cover letter</h2>
-          <p className="text-sm break-words">
-            {found.cover_letter_name ?? <span className="text-muted-foreground">No cover letter attached.</span>}
-          </p>
-        </div>
+        <CoverLetterSection application={found} />
 
         <NotesSection applicationId={found.id} />
 

@@ -33,7 +33,7 @@ export function FunnelIndicator({ status }: { status: Status }) {
           );
         })}
       </ol>
-      {isTerminal(status) ? <p className="text-[13px] text-muted-foreground">Closed — {status.toLowerCase()}.</p> : null}
+      {isTerminal(status) ? <p className="text-[13px] text-muted-foreground">{status}</p> : null}
     </div>
   );
 }

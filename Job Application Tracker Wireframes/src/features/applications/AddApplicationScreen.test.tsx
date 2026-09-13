@@ -13,6 +13,16 @@ import { AddApplicationScreen } from './AddApplicationScreen';
  */
 const createApplication = vi.fn();
 const listApplications = vi.fn();
+const setCoverLetter = vi.fn();
+const uploadFile = vi.fn();
+
+vi.mock('@/data/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/storage')>()),
+  uploadFile: (...args: unknown[]) => uploadFile(...args),
+  removeCoverLetterObject: async () => {},
+}));
+
+vi.mock('@/data/security-events', () => ({ logSecurityEvent: async () => {} }));
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -29,7 +39,12 @@ vi.mock('@/data/applications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/applications')>()),
   createApplication: (...args: unknown[]) => createApplication(...args),
   listApplications: (...args: unknown[]) => listApplications(...args),
+  setCoverLetter: (...args: unknown[]) => setCoverLetter(...args),
 }));
+
+const NEW_ID = 'b0000000-0000-0000-0000-000000000009';
+const PATH = '11111111-1111-1111-1111-111111111111/0b9c3c5e-0000-4000-8000-000000000001.pdf';
+const pdf = (name = 'Northwind letter.pdf') => new File(['%PDF-1.4 letter'], name);
 
 const renderAdd = () => renderRoutes({ '/applications/new': AddApplicationScreen }, '/applications/new');
 
@@ -41,8 +56,14 @@ async function fillRequired(user: ReturnType<typeof renderRoutes>['user']) {
 
 beforeEach(() => {
   createApplication.mockReset();
-  createApplication.mockResolvedValue(applicationRow());
+  createApplication.mockResolvedValue(applicationRow({ id: NEW_ID }));
   listApplications.mockResolvedValue([applicationRow({ location: 'Austin, TX' })]);
+  uploadFile.mockReset().mockResolvedValue(PATH);
+  setCoverLetter
+    .mockReset()
+    .mockImplementation(async (id: string, next: { path: string; name: string }) =>
+      applicationRow({ id, cover_letter_path: next.path, cover_letter_name: next.name }),
+    );
 });
 
 describe('AddApplicationScreen', () => {
@@ -138,6 +159,79 @@ describe('AddApplicationScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await user.click(await screen.findByRole('button', { name: 'Discard changes' }));
     expect(await screen.findByRole('heading', { name: 'Route /applications' })).toBeTruthy();
+  });
+
+  it('saves the application first, then uploads the chosen cover letter and attaches it (§4.3)', async () => {
+    let finishUpload: (path: string) => void = () => {};
+    uploadFile.mockReturnValue(new Promise((resolve) => (finishUpload = resolve)));
+    const { user } = renderAdd();
+    await fillRequired(user);
+
+    await user.upload(screen.getByLabelText('Attach cover letter'), pdf());
+    expect(await screen.findByText('Northwind letter.pdf')).toBeTruthy();
+    expect(screen.getByText('15 bytes')).toBeTruthy();
+    // Nothing leaves the browser until Save.
+    expect(uploadFile).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    // The upload shows on the file's row while it runs (§8.2).
+    expect(await screen.findByText('Uploading…')).toBeTruthy();
+    expect(createApplication).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeTruthy();
+
+    finishUpload(PATH);
+    expect(await screen.findByRole('heading', { name: 'Route /applications' })).toBeTruthy();
+    expect(setCoverLetter).toHaveBeenCalledWith(NEW_ID, { path: PATH, name: 'Northwind letter.pdf' }, null);
+  });
+
+  it('refuses a file by its bytes as soon as it is chosen, and saves without it', async () => {
+    const { user } = renderAdd();
+    await fillRequired(user);
+
+    const disguised = new File(['<svg xmlns="http://www.w3.org/2000/svg"></svg>'], 'letter.pdf');
+    await user.upload(screen.getByLabelText('Attach cover letter'), disguised);
+    expect((await screen.findByRole('alert')).textContent).toBe('Choose a PDF, DOC, or DOCX file.');
+    expect(screen.queryByText('letter.pdf')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { name: 'Route /applications' })).toBeTruthy();
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('keeps the application when the upload fails, and goes to its detail screen for the retry (§8.2)', async () => {
+    uploadFile.mockRejectedValue(new Error('network'));
+    const { user, router } = renderAdd();
+    await fillRequired(user);
+    await user.upload(screen.getByLabelText('Attach cover letter'), pdf());
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('heading', { name: 'Route /applications/$id' })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`/applications/${NEW_ID}`);
+    expect(createApplication).toHaveBeenCalledTimes(1);
+    expect(setCoverLetter).not.toHaveBeenCalled();
+  });
+
+  it('lets a chosen file be cleared, keeping focus on the picker', async () => {
+    const { user } = renderAdd();
+    await user.upload(await screen.findByLabelText('Attach cover letter'), pdf());
+    await user.click(await screen.findByRole('button', { name: 'Remove file' }));
+
+    expect(screen.queryByText('Northwind letter.pdf')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByLabelText('Attach cover letter'));
+  });
+
+  it('asks before Cancel discards a chosen file', async () => {
+    const { user } = renderAdd();
+    await user.upload(await screen.findByLabelText('Attach cover letter'), pdf());
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText('Discard your changes?')).toBeTruthy();
+  });
+
+  it('has no axe violations with a cover letter chosen', async () => {
+    const { user, container } = renderAdd();
+    await user.upload(await screen.findByLabelText('Attach cover letter'), pdf());
+    await screen.findByText('Northwind letter.pdf');
+    expect((await axe.run(container)).violations).toEqual([]);
   });
 
   it('has no axe violations, including with the required message showing', async () => {

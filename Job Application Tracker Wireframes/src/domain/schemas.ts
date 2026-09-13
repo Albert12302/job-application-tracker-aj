@@ -19,7 +19,7 @@ z.config({ jitless: true });
  * UX, the constraint is enforcement (§7.3).
  */
 
-const CAPS = { shortText: 120, description: 5000, noteBody: 2000, filterName: 60 } as const;
+const CAPS = { shortText: 120, description: 15000, noteBody: 2000, filterName: 60 } as const;
 
 export const statusSchema = z.enum(STATUSES);
 
@@ -61,7 +61,7 @@ export const applicationFormSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(CAPS.description, 'Descriptions are limited to 5,000 characters.')
+    .max(CAPS.description, 'Descriptions are limited to 15,000 characters.')
     .optional(),
   status: statusSchema,
   referral: z.boolean(),
@@ -174,6 +174,23 @@ export type Profile = z.infer<typeof profileSchema>;
 /** The upload function's 201 body: the path it chose, `{user_id}/{uuid}.ext` (§7.3). */
 export const uploadResponseSchema = z.object({
   path: z.string().min(1).max(512),
+});
+
+/**
+ * A cover letter as an application row holds it (§2): the stored path and the
+ * original name, set together or not at all. The name is a display label
+ * (domain/cover-letter.ts `coverLetterLabel`), capped as the column is.
+ */
+export const coverLetterSchema = z.object({
+  path: z.string().min(1).max(512),
+  name: z.string().min(1).max(255),
+});
+
+export type CoverLetter = z.infer<typeof coverLetterSchema>;
+
+/** Storage's object info, as far as the app reads it: the size in bytes. */
+export const storageObjectInfoSchema = z.object({
+  size: z.number().int().nonnegative(),
 });
 
 /** Sign-up (§4.1a). Validation order matters: email, then length, then match. */
