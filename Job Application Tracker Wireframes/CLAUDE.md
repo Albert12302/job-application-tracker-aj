@@ -215,7 +215,7 @@ src/
     date.ts                   the ONLY place date_applied converts or formats (§5.4)
     filters.ts                matchesFilter(app, criteria)  (§5.1)
     location.ts               normalizeLocation()           (§5.2)
-    stats.ts                  computeStats(apps)            (§4.5)
+    stats.ts                  computeStats(apps, history)   (§4.5) — furthest stage reached
     schemas.ts                Zod schemas + inferred types — the source of truth for
                               Application, Note, SavedFilter and their validation rules
     types.ts                  types not derived from a schema
@@ -228,8 +228,10 @@ src/
     applications.ts           list / get / create / update / remove
     notes.ts
     saved-filters.ts
-    status-history.ts         reads, when stats need them (§6 step 4); rows are written only
-                              by the two SQL functions, never from the client
+    status-history.ts         reads only, for stats (§4.5); rows are written only by the two
+                              SQL functions, never from the client
+    all-pages.ts              reads a whole set past PostgREST's silent max_rows cut-off —
+                              for anything that must cover every row (§5.3), such as stats
     storage.ts                upload (via the upload function) / signed URL / delete
     profile.ts
 
@@ -287,8 +289,11 @@ src/
       SavedFilterTab.tsx
       LocationCombobox.tsx
     stats/
+      StatsScreen.tsx             the three states (§8.2) and the summary
       StatCard.tsx
-      BreakdownBar.tsx
+      BreakdownBar.tsx            decoration; its legend carries the breakdown (§10.1)
+      StatsSkeleton.tsx
+      layout.ts                   panel and grid classes shared with the skeleton
     profile/
       AvatarUpload.tsx
 

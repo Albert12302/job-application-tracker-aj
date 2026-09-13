@@ -11,7 +11,7 @@ import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FunctionComponent } from 'react';
 
-const APP_PATHS = ['/applications', '/applications/new', '/applications/$id', '/applications/$id/edit'] as const;
+const APP_PATHS = ['/applications', '/applications/new', '/applications/$id', '/applications/$id/edit', '/stats'] as const;
 
 /**
  * Renders the screens under test at their real paths, inside a real router and

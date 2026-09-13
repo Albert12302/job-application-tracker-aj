@@ -8,6 +8,7 @@ import { indexRoute } from './routes/index';
 import { profileRoute } from './routes/profile';
 import { rootRoute } from './routes/root';
 import { signInRoute } from './routes/sign-in';
+import { statsRoute } from './routes/stats';
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -17,6 +18,7 @@ const routeTree = rootRoute.addChildren([
     applicationNewRoute,
     applicationDetailRoute,
     applicationEditRoute,
+    statsRoute,
     profileRoute,
   ]),
 ]);

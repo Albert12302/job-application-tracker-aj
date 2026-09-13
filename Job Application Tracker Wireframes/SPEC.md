@@ -857,7 +857,10 @@ screen is a release requirement, checked the same way as §7.
   measures 1.6:1 against the card. A red light enough to read as light cannot clear 3:1, and
   the control is identified by its label and shape rather than its edge; its text is at 10.2:1.
 - Status is never communicated by color alone: every tag carries its text label, and the stats
-  breakdown bar has a text legend with counts.
+  breakdown bar has a text legend with counts. The legend is what carries the breakdown, not
+  the bar: the four light status fills measure 1.2–1.4:1 against the card, so segments are not
+  distinguishable by contrast alone. The bar is decoration of the legend, hidden from assistive
+  technology, with a 3.3:1 edge so its extent shows.
 - All images and icon-only controls have text alternatives. The star, paperclip, chevrons, and
   avatar all need accessible names.
 - Layout reflows to 320px width without horizontal scrolling, and survives 200% zoom and
@@ -979,6 +982,10 @@ the prototype is the reference for those.
   Because a mis-picked status is saved at once and history cannot be edited, a move back to an
   earlier stage is read as a correction. The breakdown bar stays by current status, since it has
   to add up to the total. The total shows no percentage, which would always be 100%.
+- **The stats bar's segments are decoration; its legend is the content (§10.1).** Measured, the
+  light status fills are 1.2–1.4:1 against the card — under the 3:1 a meaningful graphic needs,
+  and a fill dark enough to pass would break the §3 tag pairings. The legend already names every
+  status and count, so the bar is hidden from assistive technology rather than retinted.
 
 ### 2026-09-12
 - **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —
