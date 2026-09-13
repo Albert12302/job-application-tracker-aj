@@ -10,7 +10,7 @@ import { apiActor, apiSession, startSignedIn } from './session.js';
  * Two users, for two reasons:
  * - dev-a, read only. Its seeded applications never change during a run
  *   (e2e/auth.spec.ts counts them), so its numbers can be asserted exactly.
- *   Tailspin Toys went Interview → Rejected in the seed: 4 Interviewed here,
+ *   Tailspin Toys went Interview → Rejected in the seed: 4 Interviews here,
  *   where current status alone would say 3.
  * - dev-d, for the test that changes statuses (CLAUDE.md). Other suites add and
  *   delete dev-d's applications at the same time, so that test narrows the
@@ -33,10 +33,9 @@ function card(page: Page, label: string) {
   return page.locator('dl > div').filter({ has: page.locator('dt', { hasText: new RegExp(`^${label}$`) }) });
 }
 
-async function expectCard(page: Page, label: string, count: string, percent: string) {
-  const stat = card(page, label);
-  await expect(stat.locator('dd').first()).toHaveText(count);
-  await expect(stat.locator('dd').nth(1)).toHaveText(`${percent} of applications`);
+/** A card's figure, by its label. */
+async function expectFigure(page: Page, label: string, value: string) {
+  await expect(card(page, label).locator('dd')).toHaveText(value);
 }
 
 test.describe("dev-a's seeded applications", () => {
@@ -71,12 +70,19 @@ test.describe("dev-a's seeded applications", () => {
     await expect(page).toHaveURL(/\/stats$/);
     await expect(statsLink).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { level: 1, name: 'Your Stats' })).toBeVisible();
-    await expect(page.getByText(/^\d[\d,]* applications?$/)).toHaveText('7 applications');
 
-    await expectCard(page, 'Interviewed', '4', '57%');
-    await expectCard(page, 'Callbacks', '2', '29%');
-    await expectCard(page, 'Offers', '1', '14%');
-    await expectCard(page, 'Heard back', '4', '57%');
+    // The prototype's two rows (§4.5). Seeded referrals: Northwind Traders and Wide World Importers.
+    const [counts, rates] = [page.locator('dl').first(), page.locator('dl').nth(1)];
+    await expect(counts.locator('dt')).toHaveText(['Applications', 'Interviews', 'Callbacks', 'Via referral']);
+    await expect(rates.locator('dt')).toHaveText(['Heard back', 'Interview rate', 'Callback rate', 'Offer rate']);
+    await expectFigure(page, 'Applications', '7');
+    await expectFigure(page, 'Interviews', '4');
+    await expectFigure(page, 'Callbacks', '2');
+    await expectFigure(page, 'Via referral', '29%');
+    await expectFigure(page, 'Heard back', '57%');
+    await expectFigure(page, 'Interview rate', '57%');
+    await expectFigure(page, 'Callback rate', '29%');
+    await expectFigure(page, 'Offer rate', '14%');
 
     // By current status, in §3 order, each named in text (§10.1).
     await expect(page.getByRole('list', { name: 'Status breakdown' }).getByRole('listitem')).toHaveText([
@@ -105,7 +111,7 @@ test.describe("dev-a's seeded applications", () => {
 
     await page.unroute('**/rest/v1/status_history*');
     await page.getByRole('button', { name: 'Retry' }).click();
-    await expectCard(page, 'Interviewed', '4', '57%');
+    await expectFigure(page, 'Interviews', '4');
   });
 
   test('zero applications is the empty state, never a divide by zero (§8.2)', async ({ page }) => {
@@ -128,12 +134,12 @@ test.describe("dev-a's seeded applications", () => {
   test('360px: two cards to a row, no sideways scroll, 44px nav targets (§11)', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto('/stats');
-    await expectCard(page, 'Interviewed', '4', '57%');
+    await expectFigure(page, 'Interviews', '4');
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     const boxes = await Promise.all(
-      ['Interviewed', 'Callbacks', 'Offers', 'Heard back'].map(async (label) => (await card(page, label).boundingBox())!),
+      ['Applications', 'Interviews', 'Callbacks', 'Via referral'].map(async (label) => (await card(page, label).boundingBox())!),
     );
     const [first, second, third, fourth] = boxes;
     expect(second!.y).toBe(first!.y);
@@ -197,7 +203,7 @@ test.describe("dev-d's status changes", () => {
    * the same moment, so each change here is spent carefully. The correction
    * rule's cases are domain/stats.test.ts's.
    */
-  test('a status change reaches stats at once, and Interview → Rejected stays Interviewed', async ({ page }, testInfo) => {
+  test('a status change reaches stats at once, and Interview → Rejected stays an interview', async ({ page }, testInfo) => {
     const company = `Stats ${testInfo.project.name} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const { data, error } = await client.rpc('create_application', {
       p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
@@ -217,7 +223,7 @@ test.describe("dev-d's status changes", () => {
 
     // Load stats first, so what follows has to replace a cached answer (§4.4 "live").
     await page.goto('/stats');
-    await expectCard(page, 'Interviewed', '1', '100%');
+    await expectFigure(page, 'Interviews', '1');
     await expect(legend).toHaveText(['Interview · 1']);
 
     // Through the app, without a reload: the list, the detail, the selector.
@@ -230,10 +236,11 @@ test.describe("dev-d's status changes", () => {
     // The breakdown follows the new status: stats were refetched, not served from cache.
     await expect(legend).toHaveText(['Rejected · 1']);
     // And the history was read: by current status alone this would be 0 (§4.5).
-    await expectCard(page, 'Interviewed', '1', '100%');
-    await expectCard(page, 'Callbacks', '0', '0%');
-    await expectCard(page, 'Offers', '0', '0%');
-    await expectCard(page, 'Heard back', '1', '100%');
+    await expectFigure(page, 'Interviews', '1');
+    await expectFigure(page, 'Interview rate', '100%');
+    await expectFigure(page, 'Callbacks', '0');
+    await expectFigure(page, 'Offer rate', '0%');
+    await expectFigure(page, 'Heard back', '100%');
 
     // Stats only read: the history is exactly the change made, one row each (§2).
     const { data: history } = await client
