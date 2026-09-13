@@ -8,25 +8,23 @@ import { cn } from '@/lib/utils';
  *
  * The bar is a picture of the legend below it and hidden from assistive tech;
  * the legend names every status and its count in text, so no status is told by
- * colour alone (§10.1). The bar's edge uses the control-border token, so its
- * extent shows even when every segment is a light fill.
+ * colour alone (§10.1). The light fills are too close to the card to carry
+ * meaning by contrast, which is why the legend is the content.
  */
 export function BreakdownBar({ breakdown, labelledBy }: { breakdown: readonly StatusCount[]; labelledBy: string }) {
   return (
-    <div className="flex flex-col gap-2.5">
-      <div aria-hidden="true" className="flex h-[22px] gap-0.5 overflow-hidden rounded-full border border-input bg-card">
+    <div>
+      <div aria-hidden="true" className="flex h-[22px] overflow-hidden rounded-full bg-secondary">
         {breakdown.map(({ status, count }) => (
-          // Grow by count from a zero basis, so segment widths stay proportional
-          // however many gaps there are; min-w keeps one application in thousands visible.
+          // Grow by count from a zero basis, so widths stay proportional;
+          // min-w keeps one application in thousands visible.
           <div key={status} className={cn('min-w-1 basis-0', STATUS_TOKENS[status].bg)} style={{ flexGrow: count }} />
         ))}
       </div>
-      <ul aria-labelledby={labelledBy} className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px]">
+      <ul aria-labelledby={labelledBy} className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[13px] text-muted-foreground">
         {breakdown.map(({ status, count }) => (
-          <li key={status} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={cn('size-3 rounded-full border border-input', STATUS_TOKENS[status].bg)} />
-            <span>{status}</span> <span aria-hidden="true" className="text-muted-foreground">·</span>{' '}
-            <span className="font-semibold tabular-nums">{count.toLocaleString()}</span>
+          <li key={status}>
+            {status} <span aria-hidden="true">·</span> {count.toLocaleString()}
           </li>
         ))}
       </ul>

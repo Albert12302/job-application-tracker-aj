@@ -98,7 +98,7 @@ test.describe('7.8.1 cross-user isolation', () => {
     // user_id to filter on, so its select policy is the only thing scoping it.
     const statsReads = (client: SupabaseClient) =>
       Promise.all([
-        client.from('applications').select('id, status').order('id'),
+        client.from('applications').select('id, status, referral').order('id'),
         client.from('status_history').select('application_id, to_status, changed_at').order('changed_at'),
       ]);
 

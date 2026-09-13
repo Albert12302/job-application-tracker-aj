@@ -1,10 +1,10 @@
 import type { ApplicationInput } from '@/domain/application-input';
 import {
   applicationSchema,
-  applicationStatusSchema,
+  statsApplicationSchema,
   coverLetterSchema,
   type Application,
-  type ApplicationStatus,
+  type StatsApplication,
   type CoverLetter,
 } from '@/domain/schemas';
 import type { Status } from '@/domain/status';
@@ -45,19 +45,19 @@ export async function getApplication(id: string): Promise<Application | null> {
 }
 
 /**
- * Every one of the user's applications, as stats need them — id and status, the
+ * Every one of the user's applications, as stats need them — id, status, and referral, the
  * whole set however large (§5.3), never a page of the list.
  */
-export async function listApplicationStatuses(userId: string): Promise<ApplicationStatus[]> {
+export async function listStatsApplications(userId: string): Promise<StatsApplication[]> {
   const rows = await allPages((from, to) =>
     supabase
       .from('applications')
-      .select('id, status')
+      .select('id, status, referral')
       .eq('user_id', userId)
       .order('id', { ascending: true })
       .range(from, to),
   );
-  return applicationStatusSchema.array().parse(rows);
+  return statsApplicationSchema.array().parse(rows);
 }
 
 export async function countApplications(userId: string): Promise<number> {

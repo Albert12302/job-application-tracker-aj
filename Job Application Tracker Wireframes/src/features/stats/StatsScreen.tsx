@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
-import type { Stats } from '@/domain/stats';
+import { percentOf, type Stats } from '@/domain/stats';
 import { errorReference } from '@/queries/errors';
 import { useStats } from '@/queries/use-stats';
 import { BreakdownBar } from './BreakdownBar';
@@ -10,9 +10,9 @@ import { StatsSkeleton } from './StatsSkeleton';
 import { SECTION_HEADING, STAT_GRID, STATS_PANEL } from './layout';
 
 /**
- * Stats (SPEC §4.5) over every application the user has (§5.3). The three
- * states are §8.2's, inside the panel, so the header and nav stay usable in all
- * of them.
+ * Stats (SPEC §4.5) over every application the user has (§5.3), laid out as
+ * the prototype has it. The three states are §8.2's, inside the panel, so the
+ * header and nav stay usable in all of them.
  */
 export function StatsScreen() {
   const stats = useStats();
@@ -48,7 +48,7 @@ export function StatsScreen() {
 
   return (
     <section aria-labelledby="stats-heading" className={STATS_PANEL}>
-      <h1 id="stats-heading" className="font-heading text-xl font-semibold">
+      <h1 id="stats-heading" className="mb-4 font-heading text-xl font-semibold">
         Your Stats
       </h1>
       {content}
@@ -57,34 +57,31 @@ export function StatsScreen() {
 }
 
 function StatsSummary({ stats }: { stats: Stats }) {
+  const rate = (count: number) => `${percentOf(count, stats.total)}%`;
+
   return (
     <>
-      <p className="text-sm text-muted-foreground">
-        <span className="font-heading text-2xl font-semibold text-foreground tabular-nums">{stats.total.toLocaleString()}</span>{' '}
-        {stats.total === 1 ? 'application' : 'applications'}
-      </p>
+      <dl className={`${STAT_GRID} mb-4`}>
+        <StatCard kind="count" tone="total" label="Applications" value={stats.total.toLocaleString()} />
+        <StatCard kind="count" tone="interview" label="Interviews" value={stats.interviewed.toLocaleString()} />
+        <StatCard kind="count" tone="callback" label="Callbacks" value={stats.callbacks.toLocaleString()} />
+        <StatCard kind="count" tone="total" label="Via referral" value={rate(stats.referrals)} />
+      </dl>
 
-      <div className="flex flex-col gap-2">
-        <h2 id="stats-reach-heading" className={SECTION_HEADING}>
-          How far applications got
-        </h2>
-        <p className="text-[13px] text-muted-foreground">
-          Each application counts for the furthest stage it reached, even if it later closed.
-        </p>
-        <dl aria-labelledby="stats-reach-heading" className={STAT_GRID}>
-          <StatCard label="Interviewed" count={stats.interviewed} total={stats.total} />
-          <StatCard label="Callbacks" count={stats.callbacks} total={stats.total} />
-          <StatCard label="Offers" count={stats.offers} total={stats.total} />
-          <StatCard label="Heard back" count={stats.heardBack} total={stats.total} />
-        </dl>
-      </div>
+      <h2 id="stats-reach-heading" className={`${SECTION_HEADING} mb-0.5`}>
+        How far applications got
+      </h2>
+      <dl aria-labelledby="stats-reach-heading" className={`${STAT_GRID} mb-4`}>
+        <StatCard kind="rate" tone="total" label="Heard back" value={rate(stats.heardBack)} />
+        <StatCard kind="rate" tone="interview" label="Interview rate" value={rate(stats.interviewed)} />
+        <StatCard kind="rate" tone="callback" label="Callback rate" value={rate(stats.callbacks)} />
+        <StatCard kind="rate" tone="offer" label="Offer rate" value={rate(stats.offers)} />
+      </dl>
 
-      <div className="flex flex-col gap-2">
-        <h2 id="stats-breakdown-heading" className={SECTION_HEADING}>
-          Status breakdown
-        </h2>
-        <BreakdownBar breakdown={stats.breakdown} labelledBy="stats-breakdown-heading" />
-      </div>
+      <h2 id="stats-breakdown-heading" className={`${SECTION_HEADING} mb-2`}>
+        Status breakdown
+      </h2>
+      <BreakdownBar breakdown={stats.breakdown} labelledBy="stats-breakdown-heading" />
     </>
   );
 }

@@ -1,4 +1,4 @@
-import type { ApplicationStatus, StatusChange } from './schemas';
+import type { StatsApplication, StatusChange } from './schemas';
 import { FUNNEL, STATUSES, funnelIndex, type Status } from './status';
 
 /**
@@ -10,7 +10,7 @@ import { FUNNEL, STATUSES, funnelIndex, type Status } from './status';
  * an earlier stage is a correction — the status was picked by mistake — and the
  * stages above it stop counting. Rejected and Withdrawn close an application
  * without lowering anything. The breakdown bar alone is by current status: it
- * has to add up to the total.
+ * has to add up to the total. Referrals are a plain count of the flag.
  */
 
 export type StatusCount = { status: Status; count: number };
@@ -21,6 +21,8 @@ export type Stats = {
   callbacks: number;
   offers: number;
   heardBack: number;
+  /** Applications marked as coming through a referral. */
+  referrals: number;
   /** In §3 order, zero counts left out (§4.5). */
   breakdown: StatusCount[];
 };
@@ -65,7 +67,7 @@ function heardBack(reach: Reach): boolean {
   return reach.stage >= INTERVIEW || reach.heardBack;
 }
 
-export function computeStats(applications: readonly ApplicationStatus[], history: readonly StatusChange[]): Stats {
+export function computeStats(applications: readonly StatsApplication[], history: readonly StatusChange[]): Stats {
   const changesById = new Map<string, StatusChange[]>();
   for (const change of history) {
     const list = changesById.get(change.application_id);
@@ -73,7 +75,15 @@ export function computeStats(applications: readonly ApplicationStatus[], history
     else changesById.set(change.application_id, [change]);
   }
 
-  const stats: Stats = { total: applications.length, interviewed: 0, callbacks: 0, offers: 0, heardBack: 0, breakdown: [] };
+  const stats: Stats = {
+    total: applications.length,
+    interviewed: 0,
+    callbacks: 0,
+    offers: 0,
+    heardBack: 0,
+    referrals: 0,
+    breakdown: [],
+  };
   const counts = new Map<Status, number>();
 
   for (const application of applications) {
@@ -82,6 +92,7 @@ export function computeStats(applications: readonly ApplicationStatus[], history
     if (reach.stage >= CALLBACK) stats.callbacks += 1;
     if (reach.stage >= OFFER) stats.offers += 1;
     if (heardBack(reach)) stats.heardBack += 1;
+    if (application.referral) stats.referrals += 1;
     counts.set(application.status, (counts.get(application.status) ?? 0) + 1);
   }
 

@@ -1,18 +1,43 @@
-import { percentOf } from '@/domain/stats';
+import { cn } from '@/lib/utils';
+
+/** Which figure's colour a card uses, as the prototype pairs them (§4.5). Measured in globals.css. */
+export type StatTone = 'total' | 'interview' | 'callback' | 'offer';
+
+const TONES: Record<StatTone, string> = {
+  total: 'text-link',
+  interview: 'text-status-interview-fg',
+  callback: 'text-status-callback-fg',
+  offer: 'text-stat-offer',
+};
 
 /**
- * One funnel stat (SPEC §4.5): its count, and that count as a share of every
- * application. A `dt`/`dd` group inside the screen's `dl`, so the label, the
- * count, and the percentage are read together. The count sits on top to look
- * at; the label comes first to hear.
+ * One stat (SPEC §4.5): a figure and its label. A `dt`/`dd` pair inside the
+ * row's `dl`, so the two are read together. The figure sits on top to look at;
+ * the label comes first to hear. Counts are the larger figures, rates the
+ * smaller, as in the prototype.
  */
-export function StatCard({ label, count, total }: { label: string; count: number; total: number }) {
+export function StatCard({
+  label,
+  value,
+  tone,
+  kind,
+}: {
+  label: string;
+  value: string;
+  tone: StatTone;
+  kind: 'count' | 'rate';
+}) {
   return (
-    <div className="flex flex-col items-center rounded-xl border px-2 py-3 text-center">
+    <div className={cn('flex flex-col rounded-xl border text-center', kind === 'count' ? 'p-3' : 'p-2.5')}>
       <dt className="order-2 text-[13px] text-muted-foreground">{label}</dt>
-      <dd className="order-1 font-heading text-2xl font-semibold tabular-nums">{count.toLocaleString()}</dd>
-      <dd className="order-3 text-[13px] font-medium tabular-nums">
-        {percentOf(count, total)}%<span className="sr-only"> of applications</span>
+      <dd
+        className={cn(
+          'order-1 font-heading font-semibold tabular-nums',
+          kind === 'count' ? 'text-2xl' : 'text-xl',
+          TONES[tone],
+        )}
+      >
+        {value}
       </dd>
     </div>
   );

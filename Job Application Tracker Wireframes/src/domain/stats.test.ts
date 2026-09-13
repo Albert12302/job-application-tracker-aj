@@ -14,7 +14,7 @@ function path(id: string, ...statuses: Status[]): StatusChange[] {
 
 /** Stats for one application whose current status is the last in its path. */
 function statsFor(...statuses: Status[]) {
-  return computeStats([{ id: 'a', status: statuses.at(-1)! }], path('a', ...statuses));
+  return computeStats([{ id: 'a', status: statuses.at(-1)!, referral: false }], path('a', ...statuses));
 }
 
 describe('reachOf', () => {
@@ -115,8 +115,8 @@ describe('computeStats — the set', () => {
   it('reads each application from its own history, and ignores rows for applications not in the set', () => {
     const stats = computeStats(
       [
-        { id: 'a', status: 'Rejected' },
-        { id: 'b', status: 'Applied' },
+        { id: 'a', status: 'Rejected', referral: false },
+        { id: 'b', status: 'Applied', referral: false },
       ],
       [...path('a', 'Applied', 'Interview', 'Rejected'), ...path('b', 'Applied'), ...path('deleted', 'Applied', 'Offer')],
     );
@@ -126,10 +126,10 @@ describe('computeStats — the set', () => {
   it('breaks down by current status, in §3 order, leaving out statuses with no applications', () => {
     const stats = computeStats(
       [
-        { id: 'a', status: 'Withdrawn' },
-        { id: 'b', status: 'Applied' },
-        { id: 'c', status: 'Rejected' },
-        { id: 'd', status: 'Applied' },
+        { id: 'a', status: 'Withdrawn', referral: false },
+        { id: 'b', status: 'Applied', referral: false },
+        { id: 'c', status: 'Rejected', referral: false },
+        { id: 'd', status: 'Applied', referral: false },
       ],
       path('c', 'Applied', 'Interview', 'Rejected'),
     );
@@ -141,20 +141,32 @@ describe('computeStats — the set', () => {
     expect(stats.breakdown.reduce((sum, part) => sum + part.count, 0)).toBe(stats.total);
   });
 
+  it('counts referrals by the flag alone, whatever the status or history', () => {
+    const stats = computeStats(
+      [
+        { id: 'a', status: 'Rejected', referral: true },
+        { id: 'b', status: 'Applied', referral: true },
+        { id: 'c', status: 'Offer', referral: false },
+      ],
+      path('a', 'Applied', 'Rejected'),
+    );
+    expect(stats.referrals).toBe(2);
+  });
+
   it('has nothing to show for no applications', () => {
-    expect(computeStats([], [])).toEqual({ total: 0, interviewed: 0, callbacks: 0, offers: 0, heardBack: 0, breakdown: [] });
+    expect(computeStats([], [])).toEqual({ total: 0, interviewed: 0, callbacks: 0, offers: 0, heardBack: 0, referrals: 0, breakdown: [] });
   });
 
   it('gives dev-a’s seeded applications (supabase/seed.sql) one more Interviewed than current status would', () => {
     const stats = computeStats(
       [
-        { id: '1', status: 'Callback' },
-        { id: '2', status: 'Interview' },
-        { id: '3', status: 'Offer' },
-        { id: '4', status: 'Rejected' },
-        { id: '5', status: 'Withdrawn' },
-        { id: '6', status: 'Applied' },
-        { id: '7', status: 'Applied' },
+        { id: '1', status: 'Callback', referral: true },
+        { id: '2', status: 'Interview', referral: false },
+        { id: '3', status: 'Offer', referral: false },
+        { id: '4', status: 'Rejected', referral: false },
+        { id: '5', status: 'Withdrawn', referral: false },
+        { id: '6', status: 'Applied', referral: true },
+        { id: '7', status: 'Applied', referral: false },
       ],
       [
         ...path('1', 'Applied', 'Interview', 'Callback'),
@@ -162,7 +174,7 @@ describe('computeStats — the set', () => {
         ...path('4', 'Applied', 'Interview', 'Rejected'),
       ],
     );
-    expect(stats).toMatchObject({ total: 7, interviewed: 4, callbacks: 2, offers: 1, heardBack: 4 });
+    expect(stats).toMatchObject({ total: 7, interviewed: 4, callbacks: 2, offers: 1, heardBack: 4, referrals: 2 });
   });
 });
 

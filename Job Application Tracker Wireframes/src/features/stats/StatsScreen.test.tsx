@@ -11,7 +11,7 @@ import { StatsScreen } from './StatsScreen';
  * The counting rules themselves are domain/stats.test.ts's; these assert what
  * the user sees in each §8.2 state.
  */
-const listApplicationStatuses = vi.fn();
+const listStatsApplications = vi.fn();
 const listStatusHistory = vi.fn();
 
 vi.mock('@/data/client', () => ({
@@ -27,7 +27,7 @@ vi.mock('@/queries/use-session', () => ({
 
 vi.mock('@/data/applications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/applications')>()),
-  listApplicationStatuses: (...args: unknown[]) => listApplicationStatuses(...args),
+  listStatsApplications: (...args: unknown[]) => listStatsApplications(...args),
 }));
 
 vi.mock('@/data/status-history', () => ({
@@ -44,19 +44,24 @@ function changes(id: string, ...statuses: Status[]): StatusChange[] {
   }));
 }
 
-/** The card for a stat, found by its label. */
-function card(label: string) {
-  return within(screen.getByText(label, { selector: 'dt' }).parentElement!);
+/** A stat's figure, found by its card's label. */
+function figure(label: string) {
+  return screen.getByText(label, { selector: 'dt' }).parentElement!.querySelector('dd')!.textContent;
 }
 
+const A1 = 'a0000000-0000-0000-0000-000000000001';
+const A2 = 'a0000000-0000-0000-0000-000000000002';
+const A3 = 'a0000000-0000-0000-0000-000000000003';
+const A4 = 'a0000000-0000-0000-0000-000000000004';
+
 beforeEach(() => {
-  listApplicationStatuses.mockReset();
+  listStatsApplications.mockReset();
   listStatusHistory.mockReset();
 });
 
 describe('StatsScreen', () => {
   it('shows skeleton bars and says it is loading', async () => {
-    listApplicationStatuses.mockReturnValue(new Promise(() => {}));
+    listStatsApplications.mockReturnValue(new Promise(() => {}));
     listStatusHistory.mockResolvedValue([]);
     renderStats();
     expect(await screen.findByText('Loading your stats')).toBeTruthy();
@@ -65,7 +70,7 @@ describe('StatsScreen', () => {
   });
 
   it('shows the empty state for no applications — no cards, no bar, no NaN', async () => {
-    listApplicationStatuses.mockResolvedValue([]);
+    listStatsApplications.mockResolvedValue([]);
     listStatusHistory.mockResolvedValue([]);
     const { container } = renderStats();
     expect(await screen.findByRole('heading', { name: 'Nothing to chart yet' })).toBeTruthy();
@@ -76,7 +81,7 @@ describe('StatsScreen', () => {
   });
 
   it('says stats failed, with a reference and never the raw message, and Retry recovers', async () => {
-    listApplicationStatuses.mockResolvedValue([{ id: 'a0000000-0000-0000-0000-000000000001', status: 'Applied' }]);
+    listStatsApplications.mockResolvedValue([{ id: A1, status: 'Applied', referral: false }]);
     listStatusHistory
       .mockRejectedValueOnce(Object.assign(new Error('permission denied for table status_history'), { code: '42501' }))
       .mockResolvedValueOnce([]);
@@ -88,30 +93,47 @@ describe('StatsScreen', () => {
     expect(alert.textContent).not.toContain('permission');
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('Interviewed', { selector: 'dt' })).toBeTruthy();
+    expect(await screen.findByText('Applications', { selector: 'dt' })).toBeTruthy();
   });
 
-  it('counts how far each application got, and breaks down by current status', async () => {
-    listApplicationStatuses.mockResolvedValue([
-      { id: 'a0000000-0000-0000-0000-000000000001', status: 'Rejected' },
-      { id: 'a0000000-0000-0000-0000-000000000002', status: 'Offer' },
-      { id: 'a0000000-0000-0000-0000-000000000003', status: 'Applied' },
-      { id: 'a0000000-0000-0000-0000-000000000004', status: 'Applied' },
+  it('shows the prototype’s two rows, counting how far each application got', async () => {
+    listStatsApplications.mockResolvedValue([
+      { id: A1, status: 'Rejected', referral: true },
+      { id: A2, status: 'Offer', referral: false },
+      { id: A3, status: 'Applied', referral: false },
+      { id: A4, status: 'Applied', referral: false },
     ]);
     listStatusHistory.mockResolvedValue([
-      ...changes('a0000000-0000-0000-0000-000000000001', 'Applied', 'Interview', 'Rejected'),
-      ...changes('a0000000-0000-0000-0000-000000000002', 'Applied', 'Callback', 'Offer'),
+      ...changes(A1, 'Applied', 'Interview', 'Rejected'),
+      ...changes(A2, 'Applied', 'Callback', 'Offer'),
     ]);
     const { container } = renderStats();
 
-    await screen.findByText('Interviewed', { selector: 'dt' });
-    expect(screen.getByText('applications').textContent).toBe('4 applications');
-    // Interview → Rejected still counts as Interviewed (§4.5).
-    expect(card('Interviewed').getByText('2').tagName).toBe('DD');
-    expect(card('Interviewed').getByText('50%', { exact: false }).textContent).toBe('50% of applications');
-    expect(card('Callbacks').getByText('1')).toBeTruthy();
-    expect(card('Offers').getByText('25%', { exact: false })).toBeTruthy();
-    expect(card('Heard back').getByText('2')).toBeTruthy();
+    await screen.findByText('Applications', { selector: 'dt' });
+    const [counts, rates] = [...container.querySelectorAll('dl')];
+    expect([...counts!.querySelectorAll('dt')].map((dt) => dt.textContent)).toEqual([
+      'Applications',
+      'Interviews',
+      'Callbacks',
+      'Via referral',
+    ]);
+    expect([...rates!.querySelectorAll('dt')].map((dt) => dt.textContent)).toEqual([
+      'Heard back',
+      'Interview rate',
+      'Callback rate',
+      'Offer rate',
+    ]);
+    expect(screen.getByRole('heading', { level: 2, name: 'How far applications got' })).toBeTruthy();
+
+    expect(figure('Applications')).toBe('4');
+    // Interview → Rejected still counts as an interview (§4.5).
+    expect(figure('Interviews')).toBe('2');
+    expect(figure('Callbacks')).toBe('1');
+    expect(figure('Via referral')).toBe('25%');
+    expect(figure('Heard back')).toBe('50%');
+    expect(figure('Interview rate')).toBe('50%');
+    expect(figure('Callback rate')).toBe('25%');
+    expect(figure('Offer rate')).toBe('25%');
 
     // The legend carries every segment as text, in §3 order, with no zero-count statuses (§10.1).
     const legend = screen.getByRole('list', { name: 'Status breakdown' });
@@ -121,14 +143,5 @@ describe('StatsScreen', () => {
       'Rejected · 1',
     ]);
     expect((await axe.run(container)).violations).toEqual([]);
-  });
-
-  it('reads one application as "1 application"', async () => {
-    listApplicationStatuses.mockResolvedValue([{ id: 'a0000000-0000-0000-0000-000000000001', status: 'Withdrawn' }]);
-    listStatusHistory.mockResolvedValue([]);
-    renderStats();
-    await screen.findByText('Heard back', { selector: 'dt' });
-    expect(screen.getByText('application').textContent).toBe('1 application');
-    expect(card('Heard back').getByText('0%', { exact: false })).toBeTruthy();
   });
 });
