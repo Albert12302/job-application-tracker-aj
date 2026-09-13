@@ -164,9 +164,16 @@ Controls, top to bottom:
 - **Filter builder** (§5.1) — collapsible panel.
 - **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
 
-Table columns: star · date · company · position · location · status tag · 📎 (cover letter
-present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking the star
-toggles it without opening the row.
+Table columns: select checkbox · star · date · company · position · location · status tag · 📎
+(cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
+the star or the checkbox acts on it without opening the row.
+
+**Selecting rows to delete.** Each row has a checkbox, and the header has one that selects every
+row on screen (mixed when only some are). Once any row is ticked, a bar appears above the list:
+"*N* selected", **Clear**, and **Delete *N* applications**, which confirms first (§9.2). Only rows
+on screen can be selected: once search, filters, or pages exist (§6 steps 5–6), select-all covers
+the visible rows only, and changing the filter or page clears the selection. The selection is
+screen state, not part of the URL, and leaving the list clears it.
 
 Pagination below the table: rows per page (10 / 25 / 50), `x–y of n` range label, Previous /
 Next, numbered pages. Changing page size or any filter resets to page 1.
@@ -734,6 +741,7 @@ Nothing ships with an unhandled failure.
 | Cover letter file (detail) | skeleton where the size goes | "No cover letter attached." + Attach cover letter | Size: "Couldn't load the file size." + Retry, name and actions still usable |
 | Cover letter download | spinner and "Preparing…" in the button | n/a | "Couldn't download the cover letter." + error reference + Retry, which asks for a new URL |
 | Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
+| Bulk delete (list) | "Counting their notes…" in the dialog, confirm disabled until counted; "Deleting…" in the confirm button, dialog buttons disabled | n/a | Stops at the first failure: "Deleted *n* of *m* applications. Couldn't delete *company*." + error reference inside the dialog; the rest stay selected, and confirming again carries on. Over the write limit: the wait-a-minute copy instead of a reference (§9.2) |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
 | Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
@@ -769,6 +777,24 @@ cover letter, which is attached, replaced, and removed on the detail screen itse
   failing the whole delete.
 - Returns to the list with a toast: "Application deleted." Offer Undo for ~5 seconds by
   deferring the commit; if Undo is not implemented, do not show it.
+
+**Deleting several from the list** (§4.2) follows the same rules, through the same one path,
+one application at a time:
+- The confirmation names them and what goes with them: "Delete 3 applications? Litware,
+  Contoso, and Fabrikam. This also deletes 5 notes and 1 attached file. This cannot be undone."
+  Past five names the rest are counted ("…, and 3 more"). A single selected application reads as
+  the detail screen's does: "Delete your application to *Litware*?" The note count is read when
+  the dialog opens; if it cannot be read, the dialog says "Their notes and attached files are
+  deleted with them." rather than blocking the delete.
+- It stops at the first failure rather than trying the rest, since most failures — the write
+  limit above all — would refuse the rest too. What was deleted leaves the list; the dialog stays
+  open on what remains, saying where it stopped: "Deleted 2 of 5 applications. Couldn't delete
+  *Contoso*." with an error reference. Confirming again carries on.
+- Every note deleted with an application counts against the write limit (§7.1), so a large
+  delete can be refused part-way. Then the dialog adds "You've made a lot of changes in the last
+  minute. Wait a minute, then try again." and shows no reference, because nothing is wrong.
+- On success: the dialog closes, the selection clears, focus moves to the list's heading, and a
+  toast says "3 applications deleted." (or "Application deleted." for one). No Undo.
 
 ### 9.3 Notes
 - Notes are individually editable and deletable from the detail screen.
@@ -915,9 +941,10 @@ The app is used on a phone as often as a laptop — a listing is usually found o
 Breakpoint: **760px**. Below it, the following changes apply.
 
 - **The table becomes cards.** A horizontally scrolling nine-column table is unusable on a
-  phone. Each application renders as a card: company and position stacked, star at the top
-  right, then a metadata row of status tag, date, location, cover-letter and referral marks.
-  Nothing is dropped, it is re-ordered by importance.
+  phone. Each application renders as a card: select checkbox at the left, company and position
+  stacked, star at the top right, then a metadata row of status tag, date, location,
+  cover-letter and referral marks. Nothing is dropped, it is re-ordered by importance. With no
+  header row to hold select-all, the selection bar offers **Select all *N*** instead.
 - **Sort moves out of the table header** into its own control above the list, labelled
   "Newest first" / "Oldest first" rather than an unlabelled chevron.
 - **Numbered pages are hidden**; Previous / Next and the range label remain. Ten numbered
@@ -982,6 +1009,13 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-13
+- **Several applications can be deleted at once from the list (§4.2, §8.2, §9.2, §11).** Asked for
+  directly: deleting one at a time meant opening each record. It goes through the one delete path
+  per application, so Storage cleanup and the §7.8.4 check still cover it. It stops at the first
+  failure instead of pressing on, because the likeliest failure is the per-user write limit —
+  which cascaded notes count against — and every later delete would be refused the same way.
+  Selection is limited to rows on screen, so a future filter can never hide what is about to be
+  deleted.
 - **Stats count the furthest stage an application reached, from its history (§4.5).** §4.5
   defined every stat by current status, while §6 step 4 said to rebuild stats from the history
   and nothing said what a history-based stat was. By current status, good numbers fell when bad

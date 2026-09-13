@@ -171,7 +171,8 @@ Three layers, each with a job:
   minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
   happens to write last. Count what a new test spends (`select window_start, count from
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
-  engine is not its subject, and prefer `page.route` for failures over real writes.
+  engine is not its subject, and prefer `page.route` for failures over real writes. A suite that
+  writes a lot gets its own seed user instead: `dev-e` belongs to `bulk-delete.spec.ts` alone.
 
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
@@ -295,7 +296,11 @@ src/
       NotesSection.tsx
       NoteItem.tsx
       DeleteApplicationDialog.tsx
-      delete-summary.ts           what a delete takes with it (§9.2)
+      BulkDeleteDialog.tsx        several at once from the list, same path per application (§9.2)
+      SelectionBar.tsx
+      SelectCheckbox.tsx
+      use-selection.ts            which rows are ticked; rows on screen only
+      delete-summary.ts           what a delete takes with it, and the bulk copy (§9.2)
       panel.ts                    the shared card and section headings
       CoverLetterField.tsx        step 3
     filters/

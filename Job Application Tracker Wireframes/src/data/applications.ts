@@ -162,9 +162,23 @@ export async function setCoverLetter(
 }
 
 /**
+ * The per-user write limit refused the change (§7.1). The user's to wait out, so
+ * not reported. The trigger raises a bare code, never the row's content.
+ */
+export class WriteRateLimitedError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super('write_rate_limited', options);
+    this.name = 'WriteRateLimitedError';
+  }
+}
+
+const isWriteRateLimited = (error: { message: string }) => error.message === 'rate_limited';
+
+/**
  * Deletes the row; its notes and status_history rows go with it (on delete
  * cascade, §9.2). Returns the cover letter path it held, because Storage does
- * not cascade and the caller has to remove the file.
+ * not cascade and the caller has to remove the file. Every cascaded note counts
+ * against the write limit too, so a large delete can be refused part-way.
  */
 export async function deleteApplicationRow(id: string): Promise<{ coverLetterPath: string | null }> {
   const { data, error } = await supabase
@@ -173,7 +187,7 @@ export async function deleteApplicationRow(id: string): Promise<{ coverLetterPat
     .eq('id', id)
     .select('cover_letter_path')
     .maybeSingle();
-  if (error) throw error;
+  if (error) throw isWriteRateLimited(error) ? new WriteRateLimitedError({ cause: error }) : error;
   if (!data) throw new ApplicationNotFoundError();
   return { coverLetterPath: data.cover_letter_path };
 }

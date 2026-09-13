@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApplicationNotFoundError, createApplication, setStarred } from '@/data/applications';
+import { ApplicationNotFoundError, createApplication, setStarred, WriteRateLimitedError } from '@/data/applications';
 import type { ApplicationInput } from '@/domain/application-input';
 import { newestFirst } from '@/domain/order';
 import type { Application } from '@/domain/schemas';
@@ -12,10 +12,13 @@ import { reporting } from './errors';
 import { keys } from './keys';
 import { useSignedInUser } from './use-session';
 
-export { ApplicationNotFoundError };
+export { ApplicationNotFoundError, WriteRateLimitedError };
 
 /** Gone or not this user's: expected (another tab deleted it), shown, and not reported. */
 const isNotFound = (error: unknown) => error instanceof ApplicationNotFoundError;
+
+/** The write limit (§7.1): the user's to wait out, shown, and not reported. */
+const isRateLimited = (error: unknown) => error instanceof WriteRateLimitedError;
 
 /**
  * Apply `patch` to application `id` wherever it is cached, at once (§8.3), and
@@ -142,6 +145,56 @@ export function useDeleteApplication(id: string) {
       ),
     onSuccess: () => {
       queryClient.setQueryData<Application[]>(keys.applicationList(user.id), (rows) => rows?.filter((row) => row.id !== id));
+      void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
+      void queryClient.invalidateQueries({ queryKey: keys.applicationCount(user.id) });
+      void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
+    },
+  });
+}
+
+/** Where a bulk delete stopped, if it did: the application it could not delete, and why. */
+export type BulkDeleteResult = { deleted: string[]; failed: { id: string; error: unknown } | null };
+
+/**
+ * Delete several applications from the list (§9.2), each through the same
+ * services/delete-application.ts as the detail screen, one at a time.
+ *
+ * It stops at the first failure rather than trying the rest: most failures —
+ * the write limit above all — would refuse the rest too. What was deleted
+ * leaves every cache; the result says where it stopped, so the screen can keep
+ * the rest selected and a second confirm carries on.
+ */
+export function useDeleteApplications() {
+  const user = useSignedInUser();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: readonly string[]): Promise<BulkDeleteResult> => {
+      const deleted: string[] = [];
+      for (const id of ids) {
+        try {
+          await reporting(
+            'delete_application',
+            () =>
+              deleteApplication(id).catch((error: unknown) => {
+                if (!isNotFound(error)) throw error; // already gone counts as done
+              }),
+            isRateLimited,
+          );
+          deleted.push(id);
+        } catch (error) {
+          return { deleted, failed: { id, error } };
+        }
+      }
+      return { deleted, failed: null };
+    },
+    onSuccess: ({ deleted }) => {
+      if (deleted.length === 0) return;
+      const gone = new Set(deleted);
+      queryClient.setQueryData<Application[]>(keys.applicationList(user.id), (rows) => rows?.filter((row) => !gone.has(row.id)));
+      for (const id of deleted) {
+        queryClient.removeQueries({ queryKey: keys.application(user.id, id) });
+        queryClient.removeQueries({ queryKey: keys.notes(user.id, id) });
+      }
       void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
       void queryClient.invalidateQueries({ queryKey: keys.applicationCount(user.id) });
       void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
