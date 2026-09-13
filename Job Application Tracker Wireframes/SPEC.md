@@ -464,7 +464,7 @@ single note can be a megabyte.
 | Stored filename | generate a UUID; keep the original name only as a display label, escaped |
 | Storage path | prefixed with the owner's user id, e.g. `{user_id}/{uuid}.pdf` |
 | Serving | private bucket, signed URL with a **60-second** TTL, generated on click — never embedded in page HTML |
-| Download response | `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` |
+| Download response | `Content-Disposition: attachment`, and the `Content-Type` the upload function sniffed from the bytes. The app fetches the file and saves it as `application/octet-stream` rather than opening the URL (§4.4). `X-Content-Type-Options: nosniff` is wanted but not required: Supabase Storage does not send it, and the rows above already do its job — see the 2026-09-12 changelog |
 
 SVG is not an accepted type anywhere. It is a script execution vector.
 
@@ -611,7 +611,9 @@ The four checks worth doing by hand, because tooling misses them:
    rows and a rejected write.
 2. Grep the built client bundle for `service_role` and for any key that is not the anon key.
 3. Request a cover-letter signed URL, wait for it to expire, confirm it stops working — then
-   confirm the bucket is not publicly listable.
+   confirm the bucket is not publicly listable. While it is live, check the hosted response's
+   headers: `Content-Disposition: attachment` and a `Content-Type` of PDF or Word. If either is
+   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it.
 4. Delete an application, then confirm its notes, history rows, and Storage object are all
    gone.
 5. Five wrong passwords on one account, then a sixth attempt with the *correct* password —
@@ -950,6 +952,16 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-12
+- **Cover-letter downloads accepted without `nosniff` (§7.3).** Supabase Storage never sends
+  the header on an object (checked in its server code), and adding it would mean serving every
+  download through a function. `nosniff` stops a browser guessing that a file is HTML or script
+  when its declared type is vague. Here the type is never vague: the upload function stores a
+  PDF or Word type taken from the bytes, and browsers do not reinterpret those. On top of that,
+  the response is an attachment, so it is saved rather than shown; it comes from Storage's
+  origin, not the app's, so even a rendered file could not reach the app's session; and the
+  app itself never opens the URL — it saves the bytes as `application/octet-stream`. What is
+  left is a signed URL someone already holds, opened within 60 seconds, for a document they
+  could download anyway. Not yet confirmed hosted: §7.8 check 3 now includes the headers.
 - **The add form attaches a cover letter after the application saves (§4.3, §8.2).** §8.2 says
   the application saves without the file rather than losing the record, so the record goes
   first. A failed upload lands on the new application's detail screen rather than the list,
@@ -1139,13 +1151,6 @@ the prototype is the reference for those.
   from the first status-change feature.
 
 ### Open questions
-- **Storage's download responses carry no `X-Content-Type-Options: nosniff` (§7.3).** Checked
-  locally: the Storage server sets `Content-Disposition: attachment` but never `nosniff` on an
-  object. Not yet checked hosted. The app itself never loads a signed URL as a document (it
-  fetches the bytes, §4.4), and every stored file is typed by its bytes as PDF or Word, so the
-  exposure is a signed URL opened directly within its 60 seconds. Closing it fully would mean
-  serving downloads through a function that sets the header. Needs a decision: accept and amend
-  §7.3, or build that function.
 - No alerting on `app_errors` — accepted at two users (§7.7), revisit before real ones.
 - The `rate_limits` fixed window allows up to 2x a limit across a boundary. Accepted; if abuse
   ever makes it matter, the table can hold one row per event instead.
