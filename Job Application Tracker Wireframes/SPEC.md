@@ -444,7 +444,7 @@ single note can be a megabyte.
 | field | limit |
 |---|---|
 | company, position, location | 120 characters each |
-| description | 5,000 characters |
+| description | 15,000 characters |
 | note body | 2,000 characters |
 | saved filter name | 60 characters |
 | email | 254 characters |
@@ -952,6 +952,13 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-12
+- **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —
+  duties, requirements, benefits, the company blurb — runs past 5,000 often enough to be refused
+  in ordinary use. Still capped, so one description cannot be megabytes. Changed in the Zod
+  schema and by a new migration (`20260913001336_raise_description_cap.sql`), not by editing
+  the original, so a local database keeps its data.
+- **A closed application's progress line reads "Rejected" or "Withdrawn"**, not "Closed —
+  rejected." The status already says it is closed; the extra word said nothing (§4.4).
 - **Cover-letter downloads accepted without `nosniff` (§7.3).** Supabase Storage never sends
   the header on an object (checked in its server code), and adding it would mean serving every
   download through a function. `nosniff` stops a browser guessing that a file is HTML or script

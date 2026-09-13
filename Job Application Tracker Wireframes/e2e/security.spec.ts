@@ -238,6 +238,46 @@ test.describe('§2 status history — written with the status, atomically', () =
   });
 });
 
+test.describe('§7.3 field caps are enforced by Postgres, not only the form', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  test('a job description of 15,000 characters saves, and one of 15,001 is refused', async () => {
+    const d = await signIn('dev-d@example.test');
+    const base = {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+    };
+
+    const { data: atCap, error: atCapError } = await d.rpc('create_application', {
+      ...base,
+      p_company: `Cap ${crypto.randomUUID().slice(0, 8)}`,
+      p_description: 'x'.repeat(15000),
+    });
+    expect(atCapError).toBeNull();
+
+    try {
+      const company = `Over cap ${crypto.randomUUID().slice(0, 8)}`;
+      const { error: overError } = await d.rpc('create_application', {
+        ...base,
+        p_company: company,
+        p_description: 'x'.repeat(15001),
+      });
+      expect(overError?.code).toBe('23514'); // check_violation
+      const { data: none } = await d.from('applications').select('id').eq('company', company);
+      expect(none).toEqual([]);
+
+      // An edit is held to the same cap as a create.
+      const id = (atCap as { id: string }).id;
+      const { error: editError } = await d.from('applications').update({ description: 'x'.repeat(15001) }).eq('id', id);
+      expect(editError?.code).toBe('23514');
+    } finally {
+      await d.from('applications').delete().eq('id', (atCap as { id: string }).id);
+    }
+  });
+});
+
 test.describe('7.8.4 delete leaves nothing behind', () => {
   /**
    * Driven through the screen rather than the tables: the delete this checks

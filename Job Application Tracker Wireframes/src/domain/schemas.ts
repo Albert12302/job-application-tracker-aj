@@ -19,7 +19,7 @@ z.config({ jitless: true });
  * UX, the constraint is enforcement (§7.3).
  */
 
-const CAPS = { shortText: 120, description: 5000, noteBody: 2000, filterName: 60 } as const;
+const CAPS = { shortText: 120, description: 15000, noteBody: 2000, filterName: 60 } as const;
 
 export const statusSchema = z.enum(STATUSES);
 
@@ -61,7 +61,7 @@ export const applicationFormSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(CAPS.description, 'Descriptions are limited to 5,000 characters.')
+    .max(CAPS.description, 'Descriptions are limited to 15,000 characters.')
     .optional(),
   status: statusSchema,
   referral: z.boolean(),
