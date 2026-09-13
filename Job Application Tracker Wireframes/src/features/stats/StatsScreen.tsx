@@ -62,20 +62,20 @@ function StatsSummary({ stats }: { stats: Stats }) {
   return (
     <>
       <dl className={`${STAT_GRID} mb-4`}>
-        <StatCard kind="count" tone="total" label="Applications" value={stats.total.toLocaleString()} />
-        <StatCard kind="count" tone="interview" label="Interviews" value={stats.interviewed.toLocaleString()} />
-        <StatCard kind="count" tone="callback" label="Callbacks" value={stats.callbacks.toLocaleString()} />
-        <StatCard kind="count" tone="total" label="Via referral" value={rate(stats.referrals)} />
+        <StatCard kind="count" label="Applications" value={stats.total.toLocaleString()} />
+        <StatCard kind="count" label="Interviews" value={stats.interviewed.toLocaleString()} />
+        <StatCard kind="count" label="Callbacks" value={stats.callbacks.toLocaleString()} />
+        <StatCard kind="count" label="Via referral" value={rate(stats.referrals)} />
       </dl>
 
       <h2 id="stats-reach-heading" className={`${SECTION_HEADING} mb-0.5`}>
         How far applications got
       </h2>
       <dl aria-labelledby="stats-reach-heading" className={`${STAT_GRID} mb-4`}>
-        <StatCard kind="rate" tone="total" label="Heard back" value={rate(stats.heardBack)} />
-        <StatCard kind="rate" tone="interview" label="Interview rate" value={rate(stats.interviewed)} />
-        <StatCard kind="rate" tone="callback" label="Callback rate" value={rate(stats.callbacks)} />
-        <StatCard kind="rate" tone="offer" label="Offer rate" value={rate(stats.offers)} />
+        <StatCard kind="rate" label="Heard back" value={rate(stats.heardBack)} />
+        <StatCard kind="rate" label="Interview rate" value={rate(stats.interviewed)} />
+        <StatCard kind="rate" label="Callback rate" value={rate(stats.callbacks)} />
+        <StatCard kind="rate" label="Offer rate" value={rate(stats.offers)} />
       </dl>
 
       <h2 id="stats-breakdown-heading" className={`${SECTION_HEADING} mb-2`}>

@@ -1000,8 +1000,8 @@ the prototype is the reference for those.
 - **The stats bar's segments are decoration; its legend is the content (§10.1).** Measured, the
   light status fills are 1.2–1.4:1 against the card — under the 3:1 a meaningful graphic needs,
   and a fill dark enough to pass would break the §3 tag pairings. The legend already names every
-  status and count, so the bar is hidden from assistive technology rather than retinted. The
-  coloured figures on the cards measure 8.5–9.6:1.
+  status and count, so the bar is hidden from assistive technology rather than retinted. Each
+  legend entry has a swatch of its colour, edged at 3.3:1 so the light ones show, as the key.
 
 ### 2026-09-12
 - **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —
