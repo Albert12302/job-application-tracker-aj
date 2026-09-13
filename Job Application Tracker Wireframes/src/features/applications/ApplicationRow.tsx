@@ -5,6 +5,7 @@ import { formatUtcDate, NUMERIC_DATE } from '@/domain/date';
 import type { Application } from '@/domain/schemas';
 import { useToggleStar } from '@/queries/use-application-mutations';
 import { NoneMark } from './NoneMark';
+import { SelectCheckbox } from './SelectCheckbox';
 import { StarToggle } from './StarToggle';
 import { StatusTag } from './StatusTag';
 import { useOpenApplication } from './use-open-application';
@@ -13,15 +14,27 @@ const WRAP = 'whitespace-normal break-words';
 
 /**
  * One application in the table (SPEC §4.2). Clicking anywhere on the row opens
- * it; the keyboard way in is the company link, and the star is its own button.
+ * it; the keyboard way in is the company link, and the checkbox and star are
+ * their own controls.
  */
-export function ApplicationRow({ application }: { application: Application }) {
+export function ApplicationRow({
+  application,
+  selected,
+  onSelectedChange,
+}: {
+  application: Application;
+  selected: boolean;
+  onSelectedChange: (selected: boolean) => void;
+}) {
   const open = useOpenApplication(application.id);
   const star = useToggleStar();
   const { id, company, starred } = application;
 
   return (
-    <TableRow onClick={open} className="cursor-pointer">
+    <TableRow onClick={open} data-state={selected ? 'selected' : undefined} className="cursor-pointer">
+      <TableCell className="pr-0">
+        <SelectCheckbox label={`Select ${company}`} checked={selected} onCheckedChange={onSelectedChange} />
+      </TableCell>
       <TableCell className="pr-0">
         <StarToggle
           starred={starred}

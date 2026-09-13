@@ -36,7 +36,7 @@ export function DeleteApplicationDialog({
   error: unknown;
   onConfirm: () => void;
 }) {
-  const summary = deleteSummary(noteCount, hasFile);
+  const summary = deleteSummary(noteCount, hasFile ? 1 : 0);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

@@ -15,6 +15,9 @@ export const keys = {
   applicationCount: (userId: string) => ['applications', userId, 'count'] as const,
   application: (userId: string, id: string) => ['applications', userId, 'detail', id] as const,
   notes: (userId: string, applicationId: string) => ['applications', userId, 'notes', applicationId] as const,
+  /** Notes held by a set of applications, for a bulk delete's confirmation (§9.2). */
+  noteCount: (userId: string, applicationIds: readonly string[]) =>
+    ['applications', userId, 'note-count', [...applicationIds].sort()] as const,
   /** Under the applications prefix, so anything that changes which applications exist refreshes it too. */
   stats: (userId: string) => ['applications', userId, 'stats'] as const,
   /** Keyed by path: a stored object never changes, only which one a row points at. */

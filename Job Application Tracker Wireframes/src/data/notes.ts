@@ -37,6 +37,23 @@ export async function listNotes(applicationId: string): Promise<Note[]> {
   return noteSchema.array().parse(data);
 }
 
+/** Ids per request: each is 36 characters in the URL, and a long URL is refused. */
+const COUNT_CHUNK = 100;
+
+/** How many notes these applications hold between them — what a bulk delete takes with it (§9.2). */
+export async function countNotes(applicationIds: readonly string[]): Promise<number> {
+  let total = 0;
+  for (let start = 0; start < applicationIds.length; start += COUNT_CHUNK) {
+    const { count, error } = await supabase
+      .from('notes')
+      .select('id', { count: 'exact', head: true })
+      .in('application_id', applicationIds.slice(start, start + COUNT_CHUNK));
+    if (error) throw error;
+    total += count ?? 0;
+  }
+  return total;
+}
+
 export async function addNote(applicationId: string, body: string): Promise<Note> {
   const { data, error } = await supabase
     .from('notes')

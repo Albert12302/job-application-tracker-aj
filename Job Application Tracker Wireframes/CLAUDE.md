@@ -296,7 +296,11 @@ src/
       NotesSection.tsx
       NoteItem.tsx
       DeleteApplicationDialog.tsx
-      delete-summary.ts           what a delete takes with it (§9.2)
+      BulkDeleteDialog.tsx        several at once from the list, same path per application (§9.2)
+      SelectionBar.tsx
+      SelectCheckbox.tsx
+      use-selection.ts            which rows are ticked; rows on screen only
+      delete-summary.ts           what a delete takes with it, and the bulk copy (§9.2)
       panel.ts                    the shared card and section headings
       CoverLetterField.tsx        step 3
     filters/

@@ -4,7 +4,7 @@ import { ApplicationTableHeader } from './ApplicationTableHeader';
 
 const ROWS = [0, 1, 2, 3, 4];
 // One width per column, close to the real content, so nothing jumps when data lands (§8.1).
-const CELLS = ['size-4', 'w-12', 'w-28', 'w-32', 'w-24', 'w-16 rounded-full', 'w-4', 'w-4', 'w-4'];
+const CELLS = ['size-4', 'size-4', 'w-12', 'w-28', 'w-32', 'w-24', 'w-16 rounded-full', 'w-4', 'w-4', 'w-4'];
 
 /**
  * Five skeleton rows in the real table shell (§8.2), or five card shapes below
