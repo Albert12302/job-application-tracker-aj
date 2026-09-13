@@ -147,6 +147,9 @@ test.describe("dev-a's seeded applications", () => {
 
 test.describe("dev-d's status changes", () => {
   test.describe.configure({ mode: 'serial' });
+  // One browser: this checks the cache and the history read, not the engine — the
+  // screen itself runs in both above — and dev-d's write budget is nearly spent (CLAUDE.md).
+  test.skip(({ browserName }) => browserName !== 'chromium', "dev-d's writes; runs once");
 
   let session: string;
   let client: SupabaseClient;
@@ -187,15 +190,20 @@ test.describe("dev-d's status changes", () => {
     await expect(select).toContainText(status);
   }
 
-  test('a status change reaches stats at once: Interview → Rejected stays Interviewed, a mis-picked Offer does not count', async ({
-    page,
-  }, testInfo) => {
+  /**
+   * Five of dev-d's writes — create (the application and its history row), one
+   * change (the status and its row), and the cleanup delete. dev-d's 120-a-minute
+   * write limit (§7.1) is shared with every other suite that writes as dev-d at
+   * the same moment, so each change here is spent carefully. The correction
+   * rule's cases are domain/stats.test.ts's.
+   */
+  test('a status change reaches stats at once, and Interview → Rejected stays Interviewed', async ({ page }, testInfo) => {
     const company = `Stats ${testInfo.project.name} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const { data, error } = await client.rpc('create_application', {
       p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
       p_company: company,
       p_position: 'Frontend Engineer',
-      p_status: 'Applied',
+      p_status: 'Interview',
       p_referral: false,
     });
     expect(error).toBeNull();
@@ -205,49 +213,37 @@ test.describe("dev-d's status changes", () => {
     await startSignedIn(page, session);
     await onlyApplication(page, id);
     const nav = page.getByRole('navigation', { name: 'Main' });
+    const legend = page.getByRole('list', { name: 'Status breakdown' }).getByRole('listitem');
 
     // Load stats first, so what follows has to replace a cached answer (§4.4 "live").
     await page.goto('/stats');
-    await expectCard(page, 'Interviewed', '0', '0%');
-    await expectCard(page, 'Heard back', '0', '0%');
+    await expectCard(page, 'Interviewed', '1', '100%');
+    await expect(legend).toHaveText(['Interview · 1']);
 
-    // Through the app, without a reload: the list, the detail, two changes.
+    // Through the app, without a reload: the list, the detail, the selector.
     await nav.getByRole('link', { name: 'Home' }).click();
     await page.getByRole('link', { name: company }).click();
     await expect(page.getByRole('heading', { level: 1, name: company })).toBeVisible();
-    await pickStatus(page, 'Interview');
     await pickStatus(page, 'Rejected');
 
     await nav.getByRole('link', { name: 'Stats' }).click();
+    // The breakdown follows the new status: stats were refetched, not served from cache.
+    await expect(legend).toHaveText(['Rejected · 1']);
+    // And the history was read: by current status alone this would be 0 (§4.5).
     await expectCard(page, 'Interviewed', '1', '100%');
     await expectCard(page, 'Callbacks', '0', '0%');
     await expectCard(page, 'Offers', '0', '0%');
     await expectCard(page, 'Heard back', '1', '100%');
-    await expect(page.getByRole('list', { name: 'Status breakdown' }).getByRole('listitem')).toHaveText(['Rejected · 1']);
 
-    // Offer picked by mistake, then put back to Interview: a correction (§4.5).
-    await page.goBack();
-    await expect(page.getByRole('heading', { level: 1, name: company })).toBeVisible();
-    await pickStatus(page, 'Offer');
-    await pickStatus(page, 'Interview');
-
-    await nav.getByRole('link', { name: 'Stats' }).click();
-    await expectCard(page, 'Offers', '0', '0%');
-    await expectCard(page, 'Interviewed', '1', '100%');
-    await expect(page.getByRole('list', { name: 'Status breakdown' }).getByRole('listitem')).toHaveText(['Interview · 1']);
-
-    // Stats only read: the history is exactly the changes made, one row each (§2).
+    // Stats only read: the history is exactly the change made, one row each (§2).
     const { data: history } = await client
       .from('status_history')
       .select('from_status, to_status')
       .eq('application_id', id)
       .order('changed_at', { ascending: true });
     expect(history).toEqual([
-      { from_status: null, to_status: 'Applied' },
-      { from_status: 'Applied', to_status: 'Interview' },
+      { from_status: null, to_status: 'Interview' },
       { from_status: 'Interview', to_status: 'Rejected' },
-      { from_status: 'Rejected', to_status: 'Offer' },
-      { from_status: 'Offer', to_status: 'Interview' },
     ]);
   });
 });

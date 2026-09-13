@@ -165,6 +165,14 @@ Three layers, each with a job:
   narrows the `applications` and `status_history` responses the page reads to its own row with
   `page.route` + `route.fetch()`: the writes, reads, and counting stay real.
 
+  **`dev-d`'s writes are budgeted too.** The write limit is 120 a minute per user (§7.1), and
+  every insert, update, and delete on the writable tables counts — a status change is two (the
+  status and its history row). A full run spends about 116 of `dev-d`'s, mostly inside one
+  minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
+  happens to write last. Count what a new test spends (`select window_start, count from
+  public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
+  engine is not its subject, and prefer `page.route` for failures over real writes.
+
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
   three — so a third run inside the hour trips the limit. Simulate failures at the network
