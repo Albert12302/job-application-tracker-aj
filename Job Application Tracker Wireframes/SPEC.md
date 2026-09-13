@@ -204,7 +204,7 @@ Actions: edit fields, delete application (confirm first).
 
 Cover letter: the original filename as a label, with the file's size and an **×** at the right
 of that row that removes it (confirming first, §9.4), then **Download** and **Replace** — or "No
-cover letter attached." and **Attach cover letter** when there is none. Help text under the actions: "PDF, DOC, or DOCX, up to 10 MB." A chosen file is
+cover letter attached." and **Attach cover letter** when there is none. A chosen file is
 checked before upload, and the first failure is shown under the row (§7.3):
 - type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
 - size — "Choose a file of 10 MB or less."

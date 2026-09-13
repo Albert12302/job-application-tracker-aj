@@ -26,7 +26,7 @@ export function CoverLetterPicker({
   disabled?: boolean;
   /** Disabled because this control's own work is under way: the cursor waits rather than refuses. */
   pending?: boolean;
-  describedBy?: string;
+  describedBy?: string | undefined;
   inputRef?: Ref<HTMLInputElement>;
 }) {
   const id = useId();

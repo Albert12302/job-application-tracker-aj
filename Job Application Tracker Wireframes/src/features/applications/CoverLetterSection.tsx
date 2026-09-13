@@ -1,5 +1,5 @@
 import { FileTextIcon, Loader2Icon } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ErrorState';
@@ -31,7 +31,6 @@ const ACTION = 'h-9 max-[760px]:h-11';
  * over to this screen. Download asks for a signed URL only when clicked (§7.3).
  */
 export function CoverLetterSection({ application }: { application: Application }) {
-  const helpId = useId();
   const pickerRef = useRef<HTMLInputElement>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -144,15 +143,11 @@ export function CoverLetterSection({ application }: { application: Application }
             onPick={start}
             pending={!!uploading}
             disabled={remove.isPending}
-            describedBy={helpId}
             name={file ? 'Replace cover letter' : 'Attach cover letter'}
           >
             {file ? 'Replace' : 'Attach cover letter'}
           </CoverLetterPicker>
         </div>
-        <p id={helpId} className="text-[13px] text-muted-foreground">
-          PDF, DOC, or DOCX, up to 10 MB.
-        </p>
       </div>
 
       <p role="status" className="sr-only">

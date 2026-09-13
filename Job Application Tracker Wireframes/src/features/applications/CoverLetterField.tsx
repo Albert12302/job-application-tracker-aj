@@ -28,7 +28,6 @@ export function CoverLetterField({
   const id = useId();
   const pickerRef = useRef<HTMLInputElement>(null);
   const labelId = `${id}-label`;
-  const helpId = `${id}-help`;
   const errorId = `${id}-error`;
 
   return (
@@ -73,15 +72,12 @@ export function CoverLetterField({
           inputRef={pickerRef}
           onPick={onPick}
           pending={uploading}
-          describedBy={problem ? `${errorId} ${helpId}` : helpId}
+          describedBy={problem ? errorId : undefined}
         >
           {file ? 'Choose a different file' : 'Attach cover letter'}
         </CoverLetterPicker>
       </div>
 
-      <p id={helpId} className="text-[13px] text-muted-foreground">
-        PDF, DOC, or DOCX, up to 10 MB.
-      </p>
       {problem ? (
         <p id={errorId} role="alert" className="text-sm text-destructive">
           {problem}

@@ -92,8 +92,6 @@ describe('CoverLetterSection', () => {
     expect(await screen.findByText('No cover letter attached.')).toBeTruthy();
     const attach = screen.getByLabelText('Attach cover letter');
     expect(attach.getAttribute('type')).toBe('file');
-    expect(attach.getAttribute('aria-describedby')).toBeTruthy();
-    expect(screen.getByText('PDF, DOC, or DOCX, up to 10 MB.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Download/ })).toBeNull();
     expect(coverLetterSize).not.toHaveBeenCalled();
   });
