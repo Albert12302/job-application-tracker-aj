@@ -158,6 +158,13 @@ Three layers, each with a job:
   Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
   exact application count, and the suites run in parallel.
 
+  **Stats cover a user's whole set, so an exact number needs a set nobody else is changing.**
+  `stats.spec.ts` reads `dev-a`'s seed read-only and asserts its numbers exactly — a change to
+  `dev-a`'s seeded applications or history in `seed.sql` changes them (and `auth.spec.ts`'s
+  count). Its status-change test runs as `dev-d`, whose set other suites change mid-run, so it
+  narrows the `applications` and `status_history` responses the page reads to its own row with
+  `page.route` + `route.fetch()`: the writes, reads, and counting stay real.
+
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
   three — so a third run inside the hour trips the limit. Simulate failures at the network

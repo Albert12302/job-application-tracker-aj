@@ -25,10 +25,7 @@ export function BreakdownBar({ breakdown, labelledBy }: { breakdown: readonly St
         {breakdown.map(({ status, count }) => (
           <li key={status} className="flex items-center gap-1.5">
             <span aria-hidden="true" className={cn('size-3 rounded-full border border-input', STATUS_TOKENS[status].bg)} />
-            <span>{status}</span>
-            <span aria-hidden="true" className="text-muted-foreground">
-              ·
-            </span>
+            <span>{status}</span> <span aria-hidden="true" className="text-muted-foreground">·</span>{' '}
             <span className="font-semibold tabular-nums">{count.toLocaleString()}</span>
           </li>
         ))}

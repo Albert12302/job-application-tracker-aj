@@ -116,9 +116,9 @@ describe('StatsScreen', () => {
     // The legend carries every segment as text, in §3 order, with no zero-count statuses (§10.1).
     const legend = screen.getByRole('list', { name: 'Status breakdown' });
     expect(within(legend).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'Applied·2',
-      'Offer·1',
-      'Rejected·1',
+      'Applied · 2',
+      'Offer · 1',
+      'Rejected · 1',
     ]);
     expect((await axe.run(container)).violations).toEqual([]);
   });
