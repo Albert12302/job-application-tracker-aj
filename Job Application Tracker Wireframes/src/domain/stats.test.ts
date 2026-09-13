@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeStats, percentOf, reachOf, type StatusChange } from './stats';
+import type { StatusChange } from './schemas';
+import { computeStats, percentOf, reachOf } from './stats';
 import type { Status } from './status';
 
 /** A history for one application: the creation row, then each change a minute apart. */

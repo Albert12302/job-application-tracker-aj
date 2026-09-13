@@ -90,6 +90,20 @@ export const applicationSchema = z.object({
 
 export type Application = z.infer<typeof applicationSchema>;
 
+/** An application as stats read it (§4.5): just enough to place it. */
+export const applicationStatusSchema = applicationSchema.pick({ id: true, status: true });
+
+export type ApplicationStatus = z.infer<typeof applicationStatusSchema>;
+
+/** A status_history row as stats read it (§2). from_status is not needed to replay. */
+export const statusChangeSchema = z.object({
+  application_id: id,
+  to_status: statusSchema,
+  changed_at: timestamp,
+});
+
+export type StatusChange = z.infer<typeof statusChangeSchema>;
+
 export const noteFormSchema = z.object({
   body: z
     .string()

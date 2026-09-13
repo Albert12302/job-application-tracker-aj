@@ -1,3 +1,4 @@
+import type { ApplicationStatus, StatusChange } from './schemas';
 import { FUNNEL, STATUSES, funnelIndex, type Status } from './status';
 
 /**
@@ -11,12 +12,6 @@ import { FUNNEL, STATUSES, funnelIndex, type Status } from './status';
  * without lowering anything. The breakdown bar alone is by current status: it
  * has to add up to the total.
  */
-
-/** What stats need of an application. */
-export type StatsApplication = { id: string; status: Status };
-
-/** What stats need of a status_history row. */
-export type StatusChange = { application_id: string; to_status: Status; changed_at: string };
 
 export type StatusCount = { status: Status; count: number };
 
@@ -70,7 +65,7 @@ function heardBack(reach: Reach): boolean {
   return reach.stage >= INTERVIEW || reach.heardBack;
 }
 
-export function computeStats(applications: readonly StatsApplication[], history: readonly StatusChange[]): Stats {
+export function computeStats(applications: readonly ApplicationStatus[], history: readonly StatusChange[]): Stats {
   const changesById = new Map<string, StatusChange[]>();
   for (const change of history) {
     const list = changesById.get(change.application_id);

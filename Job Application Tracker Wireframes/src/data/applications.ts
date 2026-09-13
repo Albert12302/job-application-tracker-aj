@@ -1,6 +1,14 @@
 import type { ApplicationInput } from '@/domain/application-input';
-import { applicationSchema, coverLetterSchema, type Application, type CoverLetter } from '@/domain/schemas';
+import {
+  applicationSchema,
+  applicationStatusSchema,
+  coverLetterSchema,
+  type Application,
+  type ApplicationStatus,
+  type CoverLetter,
+} from '@/domain/schemas';
 import type { Status } from '@/domain/status';
+import { allPages } from './all-pages';
 import { supabase } from './client';
 
 /**
@@ -34,6 +42,22 @@ export async function getApplication(id: string): Promise<Application | null> {
   const { data, error } = await supabase.from('applications').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
   return data ? applicationSchema.parse(data) : null;
+}
+
+/**
+ * Every one of the user's applications, as stats need them — id and status, the
+ * whole set however large (§5.3), never a page of the list.
+ */
+export async function listApplicationStatuses(userId: string): Promise<ApplicationStatus[]> {
+  const rows = await allPages((from, to) =>
+    supabase
+      .from('applications')
+      .select('id, status')
+      .eq('user_id', userId)
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+  return applicationStatusSchema.array().parse(rows);
 }
 
 export async function countApplications(userId: string): Promise<number> {
