@@ -93,6 +93,31 @@ test.describe('7.8.1 cross-user isolation', () => {
     expect(data ?? []).toEqual([]);
   });
 
+  test("stats' reads return only the reader's own rows (§4.5, §6 step 4)", async () => {
+    // The two reads useStats sends, unfiltered by id: status_history has no
+    // user_id to filter on, so its select policy is the only thing scoping it.
+    const statsReads = (client: SupabaseClient) =>
+      Promise.all([
+        client.from('applications').select('id, status').order('id'),
+        client.from('status_history').select('application_id, to_status, changed_at').order('changed_at'),
+      ]);
+
+    const a = await signIn('dev-a@example.test');
+    const [aApps, aHistory] = await statsReads(a);
+    // Not vacuous: A does see A's own history.
+    expect(aHistory.data?.some((row) => row.application_id === USER_A_APPLICATION)).toBe(true);
+
+    const b = await signIn('dev-b@example.test');
+    const [bApps, bHistory] = await statsReads(b);
+    expect(bApps.error).toBeNull();
+    expect(bHistory.error).toBeNull();
+
+    const bIds = new Set((bApps.data ?? []).map((row) => row.id));
+    const aIds = new Set((aApps.data ?? []).map((row) => row.id));
+    expect([...bIds].filter((id) => aIds.has(id))).toEqual([]);
+    expect((bHistory.data ?? []).filter((row) => !bIds.has(row.application_id))).toEqual([]);
+  });
+
   test('the log tables are write-only', async () => {
     const b = await signIn('dev-b@example.test');
 
