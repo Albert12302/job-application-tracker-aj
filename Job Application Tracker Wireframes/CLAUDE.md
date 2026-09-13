@@ -171,7 +171,8 @@ Three layers, each with a job:
   minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
   happens to write last. Count what a new test spends (`select window_start, count from
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
-  engine is not its subject, and prefer `page.route` for failures over real writes.
+  engine is not its subject, and prefer `page.route` for failures over real writes. A suite that
+  writes a lot gets its own seed user instead: `dev-e` belongs to `bulk-delete.spec.ts` alone.
 
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
