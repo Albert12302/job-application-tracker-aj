@@ -37,6 +37,7 @@ export type ErrorAction =
   | 'update_note'
   | 'delete_note'
   | 'restore_note'
+  | 'load_stats'
   | 'render';
 
 export type ErrorContext = { action: ErrorAction };

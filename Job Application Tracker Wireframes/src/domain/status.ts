@@ -26,15 +26,6 @@ export function funnelIndex(status: Status): number {
 }
 
 /**
- * Stats groupings (§4.5), named so the definitions live in one place.
- * "Heard back" in particular is easy to redefine by accident: it is everything
- * except Applied and Withdrawn, which means Rejected counts as a response.
- */
-export const INTERVIEWED: readonly Status[] = ['Interview', 'Callback', 'Offer'];
-export const CALLBACKS: readonly Status[] = ['Callback', 'Offer'];
-export const HEARD_BACK: readonly Status[] = ['Interview', 'Callback', 'Offer', 'Rejected'];
-
-/**
  * The audited palette (§3, §10.1). Measured ratios, not eyeballed — any change
  * here gets re-measured. Values are theme token names defined in
  * styles/globals.css, not raw hex, so a retint happens in one file.

@@ -123,8 +123,10 @@ values
   ('a0000000-0000-0000-0000-000000000003', null,        'Applied',   now() - interval '21 days'),
   ('a0000000-0000-0000-0000-000000000003', 'Applied',   'Interview', now() - interval '16 days'),
   ('a0000000-0000-0000-0000-000000000003', 'Interview', 'Offer',     now() - interval '3 days'),
+  -- Interviewed, then rejected: counts as Interviewed though its status is Rejected (§4.5).
   ('a0000000-0000-0000-0000-000000000004', null,        'Applied',   now() - interval '15 days'),
-  ('a0000000-0000-0000-0000-000000000004', 'Applied',   'Rejected',  now() - interval '5 days')
+  ('a0000000-0000-0000-0000-000000000004', 'Applied',   'Interview', now() - interval '10 days'),
+  ('a0000000-0000-0000-0000-000000000004', 'Interview', 'Rejected',  now() - interval '5 days')
 on conflict do nothing;
 
 insert into public.saved_filters (user_id, name, statuses, referral, starred, location)

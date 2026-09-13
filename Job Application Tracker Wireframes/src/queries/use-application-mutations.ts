@@ -85,6 +85,8 @@ export function useUpdateApplication(id: string) {
     onSuccess: (row) => {
       storeSaved(queryClient, user.id, row);
       void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
+      // The form can change the status (§9.1).
+      void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
     },
   });
 }
@@ -101,7 +103,9 @@ export function useChangeStatus(id: string) {
       toast.error("Couldn't change the status.");
     },
     onSuccess: (row) => storeSaved(queryClient, user.id, row),
-    onSettled: () => refreshOne(queryClient, user.id, id),
+    // Stats follow the history row this wrote (§4.4: "recalculates … the stats screen live").
+    onSettled: () =>
+      Promise.all([refreshOne(queryClient, user.id, id), queryClient.invalidateQueries({ queryKey: keys.stats(user.id) })]),
   });
 }
 
@@ -140,6 +144,7 @@ export function useDeleteApplication(id: string) {
       queryClient.setQueryData<Application[]>(keys.applicationList(user.id), (rows) => rows?.filter((row) => row.id !== id));
       void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
       void queryClient.invalidateQueries({ queryKey: keys.applicationCount(user.id) });
+      void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
     },
   });
 }

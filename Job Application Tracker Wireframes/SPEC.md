@@ -217,14 +217,41 @@ saved copy is typed `application/octet-stream`, so it can only be saved, never o
 of the app.
 
 ### 4.5 Stats
-Computed live from the current application set:
-- total applications
-- **Interviewed** — status in {Interview, Callback, Offer}
-- **Callbacks** — status in {Callback, Offer}
-- **Offers** — status = Offer
-- **Heard back** — status not in {Applied, Withdrawn} — the response rate
-Each shown as a count plus a percentage of total, with a stacked breakdown bar segmented by
-status (segments proportional to count, colored per §3, zero-count statuses omitted).
+Computed live from the user's full application set (§5.3) and its status history (§2).
+
+Laid out as the prototype has it:
+- a row of four cards — **Applications** (count), **Interviews** (count), **Callbacks** (count),
+  and **Via referral** (the share of applications marked as a referral);
+- under **How far applications got**, four rates — **Heard back**, **Interview rate**,
+  **Callback rate**, **Offer rate** — each a percentage of all applications, rounded to a whole
+  number;
+- **Status breakdown**: a stacked bar with a text legend.
+
+The funnel figures count **how far each application got**, not where it stands now — an
+application that went Interview → Rejected still counts as an interview:
+- **Interviews** — reached Interview, Callback, or Offer
+- **Callbacks** — reached Callback or Offer
+- **Offers** (shown only as the offer rate) — reached Offer
+- **Heard back** (shown only as a rate) — reached Interview or beyond, or was rejected — the
+  response rate
+
+"Reached" is read by replaying the application's history, oldest first, and then its current
+status:
+- Moving forward reaches the new stage (Applied → Interview → Callback → Offer). A jump counts
+  every stage it skips: Applied → Offer is also Interviewed and a Callback.
+- Rejected and Withdrawn close an application without lowering anything. Rejected also counts as
+  heard back; Withdrawn does not.
+- **Moving back to an earlier stage is a correction.** The status was picked by mistake, so the
+  stages above it stop counting: Offer → Interview is no longer an Offer, and moving back to
+  Applied cancels heard back too, a rejection included. History is append-only, so this is the
+  only way a mis-click can be undone in the numbers.
+- An application with no history rows is measured by its current status alone.
+
+Via referral reads the application's referral flag as it is now; it has no history.
+
+The breakdown bar is by **current** status (segments proportional to count, colored per §3,
+zero-count statuses omitted), with a legend naming each status and its count in text (§10.1).
+It is the one place current status is used, because its segments have to add up to the total.
 
 ### 4.6 Profile
 Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, application
@@ -838,7 +865,10 @@ screen is a release requirement, checked the same way as §7.
   measures 1.6:1 against the card. A red light enough to read as light cannot clear 3:1, and
   the control is identified by its label and shape rather than its edge; its text is at 10.2:1.
 - Status is never communicated by color alone: every tag carries its text label, and the stats
-  breakdown bar has a text legend with counts.
+  breakdown bar has a text legend with counts. The legend is what carries the breakdown, not
+  the bar: the four light status fills measure 1.2–1.4:1 against the card, so segments are not
+  distinguishable by contrast alone. The bar is decoration of the legend, hidden from assistive
+  technology.
 - All images and icon-only controls have text alternatives. The star, paperclip, chevrons, and
   avatar all need accessible names.
 - Layout reflows to 320px width without horizontal scrolling, and survives 200% zoom and
@@ -950,6 +980,28 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-13
+- **Stats count the furthest stage an application reached, from its history (§4.5).** §4.5
+  defined every stat by current status, while §6 step 4 said to rebuild stats from the history
+  and nothing said what a history-based stat was. By current status, good numbers fell when bad
+  news came in — an interview that ended in a rejection stopped counting as an interview, and an
+  offer turned down stopped counting as an offer or even as heard back. Reached stages only grow.
+  Because a mis-picked status is saved at once and history cannot be edited, a move back to an
+  earlier stage is read as a correction. The breakdown bar stays by current status, since it has
+  to add up to the total.
+- **The stats screen follows the prototype's layout, and gains Via referral (§4.5).** §4.5 had
+  listed four stats "each as a count plus a percentage", which was built first and did not match
+  the prototype: its first row is Applications, Interviews, Callbacks, and Via referral, and its
+  second is four rates. §1 says this document describes the prototype, so the missing referral
+  stat was a gap in §4.5, not a decision. What the prototype's layout gives up is a count for
+  offers and for heard back — those show only as rates; the breakdown legend still gives exact
+  counts by current status.
+- **The stats bar's segments are decoration; its legend is the content (§10.1).** Measured, the
+  light status fills are 1.2–1.4:1 against the card — under the 3:1 a meaningful graphic needs,
+  and a fill dark enough to pass would break the §3 tag pairings. The legend already names every
+  status and count, so the bar is hidden from assistive technology rather than retinted. Each
+  legend entry has a swatch of its colour, edged at 3.3:1 so the light ones show, as the key.
 
 ### 2026-09-12
 - **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —

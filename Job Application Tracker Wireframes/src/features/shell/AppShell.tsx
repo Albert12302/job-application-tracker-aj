@@ -7,7 +7,7 @@ import { useSignedInUser } from '@/queries/use-session';
 
 /**
  * The persistent header (SPEC §4.2): app name, nav, avatar + name opening
- * Profile. Stats joins the nav when the stats screen exists (§6 step 4).
+ * Profile.
  */
 export function AppShell() {
   const user = useSignedInUser();
@@ -37,6 +37,14 @@ export function AppShell() {
                     className="inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-muted-foreground aria-[current=page]:text-link"
                   >
                     Home
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/stats"
+                    className="inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-muted-foreground aria-[current=page]:text-link"
+                  >
+                    Stats
                   </Link>
                 </li>
               </ul>

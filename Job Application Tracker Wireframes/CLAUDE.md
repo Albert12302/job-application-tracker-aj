@@ -158,6 +158,21 @@ Three layers, each with a job:
   Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
   exact application count, and the suites run in parallel.
 
+  **Stats cover a user's whole set, so an exact number needs a set nobody else is changing.**
+  `stats.spec.ts` reads `dev-a`'s seed read-only and asserts its numbers exactly — a change to
+  `dev-a`'s seeded applications or history in `seed.sql` changes them (and `auth.spec.ts`'s
+  count). Its status-change test runs as `dev-d`, whose set other suites change mid-run, so it
+  narrows the `applications` and `status_history` responses the page reads to its own row with
+  `page.route` + `route.fetch()`: the writes, reads, and counting stay real.
+
+  **`dev-d`'s writes are budgeted too.** The write limit is 120 a minute per user (§7.1), and
+  every insert, update, and delete on the writable tables counts — a status change is two (the
+  status and its history row). A full run spends about 116 of `dev-d`'s, mostly inside one
+  minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
+  happens to write last. Count what a new test spends (`select window_start, count from
+  public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
+  engine is not its subject, and prefer `page.route` for failures over real writes.
+
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
   three — so a third run inside the hour trips the limit. Simulate failures at the network
@@ -215,7 +230,7 @@ src/
     date.ts                   the ONLY place date_applied converts or formats (§5.4)
     filters.ts                matchesFilter(app, criteria)  (§5.1)
     location.ts               normalizeLocation()           (§5.2)
-    stats.ts                  computeStats(apps)            (§4.5)
+    stats.ts                  computeStats(apps, history)   (§4.5) — furthest stage reached
     schemas.ts                Zod schemas + inferred types — the source of truth for
                               Application, Note, SavedFilter and their validation rules
     types.ts                  types not derived from a schema
@@ -228,8 +243,10 @@ src/
     applications.ts           list / get / create / update / remove
     notes.ts
     saved-filters.ts
-    status-history.ts         reads, when stats need them (§6 step 4); rows are written only
-                              by the two SQL functions, never from the client
+    status-history.ts         reads only, for stats (§4.5); rows are written only by the two
+                              SQL functions, never from the client
+    all-pages.ts              reads a whole set past PostgREST's silent max_rows cut-off —
+                              for anything that must cover every row (§5.3), such as stats
     storage.ts                upload (via the upload function) / signed URL / delete
     profile.ts
 
@@ -287,8 +304,11 @@ src/
       SavedFilterTab.tsx
       LocationCombobox.tsx
     stats/
+      StatsScreen.tsx             the three states (§8.2) and the summary
       StatCard.tsx
-      BreakdownBar.tsx
+      BreakdownBar.tsx            decoration; its legend carries the breakdown (§10.1)
+      StatsSkeleton.tsx
+      layout.ts                   panel and grid classes shared with the skeleton
     profile/
       AvatarUpload.tsx
 

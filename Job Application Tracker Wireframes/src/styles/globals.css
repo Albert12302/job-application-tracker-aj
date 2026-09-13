@@ -81,6 +81,13 @@
  *                                           carries the control, not an edge
  *   status tag text on its fill (§3)        Applied 7.2, Interview 6.3, Callback 7.5,
  *                                           Offer 5.9, Rejected 5.5, Withdrawn 6.3
+ *   status fill vs card (stats bar)         Applied 1.2, Interview 1.3, Callback 1.3,
+ *                                           Withdrawn 1.4, Offer 6.2, Rejected 6.0; the
+ *                                           secondary track 1.2 — the light fills cannot
+ *                                           carry meaning, so the bar is hidden from
+ *                                           assistive tech and its legend names each
+ *                                           status and count in text (§10.1); legend
+ *                                           swatches are edged with input, 3.3
  *   star icon vs card / page / row hover    on 4.4 / 4.0 / 3.9, off 4.0 / 3.6 / 3.6
  *                                           — icon-only state, 3:1 (§10.1). The
  *                                           prototype's grey measured 2.9 and was darkened.
