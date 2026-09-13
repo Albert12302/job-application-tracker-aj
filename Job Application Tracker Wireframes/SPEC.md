@@ -217,14 +217,33 @@ saved copy is typed `application/octet-stream`, so it can only be saved, never o
 of the app.
 
 ### 4.5 Stats
-Computed live from the current application set:
+Computed live from the user's full application set (§5.3) and its status history (§2).
+
+The funnel stats count **how far each application got**, not where it stands now — an
+application that went Interview → Rejected still counts as Interviewed:
 - total applications
-- **Interviewed** — status in {Interview, Callback, Offer}
-- **Callbacks** — status in {Callback, Offer}
-- **Offers** — status = Offer
-- **Heard back** — status not in {Applied, Withdrawn} — the response rate
-Each shown as a count plus a percentage of total, with a stacked breakdown bar segmented by
-status (segments proportional to count, colored per §3, zero-count statuses omitted).
+- **Interviewed** — reached Interview, Callback, or Offer
+- **Callbacks** — reached Callback or Offer
+- **Offers** — reached Offer
+- **Heard back** — reached Interview or beyond, or was rejected — the response rate
+
+"Reached" is read by replaying the application's history, oldest first, and then its current
+status:
+- Moving forward reaches the new stage (Applied → Interview → Callback → Offer). A jump counts
+  every stage it skips: Applied → Offer is also Interviewed and a Callback.
+- Rejected and Withdrawn close an application without lowering anything. Rejected also counts as
+  heard back; Withdrawn does not.
+- **Moving back to an earlier stage is a correction.** The status was picked by mistake, so the
+  stages above it stop counting: Offer → Interview is no longer an Offer, and moving back to
+  Applied cancels heard back too, a rejection included. History is append-only, so this is the
+  only way a mis-click can be undone in the numbers.
+- An application with no history rows is measured by its current status alone.
+
+Totals and funnel stats are shown as a count; the four funnel stats also as a percentage of the
+total, rounded to a whole number. Below them, a stacked breakdown bar by **current** status
+(segments proportional to count, colored per §3, zero-count statuses omitted), with a text legend
+naming each status and its count (§10.1). The bar is the one place current status is used,
+because its segments have to add up to the total.
 
 ### 4.6 Profile
 Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, application
@@ -950,6 +969,16 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-13
+- **Stats count the furthest stage an application reached, from its history (§4.5).** §4.5
+  defined every stat by current status, while §6 step 4 said to rebuild stats from the history
+  and nothing said what a history-based stat was. By current status, good numbers fell when bad
+  news came in — an interview that ended in a rejection stopped counting as an interview, and an
+  offer turned down stopped counting as an offer or even as heard back. Reached stages only grow.
+  Because a mis-picked status is saved at once and history cannot be edited, a move back to an
+  earlier stage is read as a correction. The breakdown bar stays by current status, since it has
+  to add up to the total. The total shows no percentage, which would always be 100%.
 
 ### 2026-09-12
 - **Job description cap raised from 5,000 to 15,000 characters (§7.3).** A pasted job listing —
