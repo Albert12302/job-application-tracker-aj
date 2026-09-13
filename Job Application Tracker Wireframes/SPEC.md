@@ -185,8 +185,8 @@ Save prepends the new application to the list and returns to the dashboard with 
 to All.
 
 Cover letter attach: **Attach cover letter** picks a file, which is checked on choosing (the
-§4.4 copy, shown under the field) and then shown with its name and size, **Choose a different
-file**, and **Remove file**. Nothing is uploaded until Save, so clearing a chosen file needs no
+§4.4 copy, shown under the field) and then shown with its name, size, and an **×** that clears
+it, with **Choose a different file** below. Nothing is uploaded until Save, so clearing a chosen file needs no
 confirmation. On Save the application is created first, then the file is uploaded and attached,
 with "Uploading…" on the file's row and "Saving…" in the button. If the upload fails, the
 application stays saved without it: the form goes to the new application's detail screen, where
@@ -202,9 +202,9 @@ counts and the stats screen live.
 Description, cover-letter file, referral flag, notes list with an add-note field.
 Actions: edit fields, delete application (confirm first).
 
-Cover letter: the original filename as a label, with the file's size, and **Download**,
-**Replace**, and **Remove** — or "No cover letter attached." and **Attach cover letter** when
-there is none. Help text under the actions: "PDF, DOC, or DOCX, up to 10 MB." A chosen file is
+Cover letter: the original filename as a label, with the file's size and an **×** at the right
+of that row that removes it (confirming first, §9.4), then **Download** and **Replace** — or "No
+cover letter attached." and **Attach cover letter** when there is none. Help text under the actions: "PDF, DOC, or DOCX, up to 10 MB." A chosen file is
 checked before upload, and the first failure is shown under the row (§7.3):
 - type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
 - size — "Choose a file of 10 MB or less."

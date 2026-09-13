@@ -1,5 +1,6 @@
 import { FileTextIcon, Loader2Icon } from 'lucide-react';
 import { useId, useRef } from 'react';
+import { OiXIcon } from '@/components/OiXIcon';
 import { Button } from '@/components/ui/button';
 import { coverLetterLabel, formatFileSize } from '@/domain/cover-letter';
 import { CoverLetterPicker } from './CoverLetterPicker';
@@ -43,12 +44,26 @@ export function CoverLetterField({
           ) : (
             <FileTextIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium [overflow-wrap:anywhere]">{coverLetterLabel(file.name)}</p>
             <p className="text-[13px] text-muted-foreground">
               {uploading ? 'Uploading…' : formatFileSize(file.size)}
             </p>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="-mt-1.5 -mr-1.5 text-muted-foreground max-[760px]:size-11"
+            aria-label="Remove file"
+            disabled={uploading}
+            onClick={() => {
+              onClear();
+              pickerRef.current?.focus(); // this button is about to go
+            }}
+          >
+            <OiXIcon className="size-3" />
+          </Button>
         </div>
       ) : null}
 
@@ -62,19 +77,6 @@ export function CoverLetterField({
         >
           {file ? 'Choose a different file' : 'Attach cover letter'}
         </CoverLetterPicker>
-        {file ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-9 max-[760px]:h-11"
-            onClick={() => {
-              onClear();
-              pickerRef.current?.focus(); // this button is about to go
-            }}
-          >
-            Remove file
-          </Button>
-        ) : null}
       </div>
 
       <p id={helpId} className="text-[13px] text-muted-foreground">

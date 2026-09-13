@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ErrorState';
+import { OiXIcon } from '@/components/OiXIcon';
 import { coverLetterLabel } from '@/domain/cover-letter';
 import type { Application } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
@@ -84,11 +85,26 @@ export function CoverLetterSection({ application }: { application: Application }
         {file ? (
           <div className="flex items-start gap-2.5">
             <FileTextIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               {/* The original filename, a label only — rendered as text, never markup (§7.3). */}
               <p className="text-sm font-medium [overflow-wrap:anywhere]">{file.label}</p>
               <CoverLetterSize path={file.path} />
             </div>
+            {/* Remove sits on the file it removes. It still asks first (§9.4). */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mt-1.5 -mr-1.5 text-muted-foreground max-[760px]:size-11"
+              aria-label="Remove cover letter"
+              disabled={busy}
+              onClick={() => {
+                remove.reset();
+                setRemoving(file);
+                setConfirmRemove(true);
+              }}
+            >
+              <OiXIcon className="size-3" />
+            </Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No cover letter attached.</p>
@@ -133,21 +149,6 @@ export function CoverLetterSection({ application }: { application: Application }
           >
             {file ? 'Replace' : 'Attach cover letter'}
           </CoverLetterPicker>
-          {file ? (
-            <Button
-              variant="outline"
-              className={ACTION}
-              aria-label="Remove cover letter"
-              disabled={busy}
-              onClick={() => {
-                remove.reset();
-                setRemoving(file);
-                setConfirmRemove(true);
-              }}
-            >
-              Remove
-            </Button>
-          ) : null}
         </div>
         <p id={helpId} className="text-[13px] text-muted-foreground">
           PDF, DOC, or DOCX, up to 10 MB.

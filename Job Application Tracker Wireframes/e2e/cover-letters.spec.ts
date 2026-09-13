@@ -201,8 +201,15 @@ test('attach on add, download, replace, and remove a cover letter', async ({ pag
   expect(await stored(second.cover_letter_path!)).toBe(true);
   await expect.poll(() => stored(first.cover_letter_path!)).toBe(false);
 
-  // Remove (§9.4), by keyboard: it asks first, Escape keeps the file...
+  // Remove is the × on the file's own row, to the right of its name
   const remove = page.getByRole('button', { name: 'Remove cover letter' });
+  const nameBox = (await page.getByText(secondName, { exact: true }).boundingBox())!;
+  const removeBox = (await remove.boundingBox())!;
+  expect(removeBox.x).toBeGreaterThan(nameBox.x + nameBox.width);
+  expect(removeBox.y).toBeLessThan(nameBox.y + nameBox.height); // same row, not below it
+  await expect(page.getByRole('button', { name: 'Remove', exact: true })).toHaveCount(0);
+
+  // (§9.4), by keyboard: it asks first, Escape keeps the file...
   await remove.focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('alertdialog');
@@ -289,6 +296,8 @@ test('a failed upload on add keeps the application, and Retry on its detail scre
   ]) {
     expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
+  // The × is icon-only, so its 44px must be both ways (§11).
+  expect((await page.getByRole('button', { name: 'Remove cover letter' }).boundingBox())?.width).toBeGreaterThanOrEqual(44);
 });
 
 test('refused files: by the browser before upload, and by the function after (§7.3)', async ({ page }, testInfo) => {
