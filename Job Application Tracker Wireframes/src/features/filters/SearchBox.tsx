@@ -6,8 +6,8 @@ const MAX = 120;
 
 /**
  * The dashboard search (SPEC §4.2, §5.1): company, position, or location, on
- * top of the active filter. A persistent visible label, not a placeholder
- * (§10.3).
+ * top of the active filter. On screen the magnifier and placeholder say what
+ * it is; the "Search" label is there for assistive technology (§4.2).
  *
  * The box keeps its own text and sends each change up to the URL. The URL
  * answers a moment later, so tying the box straight to it would drop keys typed
@@ -39,8 +39,9 @@ export function SearchBox({
   }
 
   return (
-    <div className="flex items-center gap-2 max-[760px]:flex-col max-[760px]:items-stretch max-[760px]:gap-1.5">
-      <label htmlFor={id} className="text-[13px] font-semibold">
+    <div>
+      {/* Named for assistive technology; on screen, the magnifier says it (§4.2). */}
+      <label htmlFor={id} className="sr-only">
         Search
       </label>
       <div className="relative w-[280px] max-[760px]:w-full">

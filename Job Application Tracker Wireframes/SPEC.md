@@ -159,7 +159,9 @@ Persistent header: app name, nav (Home, Stats), avatar + name (opens Profile).
 
 Controls, top to bottom:
 - **Search** — substring match over company, position, location (§5.1). Resets to page 1. It
-  has a visible "Search" label (§10.3), with the placeholder "Company, position, or location".
+  shows a magnifier icon and the placeholder "Company, position, or location"; its "Search"
+  label is for assistive technology only — the one input excepted from §10.3's visible-label
+  rule, since a magnifier on a search field is a label people already read.
 - **Filter tabs** — `All (n)`, then one per status with live counts, then any saved filters
   (each with its own count and an × to delete), then `+ Filter` which opens the filter builder.
   Every count covers the full application set, never the search (§5.3); while the list loads
@@ -937,7 +939,8 @@ screen is a release requirement, checked the same way as §7.
 - No time limits on any interaction.
 
 ### 10.3 Understandable
-- Every input has a persistent visible label — placeholder text is not a label.
+- Every input has a persistent visible label — placeholder text is not a label. One exception:
+  the dashboard search, whose magnifier icon stands in for the word (§4.2).
 - Errors identified in text, associated with their field programmatically, and describing how
   to fix the problem (§8).
 - Nothing changes context on focus or on input alone; filters apply predictably.
@@ -1059,9 +1062,12 @@ the prototype is the reference for those.
 - **Filter tabs grow to 44px on phones (§11).** §11 said the tabs were unchanged on mobile, and
   also that every control is 44px there, which §7.9 checks. The layout is unchanged; the height
   is not.
-- **The search box has a visible label (§4.2).** The prototype had only a placeholder, which
-  §10.3 says is not a label, and its "company or role" left out location, which the search
-  matches.
+- **The search box is labelled by its magnifier, not a visible word (§4.2, §10.3).** First
+  built with a visible "Search" label, because §10.3 says a placeholder is not a label; asked to
+  remove it as clutter beside the box. The magnifier icon inside the field is the recognised
+  mark of a search box, and it stays when the placeholder is replaced by typing, so §10.3 gains
+  this one exception. Screen readers still hear "Search". The placeholder names location too,
+  which the prototype's "company or role" had left out.
 - **What a saved filter's failures look like (§8.2).** Only loading was specified. A failed
   save keeps the builder's choices, like the application form; a failed delete puts the tab
   back, since the delete showed at once. A link to a saved filter that cannot be found — gone,
