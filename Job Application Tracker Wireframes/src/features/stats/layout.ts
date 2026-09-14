@@ -5,4 +5,5 @@ export const STATS_PANEL =
 /** Four stat cards to a row, two below 760px (§11). Shared with the skeleton so it cannot drift. */
 export const STAT_GRID = 'grid grid-cols-4 gap-2.5 max-[760px]:grid-cols-2';
 
-export const SECTION_HEADING = 'text-[13px] font-semibold text-muted-foreground';
+/** 18px, as every h2 in the app is. The skeleton's heading bars match its 28px line. */
+export const SECTION_HEADING = 'text-lg font-semibold text-muted-foreground';

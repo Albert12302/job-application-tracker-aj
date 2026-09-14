@@ -66,7 +66,7 @@ export function FilterBuilder({
 
   return (
     <section id={id} aria-labelledby={`${field}-heading`} className="rounded-xl border bg-card p-5 shadow-xs max-[760px]:p-4">
-      <h2 id={`${field}-heading`} className="mb-4 font-heading text-[15px] font-semibold">
+      <h2 id={`${field}-heading`} className="mb-4 font-heading text-lg font-semibold">
         New filter
       </h2>
       <form onSubmit={save} noValidate aria-busy={pending} className="flex flex-col gap-5">

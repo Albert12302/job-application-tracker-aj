@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { FUNNEL, funnelIndex, isTerminal, type Status } from '@/domain/status';
 import { cn } from '@/lib/utils';
+import { SECTION_HEADING } from './panel';
 
 /**
  * How far the application has got, across Applied → Interview → Callback →
@@ -16,7 +17,7 @@ export function FunnelIndicator({ status }: { status: Status }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <h2 id={labelId} className="text-[13px] font-semibold text-muted-foreground">
+      <h2 id={labelId} className={SECTION_HEADING}>
         Progress
       </h2>
       <ol aria-labelledby={labelId} className="grid grid-cols-4 gap-1.5">
