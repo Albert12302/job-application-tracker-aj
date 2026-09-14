@@ -31,6 +31,7 @@ export function FilterTabs({
   disabled,
   builder,
   allRef,
+  builderRef,
   onSelect,
   onDelete,
 }: {
@@ -40,8 +41,9 @@ export function FilterTabs({
   saved: SavedFiltersState;
   /** While the list itself is loading or failed (§8.2: controls visible but disabled). */
   disabled: boolean;
-  builder?: { open: boolean; controls: string; onToggle: () => void };
+  builder: { open: boolean; controls: string; onToggle: () => void };
   allRef?: Ref<HTMLButtonElement>;
+  builderRef?: Ref<HTMLButtonElement>;
   onSelect: (filter: string) => void;
   onDelete: (filter: SavedFilter) => void;
 }) {
@@ -85,20 +87,19 @@ export function FilterTabs({
               />
             ))
           : null}
-        {builder ? (
-          <button
-            type="button"
-            aria-label="New filter"
-            aria-expanded={builder.open}
-            aria-controls={builder.controls}
-            disabled={saved.status !== 'success'}
-            onClick={builder.onToggle}
-            className={tabButton(builder.open)}
-          >
-            <PlusIcon aria-hidden="true" className="size-3.5" />
-            Filter
-          </button>
-        ) : null}
+        <button
+          ref={builderRef}
+          type="button"
+          aria-label="New filter"
+          aria-expanded={builder.open}
+          aria-controls={builder.open ? builder.controls : undefined}
+          disabled={disabled || saved.status !== 'success'}
+          onClick={builder.onToggle}
+          className={tabButton(builder.open)}
+        >
+          <PlusIcon aria-hidden="true" className="size-3.5" />
+          Filter
+        </button>
       </div>
       {saved.status === 'success' && saved.filters.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No saved filters yet</p>

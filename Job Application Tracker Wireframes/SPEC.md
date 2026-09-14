@@ -167,7 +167,12 @@ Controls, top to bottom:
   a labelled group, not ARIA tabs: they narrow one list rather than switch panels, and a saved
   filter's × is its own button beside the tab. `+ Filter` waits until saved filters have
   loaded, since the next "Custom N" depends on them.
-- **Filter builder** (§5.1) — collapsible panel.
+- **Filter builder** (§5.1) — collapsible panel: name (blank becomes `Custom N`, and the field
+  says which), text match, location, statuses (none = all), referral and starred (Any / only /
+  not). Location is a list — "Any location" and each place the user's applications already use —
+  because a filter's location must match exactly and a place no application has could never
+  match. Saving adds the tab, makes it the active filter, closes the panel, and returns focus to
+  `+ Filter`; Cancel closes it without saving.
 - **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
 
 The filter and the search live in the URL (`?filter=Offer`, `?filter=<saved filter id>`,
@@ -1034,6 +1039,9 @@ the prototype is the reference for those.
   browser. §5.3 wants counts over the whole set and every saved filter's tab has a count, so the
   whole set is needed anyway; a single request would have miscounted — and silently dropped
   rows from the list — past 1,000 applications, under a 5,000 soft cap. Step 6 can revisit.
+- **The filter builder picks a location from a list, not a combobox (§4.2).** A saved filter's
+  location matches exactly (§5.1), so a typed place that no application uses could only ever
+  match nothing. The prototype used a list too.
 - **The filter tabs are toggle buttons, not ARIA tabs (§4.2).** A saved filter's tab carries an
   ×, and a tab cannot contain another control; nor do the tabs switch panels — they narrow one
   list.

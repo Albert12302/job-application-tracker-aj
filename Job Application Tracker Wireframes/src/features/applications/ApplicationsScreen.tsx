@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { ALL_FILTER, noMatchesMessage } from '@/domain/filters';
+import { uniqueLocations } from '@/domain/location';
 import type { SavedFilter } from '@/domain/schemas';
+import { FilterBuilder } from '@/features/filters/FilterBuilder';
 import { FilterTabs } from '@/features/filters/FilterTabs';
 import { SearchBox } from '@/features/filters/SearchBox';
 import { useFilteredApplications } from '@/features/filters/use-filtered-applications';
@@ -38,6 +40,9 @@ export function ApplicationsScreen() {
   const [filterNotice, setFilterNotice] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const allTab = useRef<HTMLButtonElement>(null);
+  const builderToggle = useRef<HTMLButtonElement>(null);
+  const [building, setBuilding] = useState(false);
+  const builderId = useId();
 
   // A change of filter or search clears the selection (§4.2), whatever made it —
   // a tab, typing, Clear filters, or the active saved filter being deleted.
@@ -166,9 +171,28 @@ export function ApplicationsScreen() {
         saved={view.saved}
         disabled={!ready}
         allRef={allTab}
+        builder={{ open: building, controls: builderId, onToggle: () => setBuilding((open) => !open) }}
+        builderRef={builderToggle}
         onSelect={url.setFilter}
         onDelete={removeFilter}
       />
+      {building && view.saved.status === 'success' ? (
+        <FilterBuilder
+          id={builderId}
+          locations={uniqueLocations(view.all)}
+          existingNames={view.saved.filters.map((filter) => filter.name)}
+          onSaved={(filter) => {
+            setBuilding(false);
+            url.setFilter(filter.id);
+            setFilterNotice(`Saved filter ${filter.name}.`);
+            builderToggle.current?.focus();
+          }}
+          onCancel={() => {
+            setBuilding(false);
+            builderToggle.current?.focus();
+          }}
+        />
+      ) : null}
       {/* Always mounted, so each change is announced (§10.4): results after filtering, and the selection. */}
       <p role="status" className="sr-only">
         {ready && view.narrowed ? `Showing ${visible.length} of ${applicationCount(view.all.length)}.` : ''}

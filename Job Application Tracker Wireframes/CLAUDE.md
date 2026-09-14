@@ -6,7 +6,7 @@ blocker, not a suggestion.
 
 **Keep the spec current.** When a change alters *what the product does* — a new screen, a
 changed rule, a new field, different error copy — update SPEC.md in the same commit and add a
-line to its §13 Changelog saying what changed and why. Changes to *how we build* (a library, a
+line to its §14 Changelog saying what changed and why. Changes to *how we build* (a library, a
 convention, a rule learned the hard way) go here in CLAUDE.md instead. Visual tweaks go in
 neither; the prototype is the reference for those.
 
@@ -304,10 +304,15 @@ src/
       panel.ts                    the shared card and section headings
       CoverLetterField.tsx        step 3
     filters/
-      FilterTabs.tsx
-      FilterBuilder.tsx
-      SavedFilterTab.tsx
-      LocationCombobox.tsx
+      SearchBox.tsx               keeps its own text; ignores the URL echoing what it sent
+      FilterTabs.tsx              toggle buttons in a labelled group, not ARIA tabs (§4.2)
+      SavedFilterTab.tsx          the tab and its × as sibling buttons
+      tab-styles.ts               one tab look, shared with the builder's any/yes/no choices
+      FilterBuilder.tsx           location is a list of used places, not a combobox (§4.2)
+      StatusChips.tsx             native checkboxes drawn as status tags
+      TriStateChoice.tsx          native radios drawn as tabs
+      use-list-filters.ts         `filter` and `q` in the URL
+      use-filtered-applications.ts  rows and tab counts over the whole set (§5.3)
     stats/
       StatsScreen.tsx             the three states (§8.2) and the summary
       StatCard.tsx
@@ -321,7 +326,7 @@ src/
     ui/                       shadcn-generated primitives. Ours once generated — edit in place,
                               do not wrap in a second layer of near-identical components.
       button.tsx  input.tsx  select.tsx  textarea.tsx  checkbox.tsx
-      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  tabs.tsx  skeleton.tsx
+      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  skeleton.tsx
                               Add via `npx shadcn@latest add <name>`; commit the generated file.
     EmptyState.tsx            app-level primitives shadcn does not ship (SPEC §8)
     ErrorState.tsx
