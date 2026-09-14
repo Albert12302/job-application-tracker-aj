@@ -457,6 +457,9 @@ supabase/
   made on the click (§7.3) and saved from a blob (`features/applications/save-file.ts`) — never
   handed to the browser as a link: Storage percent-encodes the name in `Content-Disposition`'s
   plain `filename`, which WebKit uses, and storage-js's own `download` option encodes it twice.
+  Preview (PDF only) is the one exception: a blank tab opened during the click, `opener` cut,
+  then sent to a signed URL without `download` (`features/applications/preview-tab.ts`), so the
+  PDF renders inline on Storage's origin. Never a `blob:` URL — that would render it as the app.
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

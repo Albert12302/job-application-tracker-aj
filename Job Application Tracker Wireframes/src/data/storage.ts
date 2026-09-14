@@ -1,4 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { canPreviewCoverLetter } from '@/domain/cover-letter';
 import { storageObjectInfoSchema, uploadResponseSchema } from '@/domain/schemas';
 import { supabase } from './client';
 
@@ -93,6 +94,21 @@ export async function downloadCoverLetter(path: string): Promise<Blob> {
   const response = await fetch(`${data.signedUrl}&download`);
   if (!response.ok) throw new StorageDownloadError(response.status);
   return response.blob();
+}
+
+/**
+ * A 60-second signed URL to open a PDF cover letter in its own tab (§4.4, §7.3).
+ *
+ * Without `download`, Storage serves the file inline, typed by the upload
+ * function's sniff, so the browser's own PDF viewer shows it — on Storage's
+ * origin, never the app's, so nothing in the file can reach the session. Only
+ * a PDF: a Word file would just download, and none is ever made into a page.
+ */
+export async function coverLetterPreviewUrl(path: string): Promise<string> {
+  if (!canPreviewCoverLetter(path)) throw new Error('preview_not_pdf');
+  const { data, error } = await supabase.storage.from(COVER_LETTERS).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 /** Storage refused a signed URL's download; the status is kept for the error code, the body is not. */

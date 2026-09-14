@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ErrorState';
 import { OiXIcon } from '@/components/OiXIcon';
-import { coverLetterLabel } from '@/domain/cover-letter';
+import { canPreviewCoverLetter, coverLetterLabel } from '@/domain/cover-letter';
 import type { Application } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
 import {
@@ -12,12 +12,14 @@ import {
   useAttachCoverLetter,
   useDownloadCoverLetter,
   useLatestCoverLetterUpload,
+  usePreviewCoverLetter,
   useRemoveCoverLetter,
 } from '@/queries/use-cover-letter';
 import { CoverLetterPicker } from './CoverLetterPicker';
 import { CoverLetterSize } from './CoverLetterSize';
 import { SECTION_HEADING } from './panel';
 import { RemoveCoverLetterDialog } from './RemoveCoverLetterDialog';
+import { openPreviewTab } from './preview-tab';
 import { saveFile } from './save-file';
 
 const ACTION = 'h-9 max-[760px]:h-11';
@@ -28,7 +30,8 @@ const ACTION = 'h-9 max-[760px]:h-11';
  *
  * An upload shows on the row while it runs, and a failed one offers Retry with
  * the same file (§8.2) — including one the add form started before handing
- * over to this screen. Download asks for a signed URL only when clicked (§7.3).
+ * over to this screen. Download and Preview ask for a signed URL only when
+ * clicked (§7.3); Preview is offered for a PDF only.
  */
 export function CoverLetterSection({ application }: { application: Application }) {
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -51,23 +54,52 @@ export function CoverLetterSection({ application }: { application: Application }
   const upload = useLatestCoverLetterUpload(id);
   const remove = useRemoveCoverLetter(id);
   const download = useDownloadCoverLetter(id);
+  const preview = usePreviewCoverLetter(id);
+  const [previewBlocked, setPreviewBlocked] = useState(false);
 
   const uploading = upload?.status === 'pending' ? upload.variables : null;
   const failed = upload?.status === 'error' ? upload : null;
   const rejected = failed?.error instanceof CoverLetterRejectedError ? failed.error : null;
   const busy = !!uploading || remove.isPending;
 
-  const start = (picked: File) => {
+  /** One file action's failure shows at a time: starting another clears it. */
+  const clearFailures = () => {
     download.reset();
+    preview.reset();
+    setPreviewBlocked(false);
+  };
+
+  const start = (picked: File) => {
+    clearFailures();
     attach.mutate(
       { applicationId: id, file: picked, currentPath: path },
       { onSuccess: () => toast.success(path ? 'Cover letter replaced.' : 'Cover letter attached.') },
     );
   };
 
+  const openPreview = () => {
+    if (!file) return;
+    clearFailures();
+    // The tab first, while this is still the click; then the URL it will show.
+    const tab = openPreviewTab();
+    if (!tab) {
+      setPreviewBlocked(true);
+      return;
+    }
+    preview.mutateAsync(file.path).then(
+      (url) => {
+        tab.show(url);
+        preview.reset(); // the tab has the URL; nothing needs to keep it
+      },
+      () => tab.close(), // not left blank; the failure shows here
+    );
+  };
+
   const fetchDownload = () => {
     if (!file) return;
     const { path: from, label } = file;
+    preview.reset();
+    setPreviewBlocked(false);
     download.mutate(from, {
       onSuccess: (bytes) => {
         saveFile(bytes, label);
@@ -119,6 +151,24 @@ export function CoverLetterSection({ application }: { application: Application }
         {/* One picker in one place, relabelled rather than swapped, so focus stays
             on it when an attach turns into a replace. */}
         <div className="flex flex-wrap gap-2">
+          {file && canPreviewCoverLetter(file.path) ? (
+            <Button
+              variant="outline"
+              className={ACTION}
+              aria-label={preview.isPending ? 'Opening the preview' : 'Preview cover letter'}
+              disabled={preview.isPending}
+              onClick={openPreview}
+            >
+              {preview.isPending ? (
+                <>
+                  <Loader2Icon aria-hidden="true" className="animate-spin" />
+                  Opening…
+                </>
+              ) : (
+                'Preview'
+              )}
+            </Button>
+          ) : null}
           {file ? (
             <Button
               variant="outline"
@@ -151,7 +201,13 @@ export function CoverLetterSection({ application }: { application: Application }
       </div>
 
       <p role="status" className="sr-only">
-        {uploading ? 'Uploading cover letter…' : download.isPending ? 'Preparing the download…' : ''}
+        {uploading
+          ? 'Uploading cover letter…'
+          : download.isPending
+            ? 'Preparing the download…'
+            : preview.isPending
+              ? 'Opening the preview…'
+              : ''}
       </p>
 
       {rejected ? (
@@ -172,6 +228,21 @@ export function CoverLetterSection({ application }: { application: Application }
             Retry
           </Button>
         </ErrorState>
+      ) : null}
+
+      {preview.isError ? (
+        <ErrorState title="Couldn't open the preview." reference={errorReference(preview.error)}>
+          <Button className={ACTION} onClick={openPreview} disabled={!file}>
+            Retry
+          </Button>
+        </ErrorState>
+      ) : null}
+
+      {/* The browser's choice, not a failure of ours: nothing to report, and Download still works. */}
+      {previewBlocked ? (
+        <p role="alert" className="text-sm text-destructive">
+          Your browser blocked the preview tab. Allow pop-ups for this site, or use Download.
+        </p>
       ) : null}
 
       {/* Mounted throughout, and holding the file it was opened for, so it can

@@ -232,8 +232,8 @@ Description, cover-letter file, referral flag, notes list with an add-note field
 Actions: edit fields, delete application (confirm first).
 
 Cover letter: the original filename as a label, with the file's size and an **×** at the right
-of that row that removes it (confirming first, §9.4), then **Download** and **Replace** — or "No
-cover letter attached." and **Attach cover letter** when there is none. A chosen file is
+of that row that removes it (confirming first, §9.4), then **Preview** (a PDF only), **Download**,
+and **Replace** — or "No cover letter attached." and **Attach cover letter** when there is none. A chosen file is
 checked before upload, and the first failure is shown under the row (§7.3):
 - type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
 - size — "Choose a file of 10 MB or less."
@@ -244,6 +244,15 @@ removed." Download asks for a 60-second signed URL when clicked, fetches the fil
 and saves it under its original name (§7.3). The signed URL is never put in the page, and the
 saved copy is typed `application/octet-stream`, so it can only be saved, never opened as part
 of the app.
+
+Preview opens a PDF in a new browser tab, in the browser's own viewer. The click opens a blank
+tab, cuts its link back to the app (`opener`), then sends it to a fresh 60-second signed URL
+*without* `download`, which Storage serves inline as `application/pdf` — so the file is shown on
+Storage's origin, never the app's, and nothing in it can reach the session. The URL goes to that
+tab only, never into the page. Whether a file is a PDF is read from its stored path's extension,
+which the upload function chose from the bytes, not from the display name. A Word file has no
+Preview: browsers cannot show one, and converting it into a page would put untrusted markup in
+the app. Reloading the preview tab after the minute is up shows Storage's error, not the file.
 
 ### 4.5 Stats
 Computed live from the user's full application set (§5.3) and its status history (§2).
@@ -526,6 +535,7 @@ single note can be a megabyte.
 | Storage path | prefixed with the owner's user id, e.g. `{user_id}/{uuid}.pdf` |
 | Serving | private bucket, signed URL with a **60-second** TTL, generated on click — never embedded in page HTML |
 | Download response | `Content-Disposition: attachment`, and the `Content-Type` the upload function sniffed from the bytes. The app fetches the file and saves it as `application/octet-stream` rather than opening the URL (§4.4). `X-Content-Type-Options: nosniff` is wanted but not required: Supabase Storage does not send it, and the rows above already do its job — see the 2026-09-12 changelog |
+| Preview response (PDF only) | No `Content-Disposition`, `Content-Type: application/pdf`, served by Storage on its own origin in a tab opened with no `opener` (§4.4). Never offered for DOC or DOCX |
 
 SVG is not an accepted type anywhere. It is a script execution vector.
 
@@ -674,7 +684,9 @@ The four checks worth doing by hand, because tooling misses them:
 3. Request a cover-letter signed URL, wait for it to expire, confirm it stops working — then
    confirm the bucket is not publicly listable. While it is live, check the hosted response's
    headers: `Content-Disposition: attachment` and a `Content-Type` of PDF or Word. If either is
-   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it.
+   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it. Then
+   Preview a PDF: its URL has no `download`, the response is `application/pdf`, and the file
+   shows in the new tab on the Storage origin.
 4. Delete an application, then confirm its notes, history rows, and Storage object are all
    gone.
 5. Five wrong passwords on one account, then a sixth attempt with the *correct* password —
@@ -767,6 +779,7 @@ Nothing ships with an unhandled failure.
 | Cover letter upload | progress indicator on the row: a spinner and "Uploading *name*…", the file controls disabled | n/a | "Upload failed." + error reference + Retry, which sends the same file again; a file being replaced stays in place. Application saves without the file rather than losing the whole record. A refused file (§4.4) shows its reason instead, with no Retry |
 | Cover letter file (detail) | skeleton where the size goes | "No cover letter attached." + Attach cover letter | Size: "Couldn't load the file size." + Retry, name and actions still usable |
 | Cover letter download | spinner and "Preparing…" in the button | n/a | "Couldn't download the cover letter." + error reference + Retry, which asks for a new URL |
+| Cover letter preview (PDF) | a blank new tab at once; spinner and "Opening…" in the button until the URL arrives | n/a | The blank tab closes; "Couldn't open the preview." + error reference + Retry, which opens a new tab and asks for a new URL. A tab the browser blocks: "Your browser blocked the preview tab. Allow pop-ups for this site, or use Download.", nothing signed or reported |
 | Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
 | Bulk delete (list) | "Counting their notes…" in the dialog, confirm disabled until counted; "Deleting…" in the confirm button, dialog buttons disabled | n/a | Stops at the first failure: "Deleted *n* of *m* applications. Couldn't delete *company*." + error reference inside the dialog; the rest stay selected, and confirming again carries on. Over the write limit: the wait-a-minute copy instead of a reference (§9.2) |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
@@ -1038,6 +1051,16 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-14
+- **Cover letters gain Preview, for PDFs only, in a new tab (§4.4, §7.3, §8.2).** Asked for. Word
+  files get none: browsers cannot show them, and converting one to HTML would mean rendering
+  untrusted markup in the app, behind a sanitiser, with an approximate layout and still nothing
+  for `.doc`. A new tab rather than a dialog: phone browsers show a PDF in a frame as its first
+  page or not at all. The tab is sent to a signed URL Storage serves inline, not a `blob:` URL of
+  the fetched bytes, so the PDF renders on Storage's origin rather than the app's — where the
+  session token lives — and the CSP's `object-src 'none'` is not in its way. Costs: the signed URL
+  shows in that tab's address bar for its 60 seconds, and reloading the tab after that fails.
 
 ### 2026-09-13
 - **§6 step 5 built: search, filter tabs with live counts, saved filters.** The list now reads

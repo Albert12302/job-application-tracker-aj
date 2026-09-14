@@ -1,5 +1,5 @@
 import { useMutation, useMutationState, useQuery, useQueryClient, type MutationState } from '@tanstack/react-query';
-import { coverLetterSize, downloadCoverLetter } from '@/data/storage';
+import { coverLetterPreviewUrl, coverLetterSize, downloadCoverLetter } from '@/data/storage';
 import type { Application } from '@/domain/schemas';
 import { attachCoverLetter, coverLetterFileProblem, CoverLetterRejectedError } from '@/services/attach-cover-letter';
 import { removeCoverLetter } from '@/services/remove-cover-letter';
@@ -95,6 +95,20 @@ export function useDownloadCoverLetter(applicationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (path: string) => reporting('download_cover_letter', () => downloadCoverLetter(path)),
+    onError: () => queryClient.invalidateQueries({ queryKey: keys.application(user.id, applicationId) }),
+  });
+}
+
+/**
+ * A signed URL for opening a PDF in its own tab (§4.4), made on click. The
+ * caller hands it to the tab and resets the mutation, so the URL is not held
+ * after. Fails the same way a download does.
+ */
+export function usePreviewCoverLetter(applicationId: string) {
+  const user = useSignedInUser();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (path: string) => reporting('preview_cover_letter', () => coverLetterPreviewUrl(path)),
     onError: () => queryClient.invalidateQueries({ queryKey: keys.application(user.id, applicationId) }),
   });
 }

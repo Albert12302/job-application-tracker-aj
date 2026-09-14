@@ -31,6 +31,7 @@ export type ErrorAction =
   | 'attach_cover_letter'
   | 'remove_cover_letter'
   | 'download_cover_letter'
+  | 'preview_cover_letter'
   | 'load_cover_letter_size'
   | 'load_notes'
   | 'add_note'
