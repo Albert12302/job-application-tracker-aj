@@ -61,11 +61,18 @@ export function CoverLetterSection({ application }: { application: Application }
   const failed = upload?.status === 'error' ? upload : null;
   const rejected = failed?.error instanceof CoverLetterRejectedError ? failed.error : null;
   const busy = !!uploading || remove.isPending;
+  // Preview and Download wait for each other: one started over the other would
+  // reset it mid-flight, and a download reset that way is never saved.
+  const fetching = download.isPending || preview.isPending;
 
-  /** One file action's failure shows at a time: starting another clears it. */
+  /**
+   * One file action's failure shows at a time: starting another clears it.
+   * Only a failure — a Replace started while a download or preview is still
+   * on its way must not cut it off.
+   */
   const clearFailures = () => {
-    download.reset();
-    preview.reset();
+    if (download.isError) download.reset();
+    if (preview.isError) preview.reset();
     setPreviewBlocked(false);
   };
 
@@ -98,8 +105,7 @@ export function CoverLetterSection({ application }: { application: Application }
   const fetchDownload = () => {
     if (!file) return;
     const { path: from, label } = file;
-    preview.reset();
-    setPreviewBlocked(false);
+    clearFailures();
     download.mutate(from, {
       onSuccess: (bytes) => {
         saveFile(bytes, label);
@@ -156,7 +162,7 @@ export function CoverLetterSection({ application }: { application: Application }
               variant="outline"
               className={ACTION}
               aria-label={preview.isPending ? 'Opening the preview' : 'Preview cover letter'}
-              disabled={preview.isPending}
+              disabled={fetching}
               onClick={openPreview}
             >
               {preview.isPending ? (
@@ -175,7 +181,7 @@ export function CoverLetterSection({ application }: { application: Application }
               className={ACTION}
               // The visible word, plus what it acts on (§10.3, label in name).
               aria-label={download.isPending ? 'Preparing the download' : 'Download cover letter'}
-              disabled={download.isPending}
+              disabled={fetching}
               onClick={fetchDownload}
             >
               {download.isPending ? (
