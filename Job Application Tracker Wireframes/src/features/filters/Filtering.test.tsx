@@ -275,6 +275,20 @@ describe('saved filters', () => {
     expect(await tabs().findByRole('button', { name: 'Live (2)' })).toBeTruthy();
   });
 
+  it('keeps the tabs it has when a later refetch fails, since they still filter the list', async () => {
+    const { queryClient } = renderList(`/applications?filter=${LIVE.id}`);
+    await waitFor(() => expect(rowNames()).toEqual(['Northwind Traders', 'Contoso']));
+
+    listSavedFilters.mockRejectedValue(new Error('network'));
+    await queryClient.refetchQueries({ queryKey: ['saved-filters'] });
+    await waitFor(() => expect(listSavedFilters).toHaveBeenCalledTimes(2));
+
+    expect(tabs().getByRole('button', { name: 'Live (2)' }).getAttribute('aria-pressed')).toBe('true');
+    expect((tabs().getByRole('button', { name: 'New filter' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText("Couldn't load your saved filters.")).toBeNull();
+    expect(rowNames()).toEqual(['Northwind Traders', 'Contoso']);
+  });
+
   it('says when there are none yet', async () => {
     listSavedFilters.mockResolvedValue([]);
     renderList();

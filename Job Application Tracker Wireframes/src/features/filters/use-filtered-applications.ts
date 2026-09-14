@@ -28,8 +28,11 @@ export function useFilteredApplications() {
   const active = resolveFilter(url.filter, savedFilters.data);
   const visible = visibleApplications(all, active, url.query);
 
+  // Once loaded, a failed background refetch keeps the filters it already has: they still
+  // narrow the list and feed the counts, so their tabs must stay too. Only a first load that
+  // failed shows the error.
   let saved: SavedFiltersState;
-  if (savedFilters.isSuccess) saved = { status: 'success', filters: savedFilters.data };
+  if (savedFilters.data) saved = { status: 'success', filters: savedFilters.data };
   else if (savedFilters.isError)
     saved = { status: 'error', retrying: savedFilters.isFetching, onRetry: () => void savedFilters.refetch() };
   else saved = { status: 'pending' };
