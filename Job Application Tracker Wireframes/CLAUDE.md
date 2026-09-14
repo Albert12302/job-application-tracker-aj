@@ -6,7 +6,7 @@ blocker, not a suggestion.
 
 **Keep the spec current.** When a change alters *what the product does* — a new screen, a
 changed rule, a new field, different error copy — update SPEC.md in the same commit and add a
-line to its §13 Changelog saying what changed and why. Changes to *how we build* (a library, a
+line to its §14 Changelog saying what changed and why. Changes to *how we build* (a library, a
 convention, a rule learned the hard way) go here in CLAUDE.md instead. Visual tweaks go in
 neither; the prototype is the reference for those.
 
@@ -173,6 +173,15 @@ Three layers, each with a job:
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
   engine is not its subject, and prefer `page.route` for failures over real writes. A suite that
   writes a lot gets its own seed user instead: `dev-e` belongs to `bulk-delete.spec.ts` alone.
+  `dev-f` belongs to the saving-and-deleting half of `filters.spec.ts`, which runs in Chromium
+  only and serially, because its tests change one user's saved filters and "Custom N"; the
+  reading half asserts `dev-a`'s seeded tabs exactly (`All (7)`, `Live (3)`, …), so a change to
+  `dev-a`'s seeded applications or saved filters changes those too. **Never save a filter as
+  `dev-a`.**
+
+  **The builder's chips and any/yes/no choices are visually hidden native inputs inside a
+  `<label>`.** Playwright's `check()` refuses them (the label intercepts the click); click the
+  label, as a user does, and assert with `toBeChecked()` on the input by role.
 
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`
@@ -304,10 +313,16 @@ src/
       panel.ts                    the shared card and section headings
       CoverLetterField.tsx        step 3
     filters/
-      FilterTabs.tsx
+      SearchBox.tsx               keeps its own text; ignores the URL echoing what it sent
+      FilterTabs.tsx              toggle buttons in a labelled group, not ARIA tabs (§4.2)
+      SavedFilterTab.tsx          the tab and its × as sibling buttons
+      tab-styles.ts               one tab look, shared with the builder's any/yes/no choices
       FilterBuilder.tsx
-      SavedFilterTab.tsx
-      LocationCombobox.tsx
+      LocationCombobox.tsx        type to narrow the places already used; picks only from them (§4.2)
+      StatusChips.tsx             native checkboxes drawn as status tags
+      TriStateChoice.tsx          native radios drawn as tabs
+      use-list-filters.ts         `filter` and `q` in the URL
+      use-filtered-applications.ts  rows and tab counts over the whole set (§5.3)
     stats/
       StatsScreen.tsx             the three states (§8.2) and the summary
       StatCard.tsx
@@ -321,8 +336,11 @@ src/
     ui/                       shadcn-generated primitives. Ours once generated — edit in place,
                               do not wrap in a second layer of near-identical components.
       button.tsx  input.tsx  select.tsx  textarea.tsx  checkbox.tsx
-      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  tabs.tsx  skeleton.tsx
+      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  skeleton.tsx  combobox.tsx  input-group.tsx
                               Add via `npx shadcn@latest add <name>`; commit the generated file.
+                              It asks to overwrite shared primitives we have edited (button,
+                              input, textarea) and aborts when nothing answers — run it as
+                              `yes n | npx shadcn@latest add <name>` so those edits survive.
     EmptyState.tsx            app-level primitives shadcn does not ship (SPEC §8)
     ErrorState.tsx
     Pagination.tsx            wraps shadcn pagination with our page-size + range label
@@ -439,6 +457,9 @@ supabase/
   made on the click (§7.3) and saved from a blob (`features/applications/save-file.ts`) — never
   handed to the browser as a link: Storage percent-encodes the name in `Content-Disposition`'s
   plain `filename`, which WebKit uses, and storage-js's own `download` option encodes it twice.
+  Preview (PDF only) is the one exception: a blank tab opened during the click, `opener` cut,
+  then sent to a signed URL without `download` (`features/applications/preview-tab.ts`), so the
+  PDF renders inline on Storage's origin. Never a `blob:` URL — that would render it as the app.
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

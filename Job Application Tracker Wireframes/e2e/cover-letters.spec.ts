@@ -150,11 +150,20 @@ test('attach on add, download, replace, and remove a cover letter', async ({ pag
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByText(`${PDF.length} bytes`)).toBeVisible();
 
-  // Download: a failed URL request says so, and Retry asks again (§8.2)
+  // Preview and Download: a failed URL request says so (§8.2). Preview's blank tab closes rather than sit empty.
   await page.route('**/storage/v1/object/sign/**', (route) =>
     route.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: '{"message":"boom"}' }),
   );
+  const failedTab = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Preview cover letter' }).click();
+  const closedTab = await failedTab;
+  await expect.poll(() => closedTab.isClosed()).toBe(true);
+  const previewError = page.getByRole('alert').filter({ hasText: "Couldn't open the preview." });
+  await expect(previewError).toContainText(/Error reference [0-9a-f]{8}/);
+
+  // Download fails the same way; starting it clears the preview's failure, so one shows at a time.
   await page.getByRole('button', { name: 'Download cover letter' }).click();
+  await expect(previewError).toHaveCount(0);
   const downloadError = page.getByRole('alert').filter({ hasText: "Couldn't download the cover letter." });
   await expect(downloadError).toBeVisible();
   await expect(downloadError).toContainText(/Error reference [0-9a-f]{8}/);
@@ -188,12 +197,38 @@ test('attach on add, download, replace, and remove a cover letter', async ({ pag
   await expect(page).toHaveURL(new RegExp(`/applications/${id}$`)); // the tab stayed on the app
   await expectNoSignedUrlInPage(page);
 
+  // Preview (§4.4): a new tab, sent to the PDF through a 60-second URL of its own, which Storage serves
+  // inline on its own origin. Headless browsers have no PDF viewer, so what is checked is what the tab
+  // was sent and what came back; a real one shows the file (checked by hand in Edge).
+  const previewTab = page.waitForEvent('popup');
+  const previewed = page
+    .context()
+    .waitForEvent('response', (r) => r.url().includes('/storage/v1/object/sign/') && r.request().method() === 'GET');
+  await page.getByRole('button', { name: 'Preview cover letter' }).click();
+  const tab = await previewTab;
+  const shown = await previewed;
+  const previewUrl = new URL(shown.url());
+  expect(previewUrl.searchParams.has('download')).toBe(false);
+  expect(decodeURIComponent(previewUrl.href)).not.toContain('Café');
+  const previewClaims = JSON.parse(
+    Buffer.from(previewUrl.searchParams.get('token')!.split('.')[1]!, 'base64url').toString(),
+  ) as { iat: number; exp: number };
+  expect(previewClaims.exp - previewClaims.iat).toBe(60);
+  expect(shown.headers()['content-type']).toBe('application/pdf');
+  expect(shown.headers()['content-disposition']).toBeUndefined();
+  await tab.close();
+  await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+  await expectNoSignedUrlInPage(page);
+
   // Replace (§9.4): the new file commits, then the old object goes
   const secondName = 'Letterhead v2.doc';
   await page.getByLabel('Replace cover letter').setInputFiles({ name: secondName, mimeType: 'application/pdf', buffer: DOC });
   await expect(page.getByText('Cover letter replaced.')).toBeVisible();
   await expect(page.getByText(secondName, { exact: true })).toBeVisible();
   await expect(page.getByText(firstName)).toHaveCount(0);
+  // A Word file downloads only: browsers cannot show one (§4.4).
+  await expect(page.getByRole('button', { name: 'Download cover letter' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Preview cover letter' })).toHaveCount(0);
 
   const second = await coverLetterOf(id);
   expect(second.cover_letter_path).toMatch(new RegExp(`^${userId}/[0-9a-f-]{36}\\.doc$`));
@@ -290,6 +325,7 @@ test('a failed upload on add keeps the application, and Retry on its detail scre
   // Still no sideways scroll with the long name on the row, and 44px controls (§11)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   for (const control of [
+    page.getByRole('button', { name: 'Preview cover letter' }),
     page.getByRole('button', { name: 'Download cover letter' }),
     page.getByText('Replace', { exact: true }),
     page.getByRole('button', { name: 'Remove cover letter' }),

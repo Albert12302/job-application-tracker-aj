@@ -20,6 +20,9 @@ const coverLetterSize = vi.fn();
 const downloadCoverLetter = vi.fn();
 const removeCoverLetterObject = vi.fn();
 const saveFile = vi.fn();
+const coverLetterPreviewUrl = vi.fn();
+const openPreviewTab = vi.fn();
+const tab = { show: vi.fn(), close: vi.fn() };
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -51,15 +54,18 @@ vi.mock('@/data/storage', async (importOriginal) => ({
   coverLetterSize: (...args: unknown[]) => coverLetterSize(...args),
   downloadCoverLetter: (...args: unknown[]) => downloadCoverLetter(...args),
   removeCoverLetterObject: (...args: unknown[]) => removeCoverLetterObject(...args),
+  coverLetterPreviewUrl: (...args: unknown[]) => coverLetterPreviewUrl(...args),
 }));
 
 vi.mock('./save-file', () => ({ saveFile: (...args: unknown[]) => saveFile(...args) }));
+vi.mock('./preview-tab', () => ({ openPreviewTab: () => openPreviewTab() }));
 
 const ID = 'a0000000-0000-0000-0000-000000000001';
 const USER = '11111111-1111-1111-1111-111111111111';
 const OLD = `${USER}/0b9c3c5e-0000-4000-8000-000000000001.pdf`;
 const NEW = `${USER}/0b9c3c5e-0000-4000-8000-000000000002.docx`;
 const BYTES = new Blob(['%PDF-1.4 letter']);
+const SIGNED = 'http://127.0.0.1:54321/storage/v1/object/sign/cover-letters/letter.pdf?token=t';
 
 const pdf = (name = 'Northwind letter.pdf') => new File(['%PDF-1.4 letter'], name);
 
@@ -79,6 +85,10 @@ beforeEach(() => {
   downloadCoverLetter.mockReset().mockResolvedValue(BYTES);
   removeCoverLetterObject.mockReset().mockResolvedValue(undefined);
   saveFile.mockReset();
+  coverLetterPreviewUrl.mockReset().mockResolvedValue(SIGNED);
+  tab.show.mockReset();
+  tab.close.mockReset();
+  openPreviewTab.mockReset().mockReturnValue(tab);
 });
 
 const withFile = (name = 'Northwind letter.pdf') => {
@@ -217,6 +227,115 @@ describe('CoverLetterSection', () => {
     await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Northwind letter.pdf'));
     expect(downloadCoverLetter).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Couldn't download the cover letter.")).toBeNull();
+  });
+
+  it('offers Preview for a PDF, left of Download, and opens it in a tab through a URL made on the click (§4.4)', async () => {
+    withFile();
+    const { user } = renderDetail();
+
+    const previewButton = await screen.findByRole('button', { name: 'Preview cover letter' });
+    const download = screen.getByRole('button', { name: 'Download cover letter' });
+    expect(previewButton.compareDocumentPosition(download) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(coverLetterPreviewUrl).not.toHaveBeenCalled(); // nothing is signed on render (§7.3)
+
+    await user.click(previewButton);
+    await waitFor(() => expect(tab.show).toHaveBeenCalledWith(SIGNED));
+    expect(openPreviewTab).toHaveBeenCalledTimes(1);
+    expect(openPreviewTab.mock.invocationCallOrder[0]!).toBeLessThan(coverLetterPreviewUrl.mock.invocationCallOrder[0]!);
+    expect(coverLetterPreviewUrl).toHaveBeenCalledWith(OLD);
+    expect(tab.close).not.toHaveBeenCalled();
+    expect(downloadCoverLetter).not.toHaveBeenCalled();
+    expect(saveFile).not.toHaveBeenCalled();
+    expect(document.body.innerHTML).not.toContain('token='); // the URL goes to the tab, never the page
+  });
+
+  it('offers no Preview for a Word file', async () => {
+    row = { ...row, cover_letter_path: NEW, cover_letter_name: 'Northwind letter.docx' };
+    renderDetail();
+
+    expect(await screen.findByRole('button', { name: 'Download cover letter' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Preview/ })).toBeNull();
+  });
+
+  it('closes the blank tab when the URL cannot be made, says so, and Retry opens it again', async () => {
+    withFile();
+    coverLetterPreviewUrl.mockRejectedValueOnce(new Error('network'));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Preview cover letter' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain("Couldn't open the preview.");
+    expect(alert.textContent).toMatch(/Error reference [0-9a-f]{8}/);
+    expect(tab.close).toHaveBeenCalledTimes(1);
+    expect(tab.show).not.toHaveBeenCalled();
+
+    await user.click(within(alert).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(tab.show).toHaveBeenCalledWith(SIGNED));
+    expect(openPreviewTab).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Couldn't open the preview.")).toBeNull();
+  });
+
+  it('holds Preview while a download is on its way, and the download still saves', async () => {
+    withFile();
+    let finish: (bytes: Blob) => void = () => {};
+    downloadCoverLetter.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Download cover letter' }));
+    expect(await screen.findByRole('button', { name: 'Preparing the download' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Preview cover letter' })).toHaveProperty('disabled', true);
+
+    finish(BYTES);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Northwind letter.pdf'));
+    expect(screen.getByRole('button', { name: 'Preview cover letter' })).toHaveProperty('disabled', false);
+    expect(openPreviewTab).not.toHaveBeenCalled();
+  });
+
+  it('holds Download while a preview is on its way, and the preview still opens', async () => {
+    withFile();
+    let finish: (url: string) => void = () => {};
+    coverLetterPreviewUrl.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Preview cover letter' }));
+    expect(await screen.findByRole('button', { name: 'Opening the preview' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Download cover letter' })).toHaveProperty('disabled', true);
+
+    finish(SIGNED);
+    await waitFor(() => expect(tab.show).toHaveBeenCalledWith(SIGNED));
+    expect(screen.getByRole('button', { name: 'Download cover letter' })).toHaveProperty('disabled', false);
+    expect(downloadCoverLetter).not.toHaveBeenCalled();
+  });
+
+  it('lets a Replace start mid-download without cutting the download off', async () => {
+    withFile('Old letter.pdf');
+    let finish: (bytes: Blob) => void = () => {};
+    downloadCoverLetter.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Download cover letter' }));
+    await screen.findByRole('button', { name: 'Preparing the download' });
+    await user.upload(screen.getByLabelText('Replace cover letter'), pdf('New letter.pdf'));
+
+    finish(BYTES);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Old letter.pdf'));
+  });
+
+  it('says when the browser blocks the tab, signing nothing', async () => {
+    withFile();
+    openPreviewTab.mockReturnValueOnce(null);
+    const { user } = renderDetail();
+
+    await user.click(await screen.findByRole('button', { name: 'Preview cover letter' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Your browser blocked the preview tab. Allow pop-ups for this site, or use Download.',
+    );
+    expect(coverLetterPreviewUrl).not.toHaveBeenCalled();
+
+    // Download still works, and clears the message.
+    await user.click(screen.getByRole('button', { name: 'Download cover letter' }));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(BYTES, 'Northwind letter.pdf'));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('asks before removing, names the file, and does nothing when kept (§9.4)', async () => {

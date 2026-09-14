@@ -46,6 +46,21 @@ export function sniffCoverLetterType(bytes: Uint8Array): CoverLetterType | null 
   return null;
 }
 
+/**
+ * A stored file's type, from its path's extension (§7.3). The upload function
+ * chose that extension from the bytes, so it can be trusted where the display
+ * name, which the user typed, cannot.
+ */
+export function storedCoverLetterType(path: string): CoverLetterType | null {
+  const extension = /\.([a-z]+)$/.exec(path)?.[1];
+  return extension === 'pdf' || extension === 'doc' || extension === 'docx' ? extension : null;
+}
+
+/** Only a PDF can be previewed: browsers show one themselves, and no Word file is ever turned into a page (§4.4). */
+export function canPreviewCoverLetter(path: string): boolean {
+  return storedCoverLetterType(path) === 'pdf';
+}
+
 export const COVER_LETTER_ERRORS = {
   type: 'Choose a PDF, DOC, or DOCX file.',
   size: 'Choose a file of 10 MB or less.',

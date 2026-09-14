@@ -3,10 +3,12 @@ import {
   COVER_LETTER_ERRORS,
   COVER_LETTER_MAX_BYTES,
   COVER_LETTER_NAME_MAX,
+  canPreviewCoverLetter,
   coverLetterLabel,
   coverLetterProblem,
   formatFileSize,
   sniffCoverLetterType,
+  storedCoverLetterType,
 } from './cover-letter';
 
 const bytes = (...values: number[]) => new Uint8Array([...values, ...new Array(8).fill(0)]);
@@ -32,6 +34,30 @@ describe('sniffCoverLetterType', () => {
 
   it('rejects images', () => {
     expect(sniffCoverLetterType(bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))).toBeNull();
+  });
+});
+
+describe('storedCoverLetterType and canPreviewCoverLetter', () => {
+  const USER = '11111111-1111-1111-1111-111111111111';
+
+  it('reads the type from the extension the upload function chose', () => {
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e-0000-4000-8000-000000000001.pdf`)).toBe('pdf');
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e-0000-4000-8000-000000000001.doc`)).toBe('doc');
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e-0000-4000-8000-000000000001.docx`)).toBe('docx');
+  });
+
+  it('knows no other type, and no path without an extension', () => {
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e.html`)).toBeNull();
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e.PDF`)).toBeNull(); // the function writes lower case
+    expect(storedCoverLetterType(`${USER}/0b9c3c5e`)).toBeNull();
+    expect(storedCoverLetterType(`${USER}/letter.pdf.html`)).toBeNull();
+  });
+
+  it('previews a PDF only (§4.4)', () => {
+    expect(canPreviewCoverLetter(`${USER}/a.pdf`)).toBe(true);
+    expect(canPreviewCoverLetter(`${USER}/a.doc`)).toBe(false);
+    expect(canPreviewCoverLetter(`${USER}/a.docx`)).toBe(false);
+    expect(canPreviewCoverLetter(`${USER}/a.pdf.svg`)).toBe(false);
   });
 });
 

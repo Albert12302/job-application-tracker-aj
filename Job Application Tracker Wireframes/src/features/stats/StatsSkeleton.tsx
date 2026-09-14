@@ -16,13 +16,13 @@ export function StatsSkeleton() {
           <Skeleton key={card} className="h-[78px] rounded-xl" />
         ))}
       </div>
-      <Skeleton className="mb-0.5 h-[19px] w-40" />
+      <Skeleton className="mb-0.5 h-7 w-52" />
       <div className={`${STAT_GRID} mb-4`}>
         {CARDS.map((card) => (
           <Skeleton key={card} className="h-[70px] rounded-xl" />
         ))}
       </div>
-      <Skeleton className="mb-2 h-[19px] w-28" />
+      <Skeleton className="mb-2 h-7 w-40" />
       <Skeleton className="h-[22px] rounded-full" />
       <Skeleton className="mt-2 h-5 w-3/4" />
     </div>

@@ -58,12 +58,12 @@ persistence, and file storage; nothing else about the behavior should change.
 | field | type | notes |
 |---|---|---|
 | id | uuid | |
-| name | string | defaults to `Custom N` if left blank |
+| name | string | defaults to `Custom N` if left blank — N is one more than the highest `Custom N` the user already has. Names need not be unique |
 | statuses | enum[] | empty = all statuses |
 | referral | `any` \| `yes` \| `no` | |
 | starred | `any` \| `yes` \| `no` | |
 | location | string \| null | null = `Any location`; otherwise exact match against normalized location |
-| text | string | matches company, position, location, description |
+| text | string \| null | matches company, position, location, description (§5.1); null = no text match |
 | created_at | timestamptz | tab order |
 
 ### Status history
@@ -158,11 +158,33 @@ the door does not have to be unlocked.
 Persistent header: app name, nav (Home, Stats), avatar + name (opens Profile).
 
 Controls, top to bottom:
-- **Search** — substring match over company, position, location. Resets to page 1.
+- **Search** — substring match over company, position, location (§5.1). Resets to page 1. It
+  shows a magnifier icon and the placeholder "Company, position, or location"; its "Search"
+  label is for assistive technology only — the one input excepted from §10.3's visible-label
+  rule, since a magnifier on a search field is a label people already read.
 - **Filter tabs** — `All (n)`, then one per status with live counts, then any saved filters
-  (each with an × to delete), then `+ Filter` which opens the filter builder.
-- **Filter builder** (§5.1) — collapsible panel.
+  (each with its own count and an × to delete), then `+ Filter` which opens the filter builder.
+  Every count covers the full application set, never the search (§5.3); while the list loads
+  the tabs show no numbers and, like the search, are disabled. The tabs are toggle buttons in
+  a labelled group, not ARIA tabs: they narrow one list rather than switch panels, and a saved
+  filter's × is its own button beside the tab. `+ Filter` waits until saved filters have
+  loaded, since the next "Custom N" depends on them.
+- **Filter builder** (§5.1) — collapsible panel: name (blank becomes `Custom N`, and the field
+  says which), text match, location, statuses, referral and starred (Any / only / not).
+  Statuses start with none ticked, led by an **All** chip that is ticked when all six are,
+  mixed when only some are, and ticks or clears all six at once; saving with none ticked says
+  "Choose at least one status." All six ticked is stored as the empty list that means all (§2). Location is a combobox over the places the user's applications already use: typing
+  narrows the list ("No location matches." when nothing does), and a place is picked from it —
+  a filter's location must match exactly, so a place no application has could never match.
+  An empty box, the default, is "Any location". Saving adds the tab, makes it the active filter, closes the panel, and returns focus to
+  `+ Filter`; Cancel closes it without saving.
 - **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
+
+The filter and the search live in the URL (`?filter=Offer`, `?filter=<saved filter id>`,
+`?q=acme`), so a filtered list can be linked to and survives a reload. Typing replaces the
+history entry rather than adding one per keystroke. A link to a saved filter waits for saved
+filters to load; one that no longer exists, or belongs to someone else, shows All. The number
+of applications shown is announced after each change of filter or search (§10.4).
 
 Table columns: select checkbox · star · date · company · position · location · status tag · 📎
 (cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
@@ -210,8 +232,8 @@ Description, cover-letter file, referral flag, notes list with an add-note field
 Actions: edit fields, delete application (confirm first).
 
 Cover letter: the original filename as a label, with the file's size and an **×** at the right
-of that row that removes it (confirming first, §9.4), then **Download** and **Replace** — or "No
-cover letter attached." and **Attach cover letter** when there is none. A chosen file is
+of that row that removes it (confirming first, §9.4), then **Preview** (a PDF only), **Download**,
+and **Replace** — or "No cover letter attached." and **Attach cover letter** when there is none. A chosen file is
 checked before upload, and the first failure is shown under the row (§7.3):
 - type, by magic bytes — "Choose a PDF, DOC, or DOCX file."
 - size — "Choose a file of 10 MB or less."
@@ -222,6 +244,15 @@ removed." Download asks for a 60-second signed URL when clicked, fetches the fil
 and saves it under its original name (§7.3). The signed URL is never put in the page, and the
 saved copy is typed `application/octet-stream`, so it can only be saved, never opened as part
 of the app.
+
+Preview opens a PDF in a new browser tab, in the browser's own viewer. The click opens a blank
+tab, cuts its link back to the app (`opener`), then sends it to a fresh 60-second signed URL
+*without* `download`, which Storage serves inline as `application/pdf` — so the file is shown on
+Storage's origin, never the app's, and nothing in it can reach the session. The URL goes to that
+tab only, never into the page. Whether a file is a PDF is read from its stored path's extension,
+which the upload function chose from the bytes, not from the display name. A Word file has no
+Preview: browsers cannot show one, and converting it into a page would put untrusted markup in
+the app. Reloading the preview tab after the minute is up shows Storage's error, not the file.
 
 ### 4.5 Stats
 Computed live from the user's full application set (§5.3) and its status history (§2).
@@ -286,11 +317,16 @@ An application matches a saved filter when **all** of these pass:
 2. `referral` is `any`, or matches the boolean
 3. `starred` is `any`, or matches the boolean
 4. `location` is `Any location`, or exactly equals the application's location
-5. `text` is empty, or is a case-insensitive substring of
-   `company + position + location + description`
+5. `text` is empty, or is a case-insensitive substring of any one of
+   company, position, location, or description
 
 The dashboard search box applies **on top of** the active filter and matches only
-company + position + location.
+company, position, or location — case-insensitively, the same way.
+
+Both text matches ignore the term's leading and trailing spaces, keep the spaces inside it, and
+test each field on its own: a term never matches across two fields ("osoProd" does not find
+Contoso / Product Engineer). An application with no location or description simply has nothing
+there to match.
 
 ### 5.2 Location normalization
 On save, a typed location is:
@@ -499,6 +535,7 @@ single note can be a megabyte.
 | Storage path | prefixed with the owner's user id, e.g. `{user_id}/{uuid}.pdf` |
 | Serving | private bucket, signed URL with a **60-second** TTL, generated on click — never embedded in page HTML |
 | Download response | `Content-Disposition: attachment`, and the `Content-Type` the upload function sniffed from the bytes. The app fetches the file and saves it as `application/octet-stream` rather than opening the URL (§4.4). `X-Content-Type-Options: nosniff` is wanted but not required: Supabase Storage does not send it, and the rows above already do its job — see the 2026-09-12 changelog |
+| Preview response (PDF only) | No `Content-Disposition`, `Content-Type: application/pdf`, served by Storage on its own origin in a tab opened with no `opener` (§4.4). Never offered for DOC or DOCX |
 
 SVG is not an accepted type anywhere. It is a script execution vector.
 
@@ -647,7 +684,9 @@ The four checks worth doing by hand, because tooling misses them:
 3. Request a cover-letter signed URL, wait for it to expire, confirm it stops working — then
    confirm the bucket is not publicly listable. While it is live, check the hosted response's
    headers: `Content-Disposition: attachment` and a `Content-Type` of PDF or Word. If either is
-   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it.
+   missing or different hosted, the §7.3 nosniff acceptance no longer holds — reopen it. Then
+   Preview a PDF: its URL has no `download`, the response is `application/pdf`, and the file
+   shows in the new tab on the Storage origin.
 4. Delete an application, then confirm its notes, history rows, and Storage object are all
    gone.
 5. Five wrong passwords on one account, then a sixth attempt with the *correct* password —
@@ -733,17 +772,20 @@ Nothing ships with an unhandled failure.
 | Surface | Loading | Empty | Error |
 |---|---|---|---|
 | Application list | 5 skeleton rows in the table shell; controls visible but disabled | **No applications yet** — headline, one line of copy, "Add application" button | "Couldn't load your applications." + Retry. Keep header and nav usable |
-| List, filtered | skeleton rows | **No matches** — name the active filter/search, offer "Clear filters" | as above |
+| List, filtered | skeleton rows | **No matches** — name the active filter/search: "No applications in *Offer* match "acme".", "No applications in *Offer*.", or "No applications match "acme"." — and offer "Clear filters", which resets the filter to All and empties the search. A user with no applications at all sees **No applications yet** instead, whatever the filter | as above |
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
 | Add / edit form | disable submit, spinner in the button, keep fields editable | n/a | Inline error above the form, field-level errors on the fields, **entered values preserved** — never clear the form on failure |
 | Cover letter upload | progress indicator on the row: a spinner and "Uploading *name*…", the file controls disabled | n/a | "Upload failed." + error reference + Retry, which sends the same file again; a file being replaced stays in place. Application saves without the file rather than losing the whole record. A refused file (§4.4) shows its reason instead, with no Retry |
 | Cover letter file (detail) | skeleton where the size goes | "No cover letter attached." + Attach cover letter | Size: "Couldn't load the file size." + Retry, name and actions still usable |
 | Cover letter download | spinner and "Preparing…" in the button | n/a | "Couldn't download the cover letter." + error reference + Retry, which asks for a new URL |
+| Cover letter preview (PDF) | a blank new tab at once; spinner and "Opening…" in the button until the URL arrives | n/a | The blank tab closes; "Couldn't open the preview." + error reference + Retry, which opens a new tab and asks for a new URL. A tab the browser blocks: "Your browser blocked the preview tab. Allow pop-ups for this site, or use Download.", nothing signed or reported |
 | Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
 | Bulk delete (list) | "Counting their notes…" in the dialog, confirm disabled until counted; "Deleting…" in the confirm button, dialog buttons disabled | n/a | Stops at the first failure: "Deleted *n* of *m* applications. Couldn't delete *company*." + error reference inside the dialog; the rest stay selected, and confirming again carries on. Over the write limit: the wait-a-minute copy instead of a reference (§9.2) |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
-| Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
+| Saved filters | n/a; `+ Filter` disabled until they load | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list. "Couldn't load your saved filters." + Retry beside `+ Filter`, which stays disabled; a linked saved filter shows All |
+| Saved filter save | "Saving…" in the button, the builder's fields kept | n/a | "Couldn't save the filter." + error reference inside the builder, every choice kept. Over the write limit (§7.1): the wait-a-minute copy instead of a reference |
+| Saved filter delete | the tab goes at once (§9.5) | n/a | The tab comes back, with the toast "Couldn't delete the filter." — plus the wait-a-minute copy when over the write limit |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
@@ -912,7 +954,8 @@ screen is a release requirement, checked the same way as §7.
 - No time limits on any interaction.
 
 ### 10.3 Understandable
-- Every input has a persistent visible label — placeholder text is not a label.
+- Every input has a persistent visible label — placeholder text is not a label. One exception:
+  the dashboard search, whose magnifier icon stands in for the word (§4.2).
 - Errors identified in text, associated with their field programmatically, and describing how
   to fix the problem (§8).
 - Nothing changes context on focus or on input alone; filters apply predictably.
@@ -957,8 +1000,9 @@ Breakpoint: **760px**. Below it, the following changes apply.
 - Page padding tightens to 14px, and bottom padding grows so the floating jump pill never
   covers the last row.
 
-Unchanged on mobile: filter tabs (they already wrap), the filter builder, and every business
-rule. This is a layout response, not a reduced feature set — no "view on desktop for more".
+Unchanged on mobile: the filter tabs' layout (they already wrap), the filter builder, and every
+business rule. Their controls still grow to 44px like every other: each tab is 44px tall, and a
+saved filter's × is a 44×44 target of its own. This is a layout response, not a reduced feature set — no "view on desktop for more".
 
 ---
 
@@ -1008,7 +1052,69 @@ Newest first. One line per substantive decision — what changed and *why*, so a
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
 
+### 2026-09-14
+- **Cover letters gain Preview, for PDFs only, in a new tab (§4.4, §7.3, §8.2).** Asked for. Word
+  files get none: browsers cannot show them, and converting one to HTML would mean rendering
+  untrusted markup in the app, behind a sanitiser, with an approximate layout and still nothing
+  for `.doc`. A new tab rather than a dialog: phone browsers show a PDF in a frame as its first
+  page or not at all. The tab is sent to a signed URL Storage serves inline, not a `blob:` URL of
+  the fetched bytes, so the PDF renders on Storage's origin rather than the app's — where the
+  session token lives — and the CSP's `object-src 'none'` is not in its way. Costs: the signed URL
+  shows in that tab's address bar for its 60 seconds, and reloading the tab after that fails.
+- **The builder's statuses start with none ticked (§4.2).** Asked for, reversing the all-ticked
+  default of 2026-09-13. An empty set is still refused with "Choose at least one status." rather
+  than taken to mean all: the reason for refusing it has not changed, and All is one click.
+
 ### 2026-09-13
+- **§6 step 5 built: search, filter tabs with live counts, saved filters.** The list now reads
+  every application, a page at a time past PostgREST's `max_rows` of 1,000, and filters in the
+  browser. §5.3 wants counts over the whole set and every saved filter's tab has a count, so the
+  whole set is needed anyway; a single request would have miscounted — and silently dropped
+  rows from the list — past 1,000 applications, under a 5,000 soft cap. Step 6 can revisit.
+- **Filter controls measured (§10.1).** The active tab is edged in the tabs' text colour, 7.4:1
+  against the tab well: the form-control border first used there measured 2.7:1, under the 3:1
+  a state indicator needs. Inactive tab text and the × are 7.4:1 on the well, a chosen status
+  chip's outline 5.1:1 and an unchosen chip's border 3.3:1 on the card, the focus ring 4.2:1 on
+  the well, and "Couldn't load your saved filters." 4.8:1 on the page.
+- **A sixth local seed user, `dev-f`, for the tests that save and delete filters.** The tests
+  that read filters assert `dev-a`'s exact tab counts and seeded saved filters, and run in
+  parallel.
+- **The builder's statuses gain an All chip and start all ticked (§4.2).** Asked for, in place of
+  the "(none = all)" hint. Without the hint an empty set of chips reads as "nothing", so the
+  default is every status ticked and an empty set is refused rather than silently meaning all.
+  The stored row is unchanged: all six are saved as `{}`, as before.
+- **The filter builder's location is a combobox you type into (§4.2).** First built as a plain
+  list, like the prototype's; asked for, because with many cities scrolling a list to find one
+  is slow. Typing only narrows the places already used — it cannot enter a new one — because a
+  saved filter's location matches exactly (§5.1), and a place no application uses could only
+  ever match nothing.
+- **The filter tabs are toggle buttons, not ARIA tabs (§4.2).** A saved filter's tab carries an
+  ×, and a tab cannot contain another control; nor do the tabs switch panels — they narrow one
+  list.
+- **Filter tabs grow to 44px on phones (§11).** §11 said the tabs were unchanged on mobile, and
+  also that every control is 44px there, which §7.9 checks. The layout is unchanged; the height
+  is not.
+- **The search box is labelled by its magnifier, not a visible word (§4.2, §10.3).** First
+  built with a visible "Search" label, because §10.3 says a placeholder is not a label; asked to
+  remove it as clutter beside the box. The magnifier icon inside the field is the recognised
+  mark of a search box, and it stays when the placeholder is replaced by typing, so §10.3 gains
+  this one exception. Screen readers still hear "Search". The placeholder names location too,
+  which the prototype's "company or role" had left out.
+- **What a saved filter's failures look like (§8.2).** Only loading was specified. A failed
+  save keeps the builder's choices, like the application form; a failed delete puts the tab
+  back, since the delete showed at once. A link to a saved filter that cannot be found — gone,
+  someone else's, or not loaded — shows All rather than an error, since nothing is broken.
+- **"No matches" copy and what Clear filters clears (§8.2).** The row said to name the filter
+  and search without saying how; Clear filters resets both, since either can be what excluded
+  everything.
+- **Text matching tests each field on its own, ignoring case (§5.1).** §5.1 matched a saved
+  filter's text against `company + position + location + description` joined together, which
+  taken literally finds a term straddling two fields ("osoProd" in Contoso / Product Engineer),
+  and it never said whether the search box ignores case. Both now match inside any one field,
+  case-insensitively, with the term's outer spaces trimmed.
+- **"Custom N" counts up from the highest one in use (§2).** The prototype's counter lived in
+  memory and reset on reload; counting the user's filters instead would hand out a name that
+  already exists after a delete.
 - **Several applications can be deleted at once from the list (§4.2, §8.2, §9.2, §11).** Asked for
   directly: deleting one at a time meant opening each record. It goes through the one delete path
   per application, so Storage cleanup and the §7.8.4 check still cover it. It stops at the first

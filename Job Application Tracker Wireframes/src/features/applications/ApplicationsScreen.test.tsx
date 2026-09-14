@@ -31,6 +31,10 @@ vi.mock('@/data/applications', async (importOriginal) => ({
   setStarred: (...args: unknown[]) => setStarred(...args),
 }));
 
+vi.mock('@/data/saved-filters', () => ({
+  listSavedFilters: async () => [],
+}));
+
 const renderList = () => renderRoutes({ '/applications': ApplicationsScreen }, '/applications');
 
 beforeEach(() => {

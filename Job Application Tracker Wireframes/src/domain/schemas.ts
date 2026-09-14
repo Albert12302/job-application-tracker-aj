@@ -124,22 +124,36 @@ export const noteSchema = z.object({
 
 export type Note = z.infer<typeof noteSchema>;
 
-const triState = z.enum(['any', 'yes', 'no']);
+export const triStateSchema = z.enum(['any', 'yes', 'no']);
 
+export type TriState = z.infer<typeof triStateSchema>;
+
+/**
+ * The filter builder (§4.2, §5.1). A blank name is allowed: it becomes
+ * "Custom N" on save (domain/filters.ts). `location` null is "Any location".
+ * At least one status is ticked; all six is stored as the row's "all" (`{}`).
+ */
 export const savedFilterFormSchema = z.object({
   name: z.string().trim().max(CAPS.filterName, 'Keep the name under 60 characters.'),
-  statuses: z.array(statusSchema).max(6),
-  referral: triState,
-  starred: triState,
-  location: z.string().trim().max(CAPS.shortText).nullable(),
-  text: z.string().trim().max(CAPS.shortText),
+  statuses: z.array(statusSchema).min(1, 'Choose at least one status.').max(STATUSES.length),
+  referral: triStateSchema,
+  starred: triStateSchema,
+  location: z.string().trim().min(1).max(CAPS.shortText).nullable(),
+  text: z.string().trim().max(CAPS.shortText, 'Keep the text under 120 characters.'),
 });
 
 export type SavedFilterFormValues = z.infer<typeof savedFilterFormSchema>;
 
-export const savedFilterSchema = savedFilterFormSchema.extend({
+/** A saved_filters row (§2). An empty text match is stored as null. */
+export const savedFilterSchema = z.object({
   id,
   user_id: id,
+  name: z.string(),
+  statuses: z.array(statusSchema),
+  referral: triStateSchema,
+  starred: triStateSchema,
+  location: z.string().nullable(),
+  text: z.string().nullable(),
   created_at: timestamp,
 });
 
@@ -228,8 +242,10 @@ export const signUpSchema = z
  *  type, and only a default makes a field optional there — without it every
  *  link to /applications would have to spell out all five params. */
 export const applicationsSearchSchema = z.object({
-  filter: z.string().default('all').catch('all'),
-  q: z.string().default('').catch(''),
+  /** `all`, a status name, or a saved filter's id — domain/filters.ts `resolveFilter` reads it. */
+  filter: z.string().max(64).default('all').catch('all'),
+  /** The search box (§5.1), capped as the field it searches is. */
+  q: z.string().max(CAPS.shortText).default('').catch(''),
   sort: z.enum(['date-desc', 'date-asc']).default('date-desc').catch('date-desc'),
   page: z.coerce.number().int().min(1).default(1).catch(1),
   pageSize: z

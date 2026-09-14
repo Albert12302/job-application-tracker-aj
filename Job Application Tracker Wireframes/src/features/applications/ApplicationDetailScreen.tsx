@@ -19,7 +19,7 @@ import { CoverLetterSection } from './CoverLetterSection';
 import { DeleteApplicationDialog } from './DeleteApplicationDialog';
 import { FunnelIndicator } from './FunnelIndicator';
 import { NotesSection } from './NotesSection';
-import { PANEL, SECTION_HEADING } from './panel';
+import { DETAIL_PANEL, DETAIL_WIDTH, SECTION_HEADING } from './panel';
 import { StarToggle } from './StarToggle';
 import { StatusSelect } from './StatusSelect';
 
@@ -61,7 +61,7 @@ export function ApplicationDetailScreen() {
 
   if (parsed.success && application.isPending) {
     return (
-      <div className={PANEL} aria-busy="true">
+      <div className={DETAIL_PANEL} aria-busy="true">
         <p role="status" className="sr-only">
           Loading this application
         </p>
@@ -78,7 +78,7 @@ export function ApplicationDetailScreen() {
 
   if (parsed.success && application.isError) {
     return (
-      <div className={PANEL}>
+      <div className={DETAIL_PANEL}>
         <ErrorState title="Couldn't load this application." reference={errorReference(application.error)}>
           <Button className="h-9 max-[760px]:h-11" onClick={() => void application.refetch()}>
             Retry
@@ -94,7 +94,7 @@ export function ApplicationDetailScreen() {
   const found = applicationId ? application.data : null;
   if (!found) {
     return (
-      <div className={PANEL}>
+      <div className={DETAIL_PANEL}>
         <h1 className="font-heading text-lg font-semibold">Application not found</h1>
         <p className="text-sm text-muted-foreground">
           It may have been deleted, or the link may be wrong.
@@ -107,9 +107,9 @@ export function ApplicationDetailScreen() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[460px] flex-col gap-3">
+    <div className={`mx-auto flex w-full ${DETAIL_WIDTH} flex-col gap-3`}>
       <BackLink />
-      <section aria-labelledby="application-company" className={PANEL}>
+      <section aria-labelledby="application-company" className={DETAIL_PANEL}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 id="application-company" className="font-heading text-xl font-semibold break-words">

@@ -5,6 +5,7 @@ import {
   applicationSchema,
   applicationsSearchSchema,
   noteSchema,
+  savedFilterFormSchema,
   signUpSchema,
 } from './schemas';
 
@@ -160,5 +161,40 @@ describe('applicationsSearchSchema', () => {
 
   it('accepts an empty search, so a bare route is valid', () => {
     expect(applicationsSearchSchema.parse({})).toMatchObject({ filter: 'all', page: 1 });
+  });
+
+  it('drops a search longer than the fields it searches, and an overlong filter', () => {
+    expect(applicationsSearchSchema.parse({ q: 'x'.repeat(121), filter: 'x'.repeat(65) })).toMatchObject({
+      q: '',
+      filter: 'all',
+    });
+    expect(applicationsSearchSchema.parse({ q: 'x'.repeat(120) }).q).toHaveLength(120);
+  });
+});
+
+describe('savedFilterFormSchema', () => {
+  const blank = { name: '', statuses: ['Applied'], referral: 'any', starred: 'any', location: null, text: '' };
+
+  it('accepts a blank name — it is filled in on save', () => {
+    expect(savedFilterFormSchema.safeParse(blank).success).toBe(true);
+  });
+
+  it('needs at least one status, with the copy', () => {
+    const result = savedFilterFormSchema.safeParse({ ...blank, statuses: [] });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Choose at least one status.');
+  });
+
+  it('caps the name at 60 characters with the copy', () => {
+    const result = savedFilterFormSchema.safeParse({ ...blank, name: 'x'.repeat(61) });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Keep the name under 60 characters.');
+    expect(savedFilterFormSchema.safeParse({ ...blank, name: 'x'.repeat(60) }).success).toBe(true);
+  });
+
+  it('caps the text match at 120 characters and rejects unknown values', () => {
+    expect(savedFilterFormSchema.safeParse({ ...blank, text: 'x'.repeat(121) }).success).toBe(false);
+    expect(savedFilterFormSchema.safeParse({ ...blank, statuses: ['Ghosted'] }).success).toBe(false);
+    expect(savedFilterFormSchema.safeParse({ ...blank, referral: 'maybe' }).success).toBe(false);
   });
 });
