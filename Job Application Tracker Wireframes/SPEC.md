@@ -58,12 +58,12 @@ persistence, and file storage; nothing else about the behavior should change.
 | field | type | notes |
 |---|---|---|
 | id | uuid | |
-| name | string | defaults to `Custom N` if left blank |
+| name | string | defaults to `Custom N` if left blank — N is one more than the highest `Custom N` the user already has. Names need not be unique |
 | statuses | enum[] | empty = all statuses |
 | referral | `any` \| `yes` \| `no` | |
 | starred | `any` \| `yes` \| `no` | |
 | location | string \| null | null = `Any location`; otherwise exact match against normalized location |
-| text | string | matches company, position, location, description |
+| text | string \| null | matches company, position, location, description (§5.1); null = no text match |
 | created_at | timestamptz | tab order |
 
 ### Status history
@@ -286,11 +286,16 @@ An application matches a saved filter when **all** of these pass:
 2. `referral` is `any`, or matches the boolean
 3. `starred` is `any`, or matches the boolean
 4. `location` is `Any location`, or exactly equals the application's location
-5. `text` is empty, or is a case-insensitive substring of
-   `company + position + location + description`
+5. `text` is empty, or is a case-insensitive substring of any one of
+   company, position, location, or description
 
 The dashboard search box applies **on top of** the active filter and matches only
-company + position + location.
+company, position, or location — case-insensitively, the same way.
+
+Both text matches ignore the term's leading and trailing spaces, keep the spaces inside it, and
+test each field on its own: a term never matches across two fields ("osoProd" does not find
+Contoso / Product Engineer). An application with no location or description simply has nothing
+there to match.
 
 ### 5.2 Location normalization
 On save, a typed location is:
@@ -1009,6 +1014,14 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-13
+- **Text matching tests each field on its own, ignoring case (§5.1).** §5.1 matched a saved
+  filter's text against `company + position + location + description` joined together, which
+  taken literally finds a term straddling two fields ("osoProd" in Contoso / Product Engineer),
+  and it never said whether the search box ignores case. Both now match inside any one field,
+  case-insensitively, with the term's outer spaces trimmed.
+- **"Custom N" counts up from the highest one in use (§2).** The prototype's counter lived in
+  memory and reset on reload; counting the user's filters instead would hand out a name that
+  already exists after a delete.
 - **Several applications can be deleted at once from the list (§4.2, §8.2, §9.2, §11).** Asked for
   directly: deleting one at a time meant opening each record. It goes through the one delete path
   per application, so Storage cleanup and the §7.8.4 check still cover it. It stops at the first
