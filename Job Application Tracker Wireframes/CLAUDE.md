@@ -173,6 +173,15 @@ Three layers, each with a job:
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
   engine is not its subject, and prefer `page.route` for failures over real writes. A suite that
   writes a lot gets its own seed user instead: `dev-e` belongs to `bulk-delete.spec.ts` alone.
+  `dev-f` belongs to the saving-and-deleting half of `filters.spec.ts`, which runs in Chromium
+  only and serially, because its tests change one user's saved filters and "Custom N"; the
+  reading half asserts `dev-a`'s seeded tabs exactly (`All (7)`, `Live (3)`, …), so a change to
+  `dev-a`'s seeded applications or saved filters changes those too. **Never save a filter as
+  `dev-a`.**
+
+  **The builder's chips and any/yes/no choices are visually hidden native inputs inside a
+  `<label>`.** Playwright's `check()` refuses them (the label intercepts the click); click the
+  label, as a user does, and assert with `toBeChecked()` on the input by role.
 
   **Real uploads are budgeted.** Every stored file counts against its user's 20 an hour (§7.1).
   A full run stores 9 of `dev-d`'s — `cover-letters.spec.ts` three per browser, `security.spec.ts`

@@ -1039,6 +1039,9 @@ the prototype is the reference for those.
   browser. §5.3 wants counts over the whole set and every saved filter's tab has a count, so the
   whole set is needed anyway; a single request would have miscounted — and silently dropped
   rows from the list — past 1,000 applications, under a 5,000 soft cap. Step 6 can revisit.
+- **A sixth local seed user, `dev-f`, for the tests that save and delete filters.** The tests
+  that read filters assert `dev-a`'s exact tab counts and seeded saved filters, and run in
+  parallel.
 - **The filter builder picks a location from a list, not a combobox (§4.2).** A saved filter's
   location matches exactly (§5.1), so a typed place that no application uses could only ever
   match nothing. The prototype used a list too.

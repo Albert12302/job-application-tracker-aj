@@ -23,6 +23,10 @@
 -- User E is for e2e/bulk-delete.spec.ts, which creates and deletes several
 -- applications a run. Writes are limited per user (120 a minute, §7.1), and a full
 -- run already spends nearly all of dev-d's, so that suite has a budget of its own.
+--   dev-f@example.test / devpassword1234
+-- User F is for the saved-filter tests in e2e/filters.spec.ts, which save and delete
+-- filters. dev-a's two seeded filters are read by the read-only filter tests, so a
+-- filter saved there mid-run would change what they see.
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -47,6 +51,10 @@ values
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
   ('55555555-5555-5555-5555-555555555555', '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'dev-e@example.test',
+   extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
+   now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
+  ('66666666-6666-6666-6666-666666666666', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'dev-f@example.test',
    extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
 on conflict (id) do nothing;
@@ -75,13 +83,16 @@ values
   (gen_random_uuid(), '44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444',
    'email', '{"sub":"44444444-4444-4444-4444-444444444444","email":"dev-d@example.test"}', now(), now()),
   (gen_random_uuid(), '55555555-5555-5555-5555-555555555555', '55555555-5555-5555-5555-555555555555',
-   'email', '{"sub":"55555555-5555-5555-5555-555555555555","email":"dev-e@example.test"}', now(), now())
+   'email', '{"sub":"55555555-5555-5555-5555-555555555555","email":"dev-e@example.test"}', now(), now()),
+  (gen_random_uuid(), '66666666-6666-6666-6666-666666666666', '66666666-6666-6666-6666-666666666666',
+   'email', '{"sub":"66666666-6666-6666-6666-666666666666","email":"dev-f@example.test"}', now(), now())
 on conflict do nothing;
 
 update public.profiles set name = 'Dev A' where id = '11111111-1111-1111-1111-111111111111';
 update public.profiles set name = 'Dev B' where id = '22222222-2222-2222-2222-222222222222';
 update public.profiles set name = 'Dev D' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set name = 'Dev E' where id = '55555555-5555-5555-5555-555555555555';
+update public.profiles set name = 'Dev F' where id = '66666666-6666-6666-6666-666666666666';
 
 -- Applications for user A, spread across the funnel so stats and the
 -- breakdown bar have something to render.
@@ -116,6 +127,22 @@ insert into public.applications (id, user_id, date_applied, company, position, l
 values
   ('b0000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
    ((current_date - 7)::timestamp at time zone 'utc'), 'Proseware', 'Staff Engineer', 'Remote', 'Interview')
+on conflict (id) do nothing;
+
+-- Three applications for user F, for e2e/filters.spec.ts to save filters against. No
+-- saved filters: that suite makes and deletes its own.
+insert into public.applications
+  (id, user_id, date_applied, company, position, location, description, status, referral, starred)
+values
+  ('f0000000-0000-0000-0000-000000000001', '66666666-6666-6666-6666-666666666666',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Fourth Coffee', 'Design Engineer', 'Portland, OR',
+   'Brand site and ordering app.', 'Interview', true, true),
+  ('f0000000-0000-0000-0000-000000000002', '66666666-6666-6666-6666-666666666666',
+   ((current_date - 8)::timestamp at time zone 'utc'),  'Margie''s Travel', 'Frontend Engineer', 'Remote',
+   null, 'Applied', false, false),
+  ('f0000000-0000-0000-0000-000000000003', '66666666-6666-6666-6666-666666666666',
+   ((current_date - 3)::timestamp at time zone 'utc'),  'Relecloud', 'UI Engineer', 'Portland, OR',
+   'Dashboards for the cloud console.', 'Offer', false, false)
 on conflict (id) do nothing;
 
 insert into public.notes (application_id, body, created_at)

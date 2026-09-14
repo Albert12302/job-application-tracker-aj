@@ -118,6 +118,32 @@ test.describe('7.8.1 cross-user isolation', () => {
     expect((bHistory.data ?? []).filter((row) => !bIds.has(row.application_id))).toEqual([]);
   });
 
+  test('user B cannot read, change, delete, or forge user A saved filters (§6 step 5)', async () => {
+    const a = await signIn('dev-a@example.test');
+    const { data: own } = await a.from('saved_filters').select('id, name').eq('name', 'Live');
+    // Not vacuous: A does see A's own filter.
+    expect(own).toHaveLength(1);
+    const live = own![0]!.id;
+
+    const b = await signIn('dev-b@example.test');
+    const { data: read, error: readError } = await b.from('saved_filters').select('*').eq('user_id', USER_A);
+    expect(readError).toBeNull();
+    expect(read).toEqual([]);
+    const { data: byId } = await b.from('saved_filters').select('*').eq('id', live);
+    expect(byId).toEqual([]);
+
+    const { data: updated } = await b.from('saved_filters').update({ name: 'Owned' }).eq('id', live).select();
+    expect(updated ?? []).toEqual([]);
+    const { data: deleted } = await b.from('saved_filters').delete().eq('id', live).select();
+    expect(deleted ?? []).toEqual([]);
+
+    const { error: forged } = await b.from('saved_filters').insert({ user_id: USER_A, name: 'Forged' });
+    expect(forged).not.toBeNull();
+
+    const { data: still } = await a.from('saved_filters').select('name').eq('id', live).single();
+    expect(still?.name).toBe('Live');
+  });
+
   test('the log tables are write-only', async () => {
     const b = await signIn('dev-b@example.test');
 
