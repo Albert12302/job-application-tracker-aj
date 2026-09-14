@@ -39,6 +39,9 @@ export type ErrorAction =
   | 'restore_note'
   | 'load_stats'
   | 'load_note_count'
+  | 'load_saved_filters'
+  | 'create_saved_filter'
+  | 'delete_saved_filter'
   | 'render';
 
 export type ErrorContext = { action: ErrorAction };

@@ -20,6 +20,8 @@ export const keys = {
     ['applications', userId, 'note-count', [...applicationIds].sort()] as const,
   /** Under the applications prefix, so anything that changes which applications exist refreshes it too. */
   stats: (userId: string) => ['applications', userId, 'stats'] as const,
+  /** Not under the applications prefix: adding or deleting an application leaves saved filters alone. */
+  savedFilters: (userId: string) => ['saved-filters', userId] as const,
   /** Keyed by path: a stored object never changes, only which one a row points at. */
   coverLetterSize: (userId: string, path: string) => ['cover-letter', userId, 'size', path] as const,
   /** A mutation key, so the detail screen can show an upload the add form started (§8.2). */

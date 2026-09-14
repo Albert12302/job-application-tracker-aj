@@ -25,16 +25,25 @@ export class ApplicationNotFoundError extends Error {
   }
 }
 
-/** Newest first (§5.3): date applied, then most recently added — as domain/order.ts sorts. */
+/**
+ * Newest first (§5.3): date applied, then most recently added — as domain/order.ts sorts —
+ * then id, so the order is total and no row moves between pages while they are read.
+ *
+ * Every row, however many: the tabs count the whole set and filtering happens over it (§5.3),
+ * so a list cut off at max_rows would miscount and silently leave applications out.
+ */
 export async function listApplications(userId: string): Promise<Application[]> {
-  const { data, error } = await supabase
-    .from('applications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('date_applied', { ascending: false })
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return applicationSchema.array().parse(data);
+  const rows = await allPages((from, to) =>
+    supabase
+      .from('applications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date_applied', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+  return applicationSchema.array().parse(rows);
 }
 
 /** Null when missing or someone else's (§8.2: never reveal which). */
@@ -172,7 +181,8 @@ export class WriteRateLimitedError extends Error {
   }
 }
 
-const isWriteRateLimited = (error: { message: string }) => error.message === 'rate_limited';
+/** The write-limit trigger's bare code, on any of the four writable tables (§7.1). */
+export const isWriteRateLimited = (error: { message: string }) => error.message === 'rate_limited';
 
 /**
  * Deletes the row; its notes and status_history rows go with it (on delete
