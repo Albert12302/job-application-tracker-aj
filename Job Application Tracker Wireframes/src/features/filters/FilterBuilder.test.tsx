@@ -132,18 +132,45 @@ describe('filter builder', () => {
     expect(await screen.findByRole('button', { name: 'Custom 3 (3)' })).toBeTruthy();
   });
 
-  it('offers Any location and each place already used, once', async () => {
+  it('narrows the places already used as you type, and picks one', async () => {
     const { user } = renderList();
     await user.click(await openBuilder());
     const builder = await screen.findByRole('region', { name: 'New filter' });
-    await user.click(within(builder).getByRole('combobox', { name: 'Location' }));
-    const options = (await screen.findAllByRole('option')).map((option) => option.textContent);
-    expect(options).toEqual(['Any location', 'Austin, TX', 'Remote']);
+    const location = within(builder).getByRole('combobox', { name: 'Location' });
+    expect(location.getAttribute('placeholder')).toBe('Any location');
 
-    await user.click(screen.getByRole('option', { name: 'Austin, TX' }));
+    await user.click(location);
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual(['Austin, TX', 'Remote']);
+
+    await user.type(location, 'aus');
+    await waitFor(() => expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Austin, TX']));
+    await user.keyboard('{Enter}');
+    expect((location as HTMLInputElement).value).toBe('Austin, TX');
+
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
     expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ location: 'Austin, TX' }));
     expect(await screen.findByRole('button', { name: 'Custom 3 (2)' })).toBeTruthy();
+  });
+
+  it('matches no place nobody has, and an emptied box is Any location', async () => {
+    const { user } = renderList();
+    await user.click(await openBuilder());
+    const builder = await screen.findByRole('region', { name: 'New filter' });
+    const location = within(builder).getByRole('combobox', { name: 'Location' }) as HTMLInputElement;
+
+    await user.type(location, 'Denver');
+    expect(await screen.findByText('No location matches.')).toBeTruthy();
+    expect(screen.queryAllByRole('option')).toEqual([]);
+
+    await user.clear(location);
+    await user.type(location, 'Remote');
+    await user.keyboard('{Enter}');
+    expect(location.value).toBe('Remote');
+    await user.clear(location);
+    await user.keyboard('{Escape}');
+
+    await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
+    expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ location: null }));
   });
 
   it('keeps every choice when the save fails, with a reference (§8.2)', async () => {

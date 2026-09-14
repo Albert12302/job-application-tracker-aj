@@ -317,7 +317,8 @@ src/
       FilterTabs.tsx              toggle buttons in a labelled group, not ARIA tabs (§4.2)
       SavedFilterTab.tsx          the tab and its × as sibling buttons
       tab-styles.ts               one tab look, shared with the builder's any/yes/no choices
-      FilterBuilder.tsx           location is a list of used places, not a combobox (§4.2)
+      FilterBuilder.tsx
+      LocationCombobox.tsx        type to narrow the places already used; picks only from them (§4.2)
       StatusChips.tsx             native checkboxes drawn as status tags
       TriStateChoice.tsx          native radios drawn as tabs
       use-list-filters.ts         `filter` and `q` in the URL
@@ -335,8 +336,11 @@ src/
     ui/                       shadcn-generated primitives. Ours once generated — edit in place,
                               do not wrap in a second layer of near-identical components.
       button.tsx  input.tsx  select.tsx  textarea.tsx  checkbox.tsx
-      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  skeleton.tsx
+      dialog.tsx  sonner.tsx  badge.tsx  table.tsx  skeleton.tsx  combobox.tsx  input-group.tsx
                               Add via `npx shadcn@latest add <name>`; commit the generated file.
+                              It asks to overwrite shared primitives we have edited (button,
+                              input, textarea) and aborts when nothing answers — run it as
+                              `yes n | npx shadcn@latest add <name>` so those edits survive.
     EmptyState.tsx            app-level primitives shadcn does not ship (SPEC §8)
     ErrorState.tsx
     Pagination.tsx            wraps shadcn pagination with our page-size + range label

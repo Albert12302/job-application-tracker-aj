@@ -178,10 +178,13 @@ test.describe('as dev-f, saving and deleting', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.type('engineer');
     await page.keyboard.press('Tab');
-    await expect(builder.getByRole('combobox', { name: 'Location' })).toBeFocused();
+    // Type to narrow the places already used, then Enter picks the highlighted one.
+    const location = builder.getByRole('combobox', { name: 'Location' });
+    await expect(location).toBeFocused();
+    await page.keyboard.type('portl');
+    await expect(page.getByRole('option')).toHaveText(['Portland, OR']);
     await page.keyboard.press('Enter');
-    await page.getByRole('option', { name: 'Portland, OR' }).press('Enter');
-    await expect(builder.getByRole('combobox', { name: 'Location' })).toContainText('Portland, OR');
+    await expect(location).toHaveValue('Portland, OR');
 
     // Applied, then Interview.
     await page.keyboard.press('Tab');

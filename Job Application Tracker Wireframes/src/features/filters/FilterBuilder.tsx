@@ -6,17 +6,16 @@ import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ErrorState';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { nextCustomName } from '@/domain/filters';
 import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
 import { WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
+import { LocationCombobox } from './LocationCombobox';
 import { StatusChips } from './StatusChips';
 import { TriStateChoice } from './TriStateChoice';
 
 const CONTROL = 'h-9 max-[760px]:h-11';
 const INPUT = 'h-9 bg-card max-[760px]:h-11';
-const ANY_LOCATION = 'Any location';
 
 const BLANK: SavedFilterFormValues = { name: '', text: '', location: null, statuses: [], referral: 'any', starred: 'any' };
 
@@ -25,9 +24,8 @@ const BLANK: SavedFilterFormValues = { name: '', text: '', location: null, statu
  * that saves a filter as a new tab. Name, text match, location, statuses,
  * referral, starred — validated by the same schema the saved row is (§7.3).
  *
- * Location is a list of the places already used, not free text: a filter's
- * location must match exactly (§5.1), so a place no application has could
- * never match anything.
+ * Location is typed to narrow the places already used, then picked
+ * (LocationCombobox): a filter's location must match exactly (§5.1).
  *
  * A failed save keeps every choice (§8.2). The save itself belongs to the
  * screen, not this panel: what happens once it lands — the new tab made active,
@@ -112,19 +110,14 @@ export function FilterBuilder({
                 control={form.control}
                 name="location"
                 render={({ field: location }) => (
-                  <Select value={location.value} onValueChange={(value: string | null) => location.onChange(value)}>
-                    <SelectTrigger id={`${field}-location`} className={`w-full ${INPUT}`} onBlur={location.onBlur}>
-                      <SelectValue>{(value: string | null) => value ?? ANY_LOCATION}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={null}>{ANY_LOCATION}</SelectItem>
-                      {locations.map((place) => (
-                        <SelectItem key={place} value={place}>
-                          {place}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <LocationCombobox
+                    id={`${field}-location`}
+                    locations={locations}
+                    value={location.value}
+                    onChange={location.onChange}
+                    onBlur={location.onBlur}
+                    className={`w-full ${INPUT}`}
+                  />
                 )}
               />
             </Field>
