@@ -158,11 +158,23 @@ the door does not have to be unlocked.
 Persistent header: app name, nav (Home, Stats), avatar + name (opens Profile).
 
 Controls, top to bottom:
-- **Search** — substring match over company, position, location. Resets to page 1.
+- **Search** — substring match over company, position, location (§5.1). Resets to page 1. It
+  has a visible "Search" label (§10.3), with the placeholder "Company, position, or location".
 - **Filter tabs** — `All (n)`, then one per status with live counts, then any saved filters
-  (each with an × to delete), then `+ Filter` which opens the filter builder.
+  (each with its own count and an × to delete), then `+ Filter` which opens the filter builder.
+  Every count covers the full application set, never the search (§5.3); while the list loads
+  the tabs show no numbers and, like the search, are disabled. The tabs are toggle buttons in
+  a labelled group, not ARIA tabs: they narrow one list rather than switch panels, and a saved
+  filter's × is its own button beside the tab. `+ Filter` waits until saved filters have
+  loaded, since the next "Custom N" depends on them.
 - **Filter builder** (§5.1) — collapsible panel.
 - **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
+
+The filter and the search live in the URL (`?filter=Offer`, `?filter=<saved filter id>`,
+`?q=acme`), so a filtered list can be linked to and survives a reload. Typing replaces the
+history entry rather than adding one per keystroke. A link to a saved filter waits for saved
+filters to load; one that no longer exists, or belongs to someone else, shows All. The number
+of applications shown is announced after each change of filter or search (§10.4).
 
 Table columns: select checkbox · star · date · company · position · location · status tag · 📎
 (cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
@@ -738,7 +750,7 @@ Nothing ships with an unhandled failure.
 | Surface | Loading | Empty | Error |
 |---|---|---|---|
 | Application list | 5 skeleton rows in the table shell; controls visible but disabled | **No applications yet** — headline, one line of copy, "Add application" button | "Couldn't load your applications." + Retry. Keep header and nav usable |
-| List, filtered | skeleton rows | **No matches** — name the active filter/search, offer "Clear filters" | as above |
+| List, filtered | skeleton rows | **No matches** — name the active filter/search: "No applications in *Offer* match "acme".", "No applications in *Offer*.", or "No applications match "acme"." — and offer "Clear filters", which resets the filter to All and empties the search. A user with no applications at all sees **No applications yet** instead, whatever the filter | as above |
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
 | Add / edit form | disable submit, spinner in the button, keep fields editable | n/a | Inline error above the form, field-level errors on the fields, **entered values preserved** — never clear the form on failure |
@@ -748,7 +760,9 @@ Nothing ships with an unhandled failure.
 | Cover letter remove | "Removing…" in the confirm button, dialog buttons disabled | n/a | "Couldn't remove the cover letter." + error reference inside the dialog; the file stays, and confirming again retries |
 | Bulk delete (list) | "Counting their notes…" in the dialog, confirm disabled until counted; "Deleting…" in the confirm button, dialog buttons disabled | n/a | Stops at the first failure: "Deleted *n* of *m* applications. Couldn't delete *company*." + error reference inside the dialog; the rest stay selected, and confirming again carries on. Over the write limit: the wait-a-minute copy instead of a reference (§9.2) |
 | Note add | optimistic append, muted until confirmed | "No notes yet." | Roll back the optimistic note, restore the text to the input, show "Couldn't save note." + Retry |
-| Saved filters | n/a | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list |
+| Saved filters | n/a; `+ Filter` disabled until they load | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list. "Couldn't load your saved filters." + Retry beside `+ Filter`, which stays disabled; a linked saved filter shows All |
+| Saved filter save | "Saving…" in the button, the builder's fields kept | n/a | "Couldn't save the filter." + error reference inside the builder, every choice kept. Over the write limit (§7.1): the wait-a-minute copy instead of a reference |
+| Saved filter delete | the tab goes at once (§9.5) | n/a | The tab comes back, with the toast "Couldn't delete the filter." — plus the wait-a-minute copy when over the write limit |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
@@ -962,8 +976,9 @@ Breakpoint: **760px**. Below it, the following changes apply.
 - Page padding tightens to 14px, and bottom padding grows so the floating jump pill never
   covers the last row.
 
-Unchanged on mobile: filter tabs (they already wrap), the filter builder, and every business
-rule. This is a layout response, not a reduced feature set — no "view on desktop for more".
+Unchanged on mobile: the filter tabs' layout (they already wrap), the filter builder, and every
+business rule. Their controls still grow to 44px like every other: each tab is 44px tall, and a
+saved filter's × is a 44×44 target of its own. This is a layout response, not a reduced feature set — no "view on desktop for more".
 
 ---
 
@@ -1014,6 +1029,27 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-13
+- **§6 step 5 built: search, filter tabs with live counts, saved filters.** The list now reads
+  every application, a page at a time past PostgREST's `max_rows` of 1,000, and filters in the
+  browser. §5.3 wants counts over the whole set and every saved filter's tab has a count, so the
+  whole set is needed anyway; a single request would have miscounted — and silently dropped
+  rows from the list — past 1,000 applications, under a 5,000 soft cap. Step 6 can revisit.
+- **The filter tabs are toggle buttons, not ARIA tabs (§4.2).** A saved filter's tab carries an
+  ×, and a tab cannot contain another control; nor do the tabs switch panels — they narrow one
+  list.
+- **Filter tabs grow to 44px on phones (§11).** §11 said the tabs were unchanged on mobile, and
+  also that every control is 44px there, which §7.9 checks. The layout is unchanged; the height
+  is not.
+- **The search box has a visible label (§4.2).** The prototype had only a placeholder, which
+  §10.3 says is not a label, and its "company or role" left out location, which the search
+  matches.
+- **What a saved filter's failures look like (§8.2).** Only loading was specified. A failed
+  save keeps the builder's choices, like the application form; a failed delete puts the tab
+  back, since the delete showed at once. A link to a saved filter that cannot be found — gone,
+  someone else's, or not loaded — shows All rather than an error, since nothing is broken.
+- **"No matches" copy and what Clear filters clears (§8.2).** The row said to name the filter
+  and search without saying how; Clear filters resets both, since either can be what excluded
+  everything.
 - **Text matching tests each field on its own, ignoring case (§5.1).** §5.1 matched a saved
   filter's text against `company + position + location + description` joined together, which
   taken literally finds a term straddling two fields ("osoProd" in Contoso / Product Engineer),

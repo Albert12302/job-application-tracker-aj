@@ -33,6 +33,10 @@ vi.mock('@/data/applications', async (importOriginal) => ({
   listApplications: async () => table,
 }));
 
+vi.mock('@/data/saved-filters', () => ({
+  listSavedFilters: async () => [],
+}));
+
 vi.mock('@/data/notes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/notes')>()),
   countNotes: (...args: unknown[]) => countNotes(...args),
@@ -77,7 +81,7 @@ describe('bulk delete', () => {
     expect(screen.queryByRole('heading', { name: 'Route /applications/$id' })).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Select Litware' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('1 selected', { selector: 'p:not([role])' })).toBeTruthy();
-    expect(screen.getByRole('status', { name: '' }).textContent).toContain('1 selected');
+    expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('1 selected');
     // Some, not all: the header box is mixed.
     expect(screen.getByRole('checkbox', { name: 'Select all applications' }).getAttribute('aria-checked')).toBe('mixed');
 
