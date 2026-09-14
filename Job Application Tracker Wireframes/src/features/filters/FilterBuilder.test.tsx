@@ -67,6 +67,10 @@ const openBuilder = async () => {
   return toggle;
 };
 
+/** Ticks every status: a new filter starts with none, and will not save that way (§4.2). */
+const tickAll = (user: ReturnType<typeof renderList>['user'], builder: HTMLElement) =>
+  user.click(within(builder).getByRole('checkbox', { name: 'All' }));
+
 describe('filter builder', () => {
   it('builds and saves a filter by keyboard alone, and opens it as the active tab', async () => {
     const { user, router, container } = renderList();
@@ -83,11 +87,10 @@ describe('filter builder', () => {
     await user.keyboard('Warm leads');
     await user.tab();
     await user.keyboard('engineer');
-    // Location, then All — every status starts ticked, so Space clears them — then Applied and Interview.
+    // Location, then All — no status starts ticked, so All is passed over — then Applied and Interview.
     await user.tab();
     await user.tab();
     expect(document.activeElement).toBe(within(builder).getByRole('checkbox', { name: 'All' }));
-    await user.keyboard(' ');
     await user.tab();
     await user.tab();
     expect(document.activeElement).toBe(within(builder).getByRole('checkbox', { name: 'Interview' }));
@@ -130,13 +133,14 @@ describe('filter builder', () => {
     const builder = await screen.findByRole('region', { name: 'New filter' });
     expect(within(builder).getByText('Optional. Left blank, it is called Custom 3.')).toBeTruthy();
 
+    await tickAll(user, builder);
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
-    // Every status, as it starts, is stored as all.
+    // Every status is stored as all.
     expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ name: 'Custom 3', text: null, statuses: [] }));
     expect(await screen.findByRole('button', { name: 'Custom 3 (3)' })).toBeTruthy();
   });
 
-  it('All starts ticked, shows mixed for some, and ticks or clears every status', async () => {
+  it('no status starts ticked; All shows mixed for some, and ticks or clears every status', async () => {
     const { user } = renderList();
     await user.click(await openBuilder());
     const builder = within(await screen.findByRole('region', { name: 'New filter' }));
@@ -146,8 +150,9 @@ describe('filter builder', () => {
         (name) => (builder.getByRole('checkbox', { name }) as HTMLInputElement).checked,
       );
     expect(screen.queryByText(/none = all/)).toBeNull();
-    expect(all.checked).toBe(true);
-    expect(statuses()).toHaveLength(6);
+    expect(all.checked).toBe(false);
+    expect(all.indeterminate).toBe(false);
+    expect(statuses()).toEqual([]);
 
     await user.click(builder.getByRole('checkbox', { name: 'Rejected' }));
     expect(all.checked).toBe(false);
@@ -163,12 +168,11 @@ describe('filter builder', () => {
     expect(all.indeterminate).toBe(false);
   });
 
-  it('will not save with no status ticked, and says why on the group', async () => {
+  it('will not save untouched, with no status ticked, and says why on the group', async () => {
     const { user } = renderList();
     await user.click(await openBuilder());
     const region = await screen.findByRole('region', { name: 'New filter' });
     const builder = within(region);
-    await user.click(builder.getByRole('checkbox', { name: 'All' }));
     await user.click(builder.getByRole('button', { name: 'Save filter' }));
 
     const message = await builder.findByText('Choose at least one status.');
@@ -195,6 +199,7 @@ describe('filter builder', () => {
     await user.keyboard('{Enter}');
     expect((location as HTMLInputElement).value).toBe('Austin, TX');
 
+    await tickAll(user, builder);
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
     expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ location: 'Austin, TX' }));
     expect(await screen.findByRole('button', { name: 'Custom 3 (2)' })).toBeTruthy();
@@ -217,6 +222,7 @@ describe('filter builder', () => {
     await user.clear(location);
     await user.keyboard('{Escape}');
 
+    await tickAll(user, builder);
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
     expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ location: null }));
   });
@@ -227,7 +233,6 @@ describe('filter builder', () => {
     await user.click(await openBuilder());
     const builder = await screen.findByRole('region', { name: 'New filter' });
     await user.type(within(builder).getByRole('textbox', { name: 'Name' }), 'Warm leads');
-    await user.click(within(builder).getByRole('checkbox', { name: 'All' }));
     await user.click(within(builder).getByRole('checkbox', { name: 'Offer' }));
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
 
@@ -246,6 +251,7 @@ describe('filter builder', () => {
     const { user } = renderList();
     await user.click(await openBuilder());
     const builder = await screen.findByRole('region', { name: 'New filter' });
+    await tickAll(user, builder);
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
 
     const alert = await within(builder).findByRole('alert');
@@ -270,6 +276,7 @@ describe('filter builder', () => {
     await user.click(toggle);
     const builder = await screen.findByRole('region', { name: 'New filter' });
     await user.type(within(builder).getByRole('textbox', { name: 'Name' }), 'Warm leads');
+    await tickAll(user, builder);
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
     expect(await within(builder).findByText('Saving…')).toBeTruthy();
 
@@ -290,7 +297,9 @@ describe('filter builder', () => {
     const { user } = renderList();
     const toggle = await openBuilder();
     await user.click(toggle);
-    await user.click(within(await screen.findByRole('region', { name: 'New filter' })).getByRole('button', { name: 'Save filter' }));
+    const builder = await screen.findByRole('region', { name: 'New filter' });
+    await tickAll(user, builder);
+    await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
     expect(await screen.findByText("Couldn't save the filter.")).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));

@@ -171,7 +171,7 @@ Controls, top to bottom:
   loaded, since the next "Custom N" depends on them.
 - **Filter builder** (§5.1) — collapsible panel: name (blank becomes `Custom N`, and the field
   says which), text match, location, statuses, referral and starred (Any / only / not).
-  Statuses start with every one ticked, led by an **All** chip that is ticked when all six are,
+  Statuses start with none ticked, led by an **All** chip that is ticked when all six are,
   mixed when only some are, and ticks or clears all six at once; saving with none ticked says
   "Choose at least one status." All six ticked is stored as the empty list that means all (§2). Location is a combobox over the places the user's applications already use: typing
   narrows the list ("No location matches." when nothing does), and a place is picked from it —
@@ -1061,6 +1061,9 @@ the prototype is the reference for those.
   the fetched bytes, so the PDF renders on Storage's origin rather than the app's — where the
   session token lives — and the CSP's `object-src 'none'` is not in its way. Costs: the signed URL
   shows in that tab's address bar for its 60 seconds, and reloading the tab after that fails.
+- **The builder's statuses start with none ticked (§4.2).** Asked for, reversing the all-ticked
+  default of 2026-09-13. An empty set is still refused with "Choose at least one status." rather
+  than taken to mean all: the reason for refusing it has not changed, and All is one click.
 
 ### 2026-09-13
 - **§6 step 5 built: search, filter tabs with live counts, saved filters.** The list now reads

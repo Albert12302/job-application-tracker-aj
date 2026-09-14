@@ -8,7 +8,6 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { nextCustomName } from '@/domain/filters';
 import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
-import { STATUSES } from '@/domain/status';
 import { errorReference } from '@/queries/errors';
 import { WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
 import { LocationCombobox } from './LocationCombobox';
@@ -18,12 +17,15 @@ import { TriStateChoice } from './TriStateChoice';
 const CONTROL = 'h-9 max-[760px]:h-11';
 const INPUT = 'h-9 bg-card max-[760px]:h-11';
 
-/** A new filter starts wide open: any location, every status ticked, any referral or star. */
+/**
+ * A new filter: any location, any referral or star, and no status ticked — the
+ * statuses are a choice to make, and saving with none says so (§4.2).
+ */
 const BLANK: SavedFilterFormValues = {
   name: '',
   text: '',
   location: null,
-  statuses: [...STATUSES],
+  statuses: [],
   referral: 'any',
   starred: 'any',
 };
