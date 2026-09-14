@@ -1,7 +1,7 @@
 import { OiXIcon } from '@/components/OiXIcon';
 import type { SavedFilter } from '@/domain/schemas';
 import { cn } from '@/lib/utils';
-import { tabButton } from './tab-styles';
+import { ACTIVE_TAB, tabButton } from './tab-styles';
 
 /**
  * A saved filter's tab (SPEC §4.2): choosing it, and an × that deletes it at
@@ -25,7 +25,7 @@ export function SavedFilterTab({
   onDelete: () => void;
 }) {
   return (
-    <span className={cn('inline-flex items-center rounded-md', active && 'bg-card shadow-sm ring-1 ring-input')}>
+    <span className={cn('inline-flex items-center rounded-md', active && ACTIVE_TAB)}>
       <button
         type="button"
         aria-pressed={active}

@@ -1039,6 +1039,11 @@ the prototype is the reference for those.
   browser. §5.3 wants counts over the whole set and every saved filter's tab has a count, so the
   whole set is needed anyway; a single request would have miscounted — and silently dropped
   rows from the list — past 1,000 applications, under a 5,000 soft cap. Step 6 can revisit.
+- **Filter controls measured (§10.1).** The active tab is edged in the tabs' text colour, 7.4:1
+  against the tab well: the form-control border first used there measured 2.7:1, under the 3:1
+  a state indicator needs. Inactive tab text and the × are 7.4:1 on the well, a chosen status
+  chip's outline 5.1:1 and an unchosen chip's border 3.3:1 on the card, the focus ring 4.2:1 on
+  the well, and "Couldn't load your saved filters." 4.8:1 on the page.
 - **A sixth local seed user, `dev-f`, for the tests that save and delete filters.** The tests
   that read filters assert `dev-a`'s exact tab counts and seeded saved filters, and run in
   parallel.
