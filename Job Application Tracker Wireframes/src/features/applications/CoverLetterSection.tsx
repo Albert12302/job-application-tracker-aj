@@ -80,7 +80,7 @@ export function CoverLetterSection({ application }: { application: Application }
     <div className="flex flex-col gap-2">
       <h2 className={SECTION_HEADING}>Cover letter</h2>
 
-      <div className="flex flex-col gap-3 rounded-lg border p-3" aria-busy={busy || undefined}>
+      <div className="flex flex-col gap-3" aria-busy={busy || undefined}>
         {file ? (
           <div className="flex items-start gap-2.5">
             <FileTextIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
@@ -93,7 +93,7 @@ export function CoverLetterSection({ application }: { application: Application }
             <Button
               variant="ghost"
               size="icon"
-              className="-mt-1.5 -mr-1.5 text-muted-foreground max-[760px]:size-11"
+              className="-mt-1.5 text-muted-foreground max-[760px]:size-11"
               aria-label="Remove cover letter"
               disabled={busy}
               onClick={() => {
