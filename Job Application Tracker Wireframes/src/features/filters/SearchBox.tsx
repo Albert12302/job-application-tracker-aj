@@ -57,7 +57,8 @@ export function SearchBox({
           disabled={disabled}
           autoComplete="off"
           placeholder="Company, position, or location"
-          className="h-9 bg-card pl-8 max-[760px]:h-11"
+          // The browser's own clear × (Chromium, Safari) is clickable, so it gets the pointer too.
+          className="h-9 bg-card pl-8 max-[760px]:h-11 [&::-webkit-search-cancel-button]:cursor-pointer"
           onChange={(event) => {
             const next = event.target.value;
             setText(next);
