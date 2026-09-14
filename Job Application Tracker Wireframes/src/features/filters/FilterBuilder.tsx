@@ -8,9 +8,9 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { nextCustomName } from '@/domain/filters';
-import { savedFilterFormSchema, type SavedFilter, type SavedFilterFormValues } from '@/domain/schemas';
+import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
 import { errorReference } from '@/queries/errors';
-import { useCreateSavedFilter, WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
+import { WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
 import { StatusChips } from './StatusChips';
 import { TriStateChoice } from './TriStateChoice';
 
@@ -29,44 +29,48 @@ const BLANK: SavedFilterFormValues = { name: '', text: '', location: null, statu
  * location must match exactly (§5.1), so a place no application has could
  * never match anything.
  *
- * A failed save keeps every choice (§8.2); a saved one becomes the active tab,
- * and the screen closes the panel.
+ * A failed save keeps every choice (§8.2). The save itself belongs to the
+ * screen, not this panel: what happens once it lands — the new tab made active,
+ * the panel closed — must not depend on the panel still being open.
  */
 export function FilterBuilder({
   id,
   locations,
   existingNames,
-  onSaved,
+  pending,
+  error,
+  onSave,
   onCancel,
 }: {
   id: string;
   locations: readonly string[];
   existingNames: readonly string[];
-  onSaved: (filter: SavedFilter) => void;
+  pending: boolean;
+  error: unknown;
+  onSave: (values: SavedFilterFormValues) => void;
   onCancel: () => void;
 }) {
   const field = useId();
-  const create = useCreateSavedFilter();
   const form = useForm<SavedFilterFormValues>({ resolver: zodResolver(savedFilterFormSchema), defaultValues: BLANK });
   const { errors } = form.formState;
-  const rateLimited = create.error instanceof WriteRateLimitedError;
+  const rateLimited = error instanceof WriteRateLimitedError;
 
-  const save = form.handleSubmit((values) => create.mutate(values, { onSuccess: onSaved }));
+  const save = form.handleSubmit(onSave);
 
   return (
     <section id={id} aria-labelledby={`${field}-heading`} className="rounded-xl border bg-card p-5 shadow-xs max-[760px]:p-4">
       <h2 id={`${field}-heading`} className="mb-4 font-heading text-[15px] font-semibold">
         New filter
       </h2>
-      <form onSubmit={save} noValidate aria-busy={create.isPending} className="flex flex-col gap-5">
-        {create.isError ? (
+      <form onSubmit={save} noValidate aria-busy={pending} className="flex flex-col gap-5">
+        {error ? (
           <ErrorState
             title={rateLimited ? `Couldn't save the filter. ${WAIT_A_MINUTE}` : "Couldn't save the filter."}
-            reference={rateLimited ? null : errorReference(create.error)}
+            reference={rateLimited ? null : errorReference(error)}
           />
         ) : null}
 
-        <fieldset disabled={create.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+        <fieldset disabled={pending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
           <div className="grid grid-cols-3 gap-3 max-[760px]:grid-cols-1">
             <Field data-invalid={!!errors.name}>
               <FieldLabel htmlFor={`${field}-name`}>Name</FieldLabel>
@@ -161,7 +165,7 @@ export function FilterBuilder({
 
           <div className="flex gap-2.5 max-[760px]:flex-col">
             <Button type="submit" className={CONTROL}>
-              {create.isPending ? (
+              {pending ? (
                 <>
                   <Loader2Icon aria-hidden="true" className="animate-spin" />
                   Saving…

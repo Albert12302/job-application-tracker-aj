@@ -11,7 +11,7 @@ import { SearchBox } from '@/features/filters/SearchBox';
 import { useFilteredApplications } from '@/features/filters/use-filtered-applications';
 import { NARROW, useMediaQuery } from '@/hooks/use-media-query';
 import { errorReference } from '@/queries/errors';
-import { useDeleteSavedFilter } from '@/queries/use-saved-filters';
+import { useCreateSavedFilter, useDeleteSavedFilter } from '@/queries/use-saved-filters';
 import { AddApplicationLink } from './AddApplicationLink';
 import { ApplicationCards } from './ApplicationCards';
 import { ApplicationListSkeleton } from './ApplicationListSkeleton';
@@ -37,6 +37,8 @@ export function ApplicationsScreen() {
   const selection = useSelection(visible);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteFilter = useDeleteSavedFilter();
+  // Here rather than in the builder, so a save finishes what it started even if the panel has gone.
+  const createFilter = useCreateSavedFilter();
   const [filterNotice, setFilterNotice] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const allTab = useRef<HTMLButtonElement>(null);
@@ -171,7 +173,16 @@ export function ApplicationsScreen() {
         saved={view.saved}
         disabled={!ready}
         allRef={allTab}
-        builder={{ open: building, controls: builderId, onToggle: () => setBuilding((open) => !open) }}
+        builder={{
+          open: building,
+          saving: createFilter.isPending,
+          controls: builderId,
+          onToggle: () => {
+            // A failure shown last time is not news on a fresh panel.
+            if (!building) createFilter.reset();
+            setBuilding((open) => !open);
+          },
+        }}
         builderRef={builderToggle}
         onSelect={url.setFilter}
         onDelete={removeFilter}
@@ -181,12 +192,18 @@ export function ApplicationsScreen() {
           id={builderId}
           locations={uniqueLocations(view.all)}
           existingNames={view.saved.filters.map((filter) => filter.name)}
-          onSaved={(filter) => {
-            setBuilding(false);
-            url.setFilter(filter.id);
-            setFilterNotice(`Saved filter ${filter.name}.`);
-            builderToggle.current?.focus();
-          }}
+          pending={createFilter.isPending}
+          error={createFilter.error}
+          onSave={(values) =>
+            createFilter.mutate(values, {
+              onSuccess: (filter) => {
+                setBuilding(false);
+                url.setFilter(filter.id);
+                setFilterNotice(`Saved filter ${filter.name}.`);
+                builderToggle.current?.focus();
+              },
+            })
+          }
           onCancel={() => {
             setBuilding(false);
             builderToggle.current?.focus();

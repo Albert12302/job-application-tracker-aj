@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ALL_FILTER, type TabCounts } from '@/domain/filters';
 import type { SavedFilter } from '@/domain/schemas';
 import { STATUSES } from '@/domain/status';
+import { cn } from '@/lib/utils';
 import { SavedFilterTab } from './SavedFilterTab';
 import { TAB_WELL, tabButton } from './tab-styles';
 
@@ -41,7 +42,11 @@ export function FilterTabs({
   saved: SavedFiltersState;
   /** While the list itself is loading or failed (§8.2: controls visible but disabled). */
   disabled: boolean;
-  builder: { open: boolean; controls: string; onToggle: () => void };
+  /**
+   * `saving`: the panel cannot be closed mid-save. aria-disabled rather than disabled, so the
+   * button keeps focus and can take it back when the save lands.
+   */
+  builder: { open: boolean; saving: boolean; controls: string; onToggle: () => void };
   allRef?: Ref<HTMLButtonElement>;
   builderRef?: Ref<HTMLButtonElement>;
   onSelect: (filter: string) => void;
@@ -93,9 +98,10 @@ export function FilterTabs({
           aria-label="New filter"
           aria-expanded={builder.open}
           aria-controls={builder.open ? builder.controls : undefined}
+          aria-disabled={builder.saving || undefined}
           disabled={disabled || saved.status !== 'success'}
-          onClick={builder.onToggle}
-          className={tabButton(builder.open)}
+          onClick={builder.saving ? undefined : builder.onToggle}
+          className={cn(tabButton(builder.open), builder.saving && 'cursor-wait')}
         >
           <PlusIcon aria-hidden="true" className="size-3.5" />
           Filter

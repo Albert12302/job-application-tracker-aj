@@ -177,6 +177,52 @@ describe('filter builder', () => {
     expect(alert.textContent).not.toContain('Error reference');
   });
 
+  it('cannot be closed mid-save, so the save still opens its tab when it lands', async () => {
+    let finish: () => void = () => {};
+    createSavedFilter.mockImplementationOnce(
+      (input: Omit<SavedFilter, 'id' | 'user_id' | 'created_at'>) =>
+        new Promise((resolve) => {
+          finish = () => {
+            const row = stored(input);
+            savedTable = [...savedTable, row];
+            resolve(row);
+          };
+        }),
+    );
+    const { user } = renderList();
+    const toggle = await openBuilder();
+    await user.click(toggle);
+    const builder = await screen.findByRole('region', { name: 'New filter' });
+    await user.type(within(builder).getByRole('textbox', { name: 'Name' }), 'Warm leads');
+    await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
+    expect(await within(builder).findByText('Saving…')).toBeTruthy();
+
+    expect(toggle.getAttribute('aria-disabled')).toBe('true');
+    await user.click(toggle);
+    expect(screen.getByRole('region', { name: 'New filter' })).toBeTruthy();
+
+    finish();
+    expect(await screen.findByRole('button', { name: 'Warm leads (3)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Warm leads (3)' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('region', { name: 'New filter' })).toBeNull();
+    expect(toggle.getAttribute('aria-disabled')).toBeNull();
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it('does not show a past failure on a fresh panel', async () => {
+    createSavedFilter.mockRejectedValueOnce(new Error('network'));
+    const { user } = renderList();
+    const toggle = await openBuilder();
+    await user.click(toggle);
+    await user.click(within(await screen.findByRole('region', { name: 'New filter' })).getByRole('button', { name: 'Save filter' }));
+    expect(await screen.findByText("Couldn't save the filter.")).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(toggle);
+    await screen.findByRole('region', { name: 'New filter' });
+    expect(screen.queryByText("Couldn't save the filter.")).toBeNull();
+  });
+
   it('closes on Cancel without saving, and returns focus to + Filter', async () => {
     const { user } = renderList();
     await user.click(await openBuilder());
