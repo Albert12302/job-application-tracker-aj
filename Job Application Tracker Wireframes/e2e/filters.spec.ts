@@ -186,7 +186,10 @@ test.describe('as dev-f, saving and deleting', () => {
     await page.keyboard.press('Enter');
     await expect(location).toHaveValue('Portland, OR');
 
-    // Applied, then Interview.
+    // All starts ticked: Space clears every status. Then Applied, then Interview.
+    await page.keyboard.press('Tab');
+    await expect(builder.getByRole('checkbox', { name: 'All', exact: true })).toBeFocused();
+    await page.keyboard.press('Space');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Space');
@@ -255,6 +258,8 @@ test.describe('as dev-f, saving and deleting', () => {
     await page.getByRole('button', { name: 'New filter' }).click();
     const builder = page.getByRole('region', { name: 'New filter' });
     await builder.getByRole('textbox', { name: 'Name' }).fill('Offers');
+    // Exact: "all" is also inside "Callback".
+    await builder.locator('label', { hasText: /^All$/ }).click();
     await builder.locator('label', { hasText: 'Offer' }).click();
     await builder.getByRole('button', { name: 'Save filter' }).click();
     const saveAlert = builder.getByRole('alert');

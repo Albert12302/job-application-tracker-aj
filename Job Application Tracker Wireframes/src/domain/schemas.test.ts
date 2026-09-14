@@ -173,10 +173,16 @@ describe('applicationsSearchSchema', () => {
 });
 
 describe('savedFilterFormSchema', () => {
-  const blank = { name: '', statuses: [], referral: 'any', starred: 'any', location: null, text: '' };
+  const blank = { name: '', statuses: ['Applied'], referral: 'any', starred: 'any', location: null, text: '' };
 
-  it('accepts a blank filter — the name is filled in on save', () => {
+  it('accepts a blank name — it is filled in on save', () => {
     expect(savedFilterFormSchema.safeParse(blank).success).toBe(true);
+  });
+
+  it('needs at least one status, with the copy', () => {
+    const result = savedFilterFormSchema.safeParse({ ...blank, statuses: [] });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Choose at least one status.');
   });
 
   it('caps the name at 60 characters with the copy', () => {

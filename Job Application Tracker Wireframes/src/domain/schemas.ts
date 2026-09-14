@@ -131,10 +131,11 @@ export type TriState = z.infer<typeof triStateSchema>;
 /**
  * The filter builder (§4.2, §5.1). A blank name is allowed: it becomes
  * "Custom N" on save (domain/filters.ts). `location` null is "Any location".
+ * At least one status is ticked; all six is stored as the row's "all" (`{}`).
  */
 export const savedFilterFormSchema = z.object({
   name: z.string().trim().max(CAPS.filterName, 'Keep the name under 60 characters.'),
-  statuses: z.array(statusSchema).max(STATUSES.length),
+  statuses: z.array(statusSchema).min(1, 'Choose at least one status.').max(STATUSES.length),
   referral: triStateSchema,
   starred: triStateSchema,
   location: z.string().trim().min(1).max(CAPS.shortText).nullable(),

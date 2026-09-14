@@ -136,16 +136,20 @@ export function nextCustomName(existingNames: readonly string[]): string {
   return `Custom ${highest + 1}`;
 }
 
-/** A saved filter as it is written (§2): a blank name becomes "Custom N", a blank text match null. */
+/**
+ * A saved filter as it is written (§2): a blank name becomes "Custom N", a blank text match
+ * null, and every status ticked is stored as the empty list that means all statuses.
+ */
 export function savedFilterInput(
   values: SavedFilterFormValues,
   existingNames: readonly string[],
 ): FilterCriteria & { name: string } {
   const name = values.name.trim();
   const text = values.text.trim();
+  const statuses = STATUSES.filter((status) => values.statuses.includes(status));
   return {
     name: name || nextCustomName(existingNames),
-    statuses: STATUSES.filter((status) => values.statuses.includes(status)),
+    statuses: statuses.length === STATUSES.length ? [] : statuses,
     referral: values.referral,
     starred: values.starred,
     location: values.location,

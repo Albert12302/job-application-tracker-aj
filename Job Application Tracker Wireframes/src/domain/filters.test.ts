@@ -214,6 +214,12 @@ describe('savedFilterInput', () => {
     });
   });
 
+  it('stores every status ticked as the empty list that means all', () => {
+    expect(
+      savedFilterInput({ ...values, statuses: ['Withdrawn', 'Applied', 'Interview', 'Callback', 'Offer', 'Rejected'] }, []),
+    ).toMatchObject({ statuses: [] });
+  });
+
   it('keeps a given name and text, trimmed, and puts statuses in their fixed order', () => {
     expect(
       savedFilterInput({ ...values, name: ' Warm leads ', text: ' design ', statuses: ['Offer', 'Applied'] }, []),

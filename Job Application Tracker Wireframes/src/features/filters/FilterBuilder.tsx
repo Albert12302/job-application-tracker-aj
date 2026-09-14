@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { nextCustomName } from '@/domain/filters';
 import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
+import { STATUSES } from '@/domain/status';
 import { errorReference } from '@/queries/errors';
 import { WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
 import { LocationCombobox } from './LocationCombobox';
@@ -17,7 +18,15 @@ import { TriStateChoice } from './TriStateChoice';
 const CONTROL = 'h-9 max-[760px]:h-11';
 const INPUT = 'h-9 bg-card max-[760px]:h-11';
 
-const BLANK: SavedFilterFormValues = { name: '', text: '', location: null, statuses: [], referral: 'any', starred: 'any' };
+/** A new filter starts wide open: any location, every status ticked, any referral or star. */
+const BLANK: SavedFilterFormValues = {
+  name: '',
+  text: '',
+  location: null,
+  statuses: [...STATUSES],
+  referral: 'any',
+  starred: 'any',
+};
 
 /**
  * The filter builder (SPEC §4.2, §5.1): a collapsible panel under the tabs
@@ -126,7 +135,14 @@ export function FilterBuilder({
           <Controller
             control={form.control}
             name="statuses"
-            render={({ field: statuses }) => <StatusChips value={statuses.value} onChange={statuses.onChange} />}
+            render={({ field: statuses }) => (
+              <StatusChips
+                value={statuses.value}
+                onChange={statuses.onChange}
+                error={errors.statuses?.message}
+                errorId={`${field}-statuses-error`}
+              />
+            )}
           />
 
           <div className="flex flex-wrap gap-5">

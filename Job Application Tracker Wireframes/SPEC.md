@@ -170,8 +170,10 @@ Controls, top to bottom:
   filter's × is its own button beside the tab. `+ Filter` waits until saved filters have
   loaded, since the next "Custom N" depends on them.
 - **Filter builder** (§5.1) — collapsible panel: name (blank becomes `Custom N`, and the field
-  says which), text match, location, statuses (none = all), referral and starred (Any / only /
-  not). Location is a combobox over the places the user's applications already use: typing
+  says which), text match, location, statuses, referral and starred (Any / only / not).
+  Statuses start with every one ticked, led by an **All** chip that is ticked when all six are,
+  mixed when only some are, and ticks or clears all six at once; saving with none ticked says
+  "Choose at least one status." All six ticked is stored as the empty list that means all (§2). Location is a combobox over the places the user's applications already use: typing
   narrows the list ("No location matches." when nothing does), and a place is picked from it —
   a filter's location must match exactly, so a place no application has could never match.
   An empty box, the default, is "Any location". Saving adds the tab, makes it the active filter, closes the panel, and returns focus to
@@ -1051,6 +1053,10 @@ the prototype is the reference for those.
 - **A sixth local seed user, `dev-f`, for the tests that save and delete filters.** The tests
   that read filters assert `dev-a`'s exact tab counts and seeded saved filters, and run in
   parallel.
+- **The builder's statuses gain an All chip and start all ticked (§4.2).** Asked for, in place of
+  the "(none = all)" hint. Without the hint an empty set of chips reads as "nothing", so the
+  default is every status ticked and an empty set is refused rather than silently meaning all.
+  The stored row is unchanged: all six are saved as `{}`, as before.
 - **The filter builder's location is a combobox you type into (§4.2).** First built as a plain
   list, like the prototype's; asked for, because with many cities scrolling a list to find one
   is slow. Typing only narrows the places already used — it cannot enter a new one — because a

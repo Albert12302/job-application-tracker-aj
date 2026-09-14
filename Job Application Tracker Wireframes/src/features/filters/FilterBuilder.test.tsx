@@ -83,8 +83,11 @@ describe('filter builder', () => {
     await user.keyboard('Warm leads');
     await user.tab();
     await user.keyboard('engineer');
-    // Location, then the six status checkboxes: Interview is the second.
+    // Location, then All — every status starts ticked, so Space clears them — then Applied and Interview.
     await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(within(builder).getByRole('checkbox', { name: 'All' }));
+    await user.keyboard(' ');
     await user.tab();
     await user.tab();
     expect(document.activeElement).toBe(within(builder).getByRole('checkbox', { name: 'Interview' }));
@@ -128,8 +131,53 @@ describe('filter builder', () => {
     expect(within(builder).getByText('Optional. Left blank, it is called Custom 3.')).toBeTruthy();
 
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
-    expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ name: 'Custom 3', text: null }));
+    // Every status, as it starts, is stored as all.
+    expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ name: 'Custom 3', text: null, statuses: [] }));
     expect(await screen.findByRole('button', { name: 'Custom 3 (3)' })).toBeTruthy();
+  });
+
+  it('All starts ticked, shows mixed for some, and ticks or clears every status', async () => {
+    const { user } = renderList();
+    await user.click(await openBuilder());
+    const builder = within(await screen.findByRole('region', { name: 'New filter' }));
+    const all = builder.getByRole('checkbox', { name: 'All' }) as HTMLInputElement;
+    const statuses = () =>
+      ['Applied', 'Interview', 'Callback', 'Offer', 'Rejected', 'Withdrawn'].filter(
+        (name) => (builder.getByRole('checkbox', { name }) as HTMLInputElement).checked,
+      );
+    expect(screen.queryByText(/none = all/)).toBeNull();
+    expect(all.checked).toBe(true);
+    expect(statuses()).toHaveLength(6);
+
+    await user.click(builder.getByRole('checkbox', { name: 'Rejected' }));
+    expect(all.checked).toBe(false);
+    expect(all.indeterminate).toBe(true);
+
+    await user.click(all);
+    expect(statuses()).toHaveLength(6);
+    expect(all.indeterminate).toBe(false);
+
+    await user.click(all);
+    expect(statuses()).toEqual([]);
+    expect(all.checked).toBe(false);
+    expect(all.indeterminate).toBe(false);
+  });
+
+  it('will not save with no status ticked, and says why on the group', async () => {
+    const { user } = renderList();
+    await user.click(await openBuilder());
+    const region = await screen.findByRole('region', { name: 'New filter' });
+    const builder = within(region);
+    await user.click(builder.getByRole('checkbox', { name: 'All' }));
+    await user.click(builder.getByRole('button', { name: 'Save filter' }));
+
+    const message = await builder.findByText('Choose at least one status.');
+    expect(builder.getByRole('group', { name: 'Statuses' }).getAttribute('aria-describedby')).toBe(message.id);
+    expect(createSavedFilter).not.toHaveBeenCalled();
+
+    await user.click(builder.getByRole('checkbox', { name: 'Offer' }));
+    await user.click(builder.getByRole('button', { name: 'Save filter' }));
+    expect(createSavedFilter).toHaveBeenCalledWith(expect.objectContaining({ statuses: ['Offer'] }));
   });
 
   it('narrows the places already used as you type, and picks one', async () => {
@@ -179,6 +227,7 @@ describe('filter builder', () => {
     await user.click(await openBuilder());
     const builder = await screen.findByRole('region', { name: 'New filter' });
     await user.type(within(builder).getByRole('textbox', { name: 'Name' }), 'Warm leads');
+    await user.click(within(builder).getByRole('checkbox', { name: 'All' }));
     await user.click(within(builder).getByRole('checkbox', { name: 'Offer' }));
     await user.click(within(builder).getByRole('button', { name: 'Save filter' }));
 
