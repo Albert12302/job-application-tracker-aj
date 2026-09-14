@@ -86,6 +86,7 @@ describe('filter builder', () => {
 
     await user.keyboard('Warm leads');
     await user.tab();
+    expect(document.activeElement).toBe(within(builder).getByRole('textbox', { name: 'Contains text (optional)' }));
     await user.keyboard('engineer');
     // Location, then All — no status starts ticked, so All is passed over — then Applied and Interview.
     await user.tab();

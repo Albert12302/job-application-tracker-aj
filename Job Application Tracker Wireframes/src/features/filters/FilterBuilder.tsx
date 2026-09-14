@@ -101,7 +101,7 @@ export function FilterBuilder({
             </Field>
 
             <Field data-invalid={!!errors.text}>
-              <FieldLabel htmlFor={`${field}-text`}>Text match (optional)</FieldLabel>
+              <FieldLabel htmlFor={`${field}-text`}>Contains text (optional)</FieldLabel>
               <Input
                 id={`${field}-text`}
                 className={INPUT}
