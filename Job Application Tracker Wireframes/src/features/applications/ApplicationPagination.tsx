@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { useId, type Ref } from 'react';
+import { useId, type MouseEvent, type Ref } from 'react';
 import {
   Pagination,
   PaginationContent,
@@ -44,8 +44,8 @@ export function ApplicationPagination({
   /** The list's URL state for a link to `page`. */
   linkSearch: (page: number) => ApplicationsSearch;
   onPageSize: (size: PageSize) => void;
-  /** A link to `page` was followed — the screen moves focus to the new page. */
-  onPageLink: (page: number) => void;
+  /** A link to `page` was clicked — the screen moves focus to the new page if this tab goes there. */
+  onPageLink: (page: number, event: MouseEvent<HTMLAnchorElement>) => void;
   /** Where Jump to bottom sends focus. */
   ref?: Ref<HTMLDivElement>;
 }) {
@@ -59,7 +59,7 @@ export function ApplicationPagination({
       search={linkSearch(target)}
       activeOptions={{ exact: true }}
       resetScroll={false}
-      onClick={() => onPageLink(target)}
+      onClick={(event) => onPageLink(target, event)}
     />
   );
   // No href, so not focusable; still read as a link that is unavailable.

@@ -126,6 +126,25 @@ describe('pagination (§4.2)', () => {
     expect(within(pages()).getByRole('link', { name: 'Previous' }).getAttribute('href')).toContain('page=2');
   });
 
+  it('leaves focus alone after a Ctrl-click opens a page elsewhere, even when the page changes later', async () => {
+    const { user, router } = renderList('/applications?page=2');
+    await waitFor(() => expect(rowNames()).toEqual(names(11, 20)));
+
+    // Ctrl-click opens a new tab; this tab stays on page 2.
+    await user.keyboard('{Control>}');
+    await user.click(within(pages()).getByRole('link', { name: 'Page 3' }));
+    await user.keyboard('{/Control}');
+    expect(searchOf(router)).toMatchObject({ page: 2 });
+
+    // Typing a search goes back to page 1 — a change of page the link did not make.
+    const search = screen.getByRole('searchbox', { name: 'Search' }) as HTMLInputElement;
+    await user.type(search, 'Company');
+    await waitFor(() => expect(searchOf(router)).toMatchObject({ q: 'Company', page: 1 }));
+    await waitFor(() => expect(rowNames()).toEqual(names(1, 10)));
+    expect(document.activeElement).toBe(search);
+    expect(search.value).toBe('Company');
+  });
+
   it('never repeats or loses a row across pages when many share a date', async () => {
     // Twelve on one day, all added in the same moment: only the id orders them, across the
     // boundary between page 1 and page 2.

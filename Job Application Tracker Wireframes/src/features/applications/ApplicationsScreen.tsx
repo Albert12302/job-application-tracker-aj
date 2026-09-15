@@ -56,7 +56,8 @@ export function ApplicationsScreen() {
   const builderId = useId();
   const pageStart = useRef<HTMLElement | null>(null);
   const pagination = useRef<HTMLDivElement>(null);
-  const followedPageLink = useRef(false);
+  /** The page a link was just followed to, until the list reaches it. */
+  const pageLinkTarget = useRef<number | null>(null);
   const ready = applications.isSuccess && !view.waiting;
 
   // A change of filter, search, order, page, or page size clears the selection (§4.2),
@@ -77,9 +78,12 @@ export function ApplicationsScreen() {
 
   // After Previous, Next, or a number, the new page is read from its start: the view goes
   // to the top of the list and focus to the list, whose name says which page it is.
+  // Only for the page that link went to, and any change of page uses up the mark — so a
+  // later change made some other way (typing a search, a tab, Back) never takes focus.
   useEffect(() => {
-    if (!followedPageLink.current) return;
-    followedPageLink.current = false;
+    const target = pageLinkTarget.current;
+    pageLinkTarget.current = null;
+    if (target !== paging.page) return;
     pageStart.current?.scrollIntoView?.({ block: 'start', behavior: scrollBehavior() });
     pageStart.current?.focus({ preventScroll: true });
   }, [paging.page]);
@@ -296,8 +300,11 @@ export function ApplicationsScreen() {
             narrow={narrow}
             linkSearch={url.pageSearch}
             onPageSize={url.setPageSize}
-            onPageLink={(target) => {
-              if (target !== paging.page) followedPageLink.current = true;
+            onPageLink={(target, event) => {
+              // A modified click (Ctrl, Cmd, Shift, Alt, or a middle button) opens a new tab or
+              // window; this tab's page does not change, so there is nothing to move focus to.
+              const plain = event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey;
+              pageLinkTarget.current = plain && target !== paging.page ? target : null;
             }}
           />
         </>
