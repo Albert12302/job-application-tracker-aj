@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PAGE_SIZES } from './pagination';
 import { STATUSES } from './status';
 
 // No JIT. Zod 4 probes `new Function` to compile faster validators, and the
@@ -246,15 +247,12 @@ export const applicationsSearchSchema = z.object({
   filter: z.string().max(64).default('all').catch('all'),
   /** The search box (§5.1), capped as the field it searches is. */
   q: z.string().max(CAPS.shortText).default('').catch(''),
+  /** Newest or oldest first by date applied (§4.2, §5.3). */
   sort: z.enum(['date-desc', 'date-asc']).default('date-desc').catch('date-desc'),
+  /** A page past the end is valid here; the list shows its last page and corrects the URL. */
   page: z.coerce.number().int().min(1).default(1).catch(1),
-  pageSize: z
-    .coerce
-    .number()
-    .int()
-    .pipe(z.union([z.literal(10), z.literal(25), z.literal(50)]))
-    .default(25)
-    .catch(25),
+  /** Rows per page: 10, 25, or 50, starting at 10 as the prototype does. */
+  pageSize: z.coerce.number().int().pipe(z.literal(PAGE_SIZES)).default(10).catch(10),
 });
 
 export type ApplicationsSearch = z.infer<typeof applicationsSearchSchema>;
