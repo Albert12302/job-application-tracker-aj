@@ -49,13 +49,25 @@ export async function uploadFile(kind: UploadKind, file: Blob): Promise<string> 
 }
 
 /**
- * The avatar as a data: URL. Downloaded through the authenticated client rather
- * than a signed URL, so no fetchable link to the file ever sits in the page;
- * a data: URL also needs no revoking, unlike a blob: URL.
+ * The avatar's bytes, through the authenticated client — not a signed URL.
+ *
+ * The rule for private-bucket images (CLAUDE.md): nothing fetchable ever sits
+ * in the page. §9.8 describes the export as fetching every file through the
+ * detail screen's signed URLs, but the detail screen has never fetched the
+ * avatar that way, and an export is not a reason to start.
  */
-export async function downloadAvatarDataUrl(path: string): Promise<string> {
+export async function downloadAvatar(path: string): Promise<Blob> {
   const { data, error } = await supabase.storage.from(AVATARS).download(path);
   if (error) throw error;
+  return data;
+}
+
+/**
+ * The avatar as a data: URL. A data: URL also needs no revoking, unlike a
+ * blob: URL.
+ */
+export async function downloadAvatarDataUrl(path: string): Promise<string> {
+  const data = await downloadAvatar(path);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));

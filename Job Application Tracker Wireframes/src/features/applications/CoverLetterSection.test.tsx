@@ -57,7 +57,7 @@ vi.mock('@/data/storage', async (importOriginal) => ({
   coverLetterPreviewUrl: (...args: unknown[]) => coverLetterPreviewUrl(...args),
 }));
 
-vi.mock('./save-file', () => ({ saveFile: (...args: unknown[]) => saveFile(...args) }));
+vi.mock('@/lib/save-file', () => ({ saveFile: (...args: unknown[]) => saveFile(...args) }));
 vi.mock('./preview-tab', () => ({ openPreviewTab: () => openPreviewTab() }));
 
 const ID = 'a0000000-0000-0000-0000-000000000001';

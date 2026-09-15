@@ -43,6 +43,7 @@ export type ErrorAction =
   | 'load_saved_filters'
   | 'create_saved_filter'
   | 'delete_saved_filter'
+  | 'export_data'
   | 'render';
 
 export type ErrorContext = { action: ErrorAction };

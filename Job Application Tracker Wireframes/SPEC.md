@@ -327,7 +327,7 @@ It is the one place current status is used, because its segments have to add up 
 
 ### 4.6 Profile
 Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, application
-count, sign out.
+count, **Export my data** (§9.8), sign out.
 
 A chosen photo is checked before upload, in this order, and the first failure is shown under
 the avatar (§7.3):
@@ -827,6 +827,7 @@ Nothing ships with an unhandled failure.
 | Saved filter delete | the tab goes at once (§9.5) | n/a | The tab comes back, with the toast "Couldn't delete the filter." — plus the wait-a-minute copy when over the write limit |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
+| Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
 | Offline | n/a | n/a | Persistent banner: "You're offline. Changes won't save." Disable mutations |
 
@@ -1095,6 +1096,34 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-15
+- **§6 step 7 begun: data export built first (§9.8).** Export ships before deletion, as §6 and
+  §9.8 require — deleting without an exit is a hostage situation, so the way out exists before
+  the door closes.
+- **The zip is built with `fflate`, synchronously (§7.5, §7.6).** Its async API builds a worker
+  from a `blob:` URL, and the §7.5 policy has no `worker-src`, so the fallback to
+  `default-src 'self'` refuses it; `zipSync` avoids the worker and keeps that code out of the
+  bundle. fflate has no `eval` or `new Function`, so it does not repeat the problem Zod's JIT
+  caused. Cost, measured: +5.6 KB gzipped for the library and the whole export feature together.
+  JSON is deflated and stored files are not — PDF, DOCX, PNG, JPEG and WebP are already
+  compressed. `zipSync` holds the whole zip in memory; at the §7.3 file caps a user with
+  hundreds of megabytes of letters would need fflate's streaming `Zip` instead, which is the
+  day to revisit.
+- **The avatar is fetched through the authenticated client, not a signed URL (§9.8).** §9.8 said
+  every file came through "the same 60-second signed URLs the detail screen uses", but the detail
+  screen has never fetched the avatar that way: private-bucket images are downloaded and rendered
+  as `data:` URLs so that nothing fetchable sits in the page. Cover letters do use signed URLs, as
+  specified. An export is not a reason to open a second path to an image.
+- **`export-errors.txt` is written only when something was skipped (§9.8).** §9.8 says the zip
+  "includes" it; an empty errors file in every export teaches people to ignore the one that
+  matters. Files inside `files/` keep their stored names (`{uuid}.ext`), and `applications.json`
+  connects them through the `cover_letter_path` and `cover_letter_name` each row already holds —
+  original names can collide and can carry path characters.
+- **Export gets no rate limit of its own (§7.1).** Every §7.1 limit is a write, a sign-in, an
+  upload, or an error report. An export reads rows the user can already select and asks for one
+  signed URL per file; it never reaches `consume_rate_limit`, and a bucket for it would be a
+  second enforcement point for nothing. The button being disabled while it runs is what bounds it.
 
 ### 2026-09-14
 - **§6 step 6 built: sort and pagination, with pages cut in the browser (§4.2, §5.3).** The list

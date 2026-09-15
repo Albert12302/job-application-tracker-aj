@@ -1,4 +1,5 @@
 import { noteSchema, type Note } from '@/domain/schemas';
+import { allPages } from './all-pages';
 import { supabase } from './client';
 
 /**
@@ -35,6 +36,34 @@ export async function listNotes(applicationId: string): Promise<Note[]> {
     .order('id', { ascending: true });
   if (error) throw error;
   return noteSchema.array().parse(data);
+}
+
+/**
+ * Every note the user holds, across every application, oldest first (§9.8).
+ *
+ * No filter and no user_id: the select policy is an EXISTS against the parent
+ * application, so "all notes" already means "my notes". Read a page at a time,
+ * because an export that stopped at PostgREST's max_rows would quietly leave
+ * notes out of the file the user is keeping.
+ */
+export async function listAllNotes(): Promise<Note[]> {
+  const rows = await allPages((from, to) =>
+    supabase
+      .from('notes')
+      .select('*')
+      .order('created_at', { ascending: true })
+      // id breaks ties, so the order is total and no row can slip between pages.
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+  return noteSchema.array().parse(rows);
+}
+
+/** How many notes the user holds altogether — the deletion dialog's count (§9.7). */
+export async function countAllNotes(): Promise<number> {
+  const { count, error } = await supabase.from('notes').select('id', { count: 'exact', head: true });
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /** Ids per request: each is 36 characters in the URL, and a long URL is refused. */
