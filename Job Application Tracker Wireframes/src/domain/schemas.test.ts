@@ -156,7 +156,20 @@ describe('applicationsSearchSchema', () => {
       pageSize: '999',
       sort: 'sideways',
     });
-    expect(parsed).toMatchObject({ page: 1, pageSize: 25, sort: 'date-desc', filter: 'all', q: '' });
+    expect(parsed).toMatchObject({ page: 1, pageSize: 10, sort: 'date-desc', filter: 'all', q: '' });
+  });
+
+  it('reads the page, the three page sizes, and both orders from their URL strings', () => {
+    for (const size of ['10', '25', '50']) {
+      expect(applicationsSearchSchema.parse({ pageSize: size }).pageSize).toBe(Number(size));
+    }
+    expect(applicationsSearchSchema.parse({ page: '3', sort: 'date-asc' })).toMatchObject({ page: 3, sort: 'date-asc' });
+  });
+
+  it('falls back on a page below 1 or a fraction, and a size that is not offered', () => {
+    expect(applicationsSearchSchema.parse({ page: '0' }).page).toBe(1);
+    expect(applicationsSearchSchema.parse({ page: '2.5' }).page).toBe(1);
+    expect(applicationsSearchSchema.parse({ pageSize: '20' }).pageSize).toBe(10);
   });
 
   it('accepts an empty search, so a bare route is valid', () => {

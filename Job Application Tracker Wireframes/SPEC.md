@@ -178,13 +178,27 @@ Controls, top to bottom:
   a filter's location must match exactly, so a place no application has could never match.
   An empty box, the default, is "Any location". Saving adds the tab, makes it the active filter, closes the panel, and returns focus to
   `+ Filter`; Cancel closes it without saving.
-- **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
+- **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction. The column
+  carries `aria-sort`, and the header is a button named for what it does ("Date, show oldest
+  first"). Changing the order goes back to page 1 and is announced ("Sorted oldest first.").
 
-The filter and the search live in the URL (`?filter=Offer`, `?filter=<saved filter id>`,
-`?q=acme`), so a filtered list can be linked to and survives a reload. Typing replaces the
-history entry rather than adding one per keystroke. A link to a saved filter waits for saved
-filters to load; one that no longer exists, or belongs to someone else, shows All. The number
-of applications shown is announced after each change of filter or search (§10.4).
+The filter, the search, the order, the page, and the page size all live in the URL
+(`?filter=Offer`, `?filter=<saved filter id>`, `?q=acme`, `?sort=date-asc`, `?page=2`,
+`?pageSize=25`), each left out while at its default, so a list can be linked to and survives a
+reload. Typing replaces the history entry rather than adding one per keystroke; every other
+change adds one, so Back undoes it. A malformed value falls back to its default. A link to a
+saved filter waits for saved filters to load; one that no longer exists, or belongs to someone
+else, shows All. The rows shown are announced after each change of filter, search, page, or page
+size (§10.4): "Showing 11 to 20 of 42 applications." when there is more than one page, "Showing
+3 of 7 applications." for a narrowed list on one page, and "Showing 23 applications." for a whole
+list that a change has brought onto one page (rows per page from 10 to 25, say). A list that has
+only just loaded onto one unnarrowed page announces nothing.
+
+Leaving the list for an application and coming back — the detail screen's "Back to applications",
+the edit screen's links back, and the return after deleting from the detail screen — lands on
+the list as it was left: the same filter, search, order, page, and page size. That memory lives
+in the tab only, never in storage (it holds the search text), and belongs to the signed-in user.
+The header's Home link opens the default list, and Add returns to it (§4.3).
 
 Table columns: select checkbox · star · date · company · position · location · status tag · 📎
 (cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
@@ -193,14 +207,34 @@ the star or the checkbox acts on it without opening the row.
 **Selecting rows to delete.** Each row has a checkbox, and the header has one that selects every
 row on screen (mixed when only some are). Once any row is ticked, a bar appears above the list:
 "*N* selected", **Clear**, and **Delete *N* applications**, which confirms first (§9.2). Only rows
-on screen can be selected: once search, filters, or pages exist (§6 steps 5–6), select-all covers
-the visible rows only, and changing the filter or page clears the selection. The selection is
+on screen can be selected: select-all covers the rows on the current page only, and changing the
+filter, the search, the order, the page, or the page size clears the selection. The selection is
 screen state, not part of the URL, and leaving the list clears it.
 
-Pagination below the table: rows per page (10 / 25 / 50), `x–y of n` range label, Previous /
-Next, numbered pages. Changing page size or any filter resets to page 1.
+Pagination below the table: rows per page (10 / 25 / 50, starting at 10), `x–y of n` range label,
+First page (`«`) / Previous / numbered pages / Next / Last page (`»`). First and Last are
+icon-only, named "First page" and "Last page" for screen readers and in a tooltip. Changing page size, the order, the search, or any filter resets
+to page 1. The *n* is every application the filter and search let through, across all pages;
+the tab counts stay over the whole set (§5.3).
+- The pages are a `<nav>` labelled "Pages" of links, the current page marked
+  `aria-current="page"` (§10.4). First and Previous on the first page, and Next and Last on the
+  last, are shown but unavailable, and are not tab stops.
+- Numbered pages show the first, the last, and the current page with its neighbours, with "…"
+  for the rest. From seven pages up they are always exactly seven items, each as wide as the
+  next, so the bar keeps one width and nothing beside it moves as the page changes: near either
+  end the room goes to more pages (`1 2 3 4 5 … 25`, `1 … 11 12 13 … 25`, `1 … 21 22 23 24 25`).
+  A "…" always stands for at least two pages; a single page is shown instead.
+- Following a page link moves the view to the top of the list and focus to the list, whose name
+  says which page it is ("Your applications, newest first, page 2 of 5").
+- A page past the end — a stale link, or the last rows of the last page deleted — shows the last
+  page, and the URL is corrected to match without a history entry.
+- While the list loads, the pagination shows disabled with no range; in the empty, no-matches,
+  and error states it is not shown.
 
-A floating **Jump to bottom** pill appears when more than ~100px of scroll remains.
+A floating **Jump to bottom** pill appears on the list when more than ~100px of scroll remains.
+It is a button after the list in the tab order. Pressing it scrolls to the bottom — instantly under
+`prefers-reduced-motion` — and moves focus to the pagination, since the pill disappears once the
+bottom is near.
 
 Empty state when a filter or search matches nothing.
 
@@ -367,6 +401,11 @@ and they need the user's zone stored on the profile.
 ### 5.3 Counts and sorting
 Tab counts and stats always reflect the full application set for the user, never the current
 page or search. Default sort is date descending.
+
+Newest first is date applied, newest first (compared as UTC dates, §5.4); within one day the most
+recently added first; then by id, so no two applications ever tie and none repeats or goes missing
+between pages. Oldest first is exactly that order reversed, so the last page of one is the first
+page of the other.
 
 ---
 
@@ -771,7 +810,7 @@ Nothing ships with an unhandled failure.
 
 | Surface | Loading | Empty | Error |
 |---|---|---|---|
-| Application list | 5 skeleton rows in the table shell; controls visible but disabled | **No applications yet** — headline, one line of copy, "Add application" button | "Couldn't load your applications." + Retry. Keep header and nav usable |
+| Application list | 5 skeleton rows in the table shell; controls visible but disabled, the pagination with no range | **No applications yet** — headline, one line of copy, "Add application" button; no pagination | "Couldn't load your applications." + Retry, no pagination. Keep header and nav usable |
 | List, filtered | skeleton rows | **No matches** — name the active filter/search: "No applications in *Offer* match "acme".", "No applications in *Offer*.", or "No applications match "acme"." — and offer "Clear filters", which resets the filter to All and empties the search. A user with no applications at all sees **No applications yet** instead, whatever the filter | as above |
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
@@ -989,9 +1028,14 @@ Breakpoint: **760px**. Below it, the following changes apply.
   cover-letter and referral marks. Nothing is dropped, it is re-ordered by importance. With no
   header row to hold select-all, the selection bar offers **Select all *N*** instead.
 - **Sort moves out of the table header** into its own control above the list, labelled
-  "Newest first" / "Oldest first" rather than an unlabelled chevron.
-- **Numbered pages are hidden**; Previous / Next and the range label remain. Ten numbered
-  targets do not fit at a usable size.
+  "Newest first" / "Oldest first" rather than an unlabelled chevron. The words are the order in
+  effect; screen readers hear "Sort by date: Newest first", so they read as the order, not the
+  action.
+- **Numbered pages are hidden**; the range label remains, and the pages read
+  `«  ‹  Page 12 of 25  ›  »` — First, Previous, where this is, Next, Last. Ten numbered targets do
+  not fit at a usable size, so First and Last are the way to either end. Previous and Next are
+  chevrons here rather than words, still named "Previous" and "Next" for screen readers: with the
+  words, the row does not fit on one line beside 44px targets at 360px, let alone 320px.
 - **Controls go full-width and stack** — search above the add button, both edge to edge.
 - **Control height goes 36px → 44px** for every input, select, and button; the star tap area
   is a 44×44 box around a 19px icon.
@@ -1053,6 +1097,54 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-14
+- **§6 step 6 built: sort and pagination, with pages cut in the browser (§4.2, §5.3).** The list
+  already reads every application for the tab counts (2026-09-13), so sorting and paging happen
+  over that same set rather than asking the database for one page at a time. One matching rule
+  (`domain/filters.ts`) then produces the tab counts, the range's *n*, and the rows, so they can
+  never disagree; paging from the database would have needed each saved filter rewritten as a
+  query, a second copy of the rules that Postgres and JavaScript would not match identically (case
+  folding), and a count request per tab. A Postgres function that filters and counts was considered
+  and not built ahead of need: unused, it would speed nothing up and drift from the rules the app
+  runs. When to revisit, and in what order, is under Open questions.
+- **Order, page, and page size join the filter and search in the URL (§4.2).** §4.2 named only the
+  filter and search; the build conventions already listed all five. A page to come back to after a
+  reload or a shared link is the same need the filter had. Page size starts at 10, as in the
+  prototype, and is not remembered between visits.
+- **A total order, and what resets and clears (§4.2, §5.3).** Pages cut from an order with ties
+  could show a row twice or never; within a day the order now falls back to when the application
+  was added, then its id. Oldest first is the exact reverse. The order, like the page size, resets
+  to page 1 (the prototype did), and a change of order clears the selection, since the rows on
+  screen change.
+- **What §4.2 left open about pages.** A page past the end shows the last page rather than "No
+  matches" while earlier pages hold rows. Numbered pages are windowed: the prototype showed every
+  number, which at the 5,000 soft cap is 500 of them. Following a page link moves focus to the new
+  page's start, since otherwise a keyboard user is left at the bottom of it; Jump to bottom moves
+  focus to the pagination for the same reason, and appears on the list only, where §4.2 puts it.
+- **Pagination gains First page and Last page arrows (§4.2, §11).** Asked for. On a desktop the
+  first and last numbers are already always shown, so the arrows repeat them there; on a phone,
+  where the numbers are hidden, they are the only way to either end without paging one at a time.
+- **The page numbers keep one width, and a phone names the page (§4.2, §11).** Asked for, after
+  seeing 25 pages: the numbers ran four to seven items wide depending on the page, so First and
+  Previous shifted under the pointer while paging. They are now always seven slots of equal width.
+  A phone showed only "111–120 of 250", leaving the page number to be worked out, so it now says
+  "Page 12 of 25" — and Previous and Next became chevrons there to fit it on one line at 320px,
+  measured: 357px wide with the words against 292px available.
+- **A seventh local seed user, `dev-g`, for the pagination tests.** No other seed user has more
+  than one page of applications, and creating 23 during a run would spend most of `dev-d`'s write
+  limit (§7.1). Read-only, so its tests run in parallel in both browsers.
+- **Pagination measured, and form-control borders darkened a step (§10.1).** The current page's
+  edge, the select, the phone sort control, and the Jump to bottom pill sit on the page background,
+  where the form-control border measured 2.97:1 — under the 3:1 a control boundary and a state
+  indicator need; the search box had the same shortfall since step 5. The border token darkened
+  from 0.65 to 0.63 lightness: 3.2:1 on the page, 3.5:1 on a card. Page numbers are 6.9:1 (current
+  15.1:1), the pill's text 9.0:1, and the focus ring 4.6:1 on the page.
+- **Selects are 44px tall on phones (§11).** The status select and the new rows-per-page select
+  measured 32px below 760px: the generated component's own height outranked the phone height.
+  Found by measuring the new control; the status select had been short since step 2.
+- **Back to applications returns to the list as it was left (§4.2).** It went to the default list,
+  which lost the filter since step 5 and, with pages, the page too: open the 23rd application,
+  come back, and land on page 1. Kept in memory rather than `sessionStorage`, because the search
+  is user content; a reload of the detail screen goes back to the default list.
 - **Cover letters gain Preview, for PDFs only, in a new tab (§4.4, §7.3, §8.2).** Asked for. Word
   files get none: browsers cannot show them, and converting one to HTML would mean rendering
   untrusted markup in the app, behind a sanitiser, with an approximate layout and still nothing
@@ -1350,6 +1442,22 @@ the prototype is the reference for those.
   from the first status-change feature.
 
 ### Open questions
+- **The list downloads every application (§4.2, §5.3; decided 2026-09-14).** The trigger is the
+  size of one person's set, not the number of users: each user loads only their own rows, so adding
+  users slows no one's list. Nearly all of the download is `description` (up to 15,000 characters),
+  which the list never shows — roughly 0.4 KB an application without it, 4 KB with a pasted job ad,
+  so about 4 MB at 1,000 applications and 20 MB at the 5,000 soft cap, before compression.
+  **Revisit when the list takes more than a second or two to appear on a phone**, likeliest past
+  about 1,000 applications with long descriptions. Then, in this order:
+  1. Read the list without `description`, and fetch descriptions in a second request only while
+     a saved filter has a text match — the only thing on the list that reads them. No migration,
+     and matching stays in `domain/filters.ts` alone, so counts and rows cannot disagree.
+  2. Only if that is not enough (a user who relies on text filters): one Postgres function that
+     returns the page, the total, and every tab count in one call, with an index on the list order
+     — a migration. Its SQL matching must pass the same test cases as `domain/filters.ts`, or the
+     two copies drift. Not PostgREST filter strings, which need escaping of `%`, `,` and `(`.
+
+  Either way the change is confined to `use-filtered-applications.ts` and the data layer beneath it.
 - No alerting on `app_errors` — accepted at two users (§7.7), revisit before real ones.
 - The `rate_limits` fixed window allows up to 2x a limit across a boundary. Accepted; if abuse
   ever makes it matter, the table can hold one row per event instead.

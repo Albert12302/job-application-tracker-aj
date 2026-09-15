@@ -12,6 +12,7 @@ import { useUpdateApplication } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { useApplications } from '@/queries/use-applications';
 import { ApplicationForm } from './ApplicationForm';
+import { useListReturn } from './list-return';
 import { PANEL } from './panel';
 
 /**
@@ -30,6 +31,7 @@ export function EditApplicationScreen() {
   const application = useApplication(applicationId);
   const applications = useApplications();
   const update = useUpdateApplication(applicationId ?? '');
+  const listSearch = useListReturn();
 
   // Every other application's location: this one's own old spelling must not
   // stop the user correcting it (§5.2).
@@ -42,7 +44,7 @@ export function EditApplicationScreen() {
 
   const backToApplication = () => {
     if (applicationId) void navigate({ to: '/applications/$id', params: { id: applicationId } });
-    else void navigate({ to: '/applications' });
+    else void navigate({ to: '/applications', search: listSearch });
   };
 
   if (applicationId && application.isPending) {
@@ -68,7 +70,11 @@ export function EditApplicationScreen() {
           <Button className="h-9 max-[760px]:h-11" onClick={() => void application.refetch()}>
             Retry
           </Button>
-          <Link to="/applications" className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}>
+          <Link
+            to="/applications"
+            search={listSearch}
+            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
+          >
             Back to list
           </Link>
         </ErrorState>
@@ -83,6 +89,7 @@ export function EditApplicationScreen() {
         <p className="text-sm text-muted-foreground">It may have been deleted, or the link may be wrong.</p>
         <Link
           to="/applications"
+          search={listSearch}
           className={buttonVariants({ variant: 'outline', className: 'h-9 w-fit max-[760px]:h-11' })}
         >
           Back to applications
