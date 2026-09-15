@@ -70,6 +70,18 @@ export function ApplicationsScreen() {
     selection.clear();
   }
 
+  // Once the rows shown have been changed — filter, search, page, or page size (§4.2) — every
+  // later list is announced, even one unnarrowed page, which on its own says nothing: rows per
+  // page from 10 to 25 over 23 applications must still be heard. The order has its own notice,
+  // and a list that has only just loaded is not news.
+  const shownKey = [view.activeParam, url.query, paging.page, url.pageSize].join('\n');
+  const [shownFor, setShownFor] = useState(shownKey);
+  const [rowsChanged, setRowsChanged] = useState(false);
+  if (shownKey !== shownFor) {
+    setShownFor(shownKey);
+    if (ready) setRowsChanged(true);
+  }
+
   // A page past the end — a stale link, or the rows of the last page deleted — shows the
   // last page; the URL follows, so a reload or a copied link agrees with the screen.
   useEffect(() => {
@@ -220,6 +232,7 @@ export function ApplicationsScreen() {
   if (ready && matched.length > 0) {
     if (paging.pageCount > 1) summary = `Showing ${spokenRange(paging)} applications.`;
     else if (view.narrowed) summary = `Showing ${matched.length} of ${applicationCount(view.all.length)}.`;
+    else if (rowsChanged) summary = `Showing ${applicationCount(matched.length)}.`;
   }
 
   return (

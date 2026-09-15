@@ -214,6 +214,24 @@ describe('pagination (§4.2)', () => {
     expect(within(pages()).queryByRole('link', { name: 'Page 2' })).toBeNull();
   });
 
+  it('announces the rows after a change of page size, even when they now fit one unnarrowed page (§10.4)', async () => {
+    const { user } = renderList();
+    await waitFor(() => expect(rowNames()).toEqual(names(1, 10)));
+    expect(statusText()).toContain('Showing 1 to 10 of 23 applications.');
+
+    await user.click(screen.getByRole('combobox', { name: 'Rows per page' }));
+    await user.click(await screen.findByRole('option', { name: '25' }));
+    await waitFor(() => expect(rowNames()).toHaveLength(23));
+    expect(statusText()).toContain('Showing 23 applications.');
+  });
+
+  it('stays quiet about a single unnarrowed page that has only just loaded', async () => {
+    listApplications.mockResolvedValue(TWENTY_THREE.slice(0, 7));
+    renderList();
+    await waitFor(() => expect(rowNames()).toHaveLength(7));
+    expect(statusText().some((text) => text?.startsWith('Showing'))).toBe(false);
+  });
+
   it('goes back to page 1 when the filter or the search changes, and counts the whole filtered set', async () => {
     const { user, router } = renderList('/applications?page=3');
     await waitFor(() => expect(rowNames()).toEqual(names(21, 23)));

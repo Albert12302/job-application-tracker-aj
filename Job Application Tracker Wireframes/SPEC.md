@@ -190,7 +190,9 @@ change adds one, so Back undoes it. A malformed value falls back to its default.
 saved filter waits for saved filters to load; one that no longer exists, or belongs to someone
 else, shows All. The rows shown are announced after each change of filter, search, page, or page
 size (§10.4): "Showing 11 to 20 of 42 applications." when there is more than one page, "Showing
-3 of 7 applications." for a narrowed list on one page.
+3 of 7 applications." for a narrowed list on one page, and "Showing 23 applications." for a whole
+list that a change has brought onto one page (rows per page from 10 to 25, say). A list that has
+only just loaded onto one unnarrowed page announces nothing.
 
 Leaving the list for an application and coming back — the detail screen's "Back to applications",
 the edit screen's links back, and the return after deleting from the detail screen — lands on
