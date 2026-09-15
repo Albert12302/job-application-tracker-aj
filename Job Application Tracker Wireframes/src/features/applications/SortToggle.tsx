@@ -14,7 +14,7 @@ export function SortToggle({ sort, onToggle, disabled }: { sort: ListSort; onTog
   return (
     <Button
       variant="outline"
-      className="h-11 self-end px-3 text-[13px]"
+      className="h-11 self-end bg-card px-3 text-[13px]"
       aria-label={`Sort by date: ${sortLabel(sort)}`}
       onClick={onToggle}
       disabled={disabled}

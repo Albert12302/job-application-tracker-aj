@@ -15,6 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PAGE_SIZES, pageItems, rangeLabel, spokenRange, type PageSize, type PageWindow } from '@/domain/pagination';
 import type { ApplicationsSearch } from '@/domain/schemas';
 
+// As the prototype draws them: First, Previous, Next, and Last are white buttons with a light
+// edge — named by their word or chevron, so the edge is decoration (§10.1) — and stay white,
+// only faded, while unavailable.
+const FILLED = 'border-border bg-card aria-disabled:hover:bg-card';
 const CONTROL = 'h-9 max-[760px]:h-11';
 const ICON = 'size-9 max-[760px]:size-11';
 
@@ -70,7 +74,8 @@ export function ApplicationPagination({
   const unavailable = { role: 'link', 'aria-disabled': true } as const;
   // On a phone Previous and Next are chevrons, like First and Last, to leave room for
   // "Page 12 of 25" on one line at 320px; screen readers still hear "Previous" and "Next".
-  const step = narrow ? { className: ICON, iconOnly: true } : { className: CONTROL };
+  const step = narrow ? { className: `${ICON} ${FILLED}`, iconOnly: true } : { className: `${CONTROL} ${FILLED}` };
+  const end = `${ICON} ${FILLED}`;
 
   return (
     <div
@@ -81,7 +86,7 @@ export function ApplicationPagination({
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 outline-none"
     >
       <div className="flex flex-wrap items-center gap-2.5">
-        <span id={sizeLabel} className="text-[13px] whitespace-nowrap text-muted-foreground">
+        <span id={sizeLabel} className="text-[13px] whitespace-nowrap">
           Rows per page
         </span>
         <Select
@@ -89,7 +94,7 @@ export function ApplicationPagination({
           onValueChange={(value) => onPageSize(value as PageSize)}
           disabled={paging === null}
         >
-          <SelectTrigger aria-labelledby={sizeLabel} className={`${CONTROL} w-[76px]`}>
+          <SelectTrigger aria-labelledby={sizeLabel} className={`${CONTROL} w-[76px] bg-card`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -101,7 +106,7 @@ export function ApplicationPagination({
           </SelectContent>
         </Select>
         {paging ? (
-          <p className="text-[13px] whitespace-nowrap text-muted-foreground">
+          <p className="text-[13px] whitespace-nowrap">
             <span aria-hidden="true">{rangeLabel(paging)}</span>
             <span className="sr-only">{spokenRange(paging)}</span>
           </p>
@@ -112,9 +117,9 @@ export function ApplicationPagination({
         <PaginationContent className="flex-wrap gap-1 max-[760px]:w-full max-[760px]:justify-between">
           <PaginationItem>
             {page > 1 ? (
-              <PaginationFirst className={ICON} render={link(1)} />
+              <PaginationFirst className={end} render={link(1)} />
             ) : (
-              <PaginationFirst className={ICON} {...unavailable} />
+              <PaginationFirst className={end} {...unavailable} />
             )}
           </PaginationItem>
           <PaginationItem>
@@ -142,7 +147,12 @@ export function ApplicationPagination({
                     <PaginationLink
                       isActive={item.page === page}
                       aria-label={`Page ${item.page}`}
-                      className={`h-9 w-auto min-w-9 px-2 ${item.page === page ? '' : 'text-muted-foreground'}`}
+                      // The current page is white with a soft shadow, as in the prototype, and keeps
+                      // the control edge (3.2:1): white alone on this page measures 1.1:1, too faint
+                      // to show which page is current (§10.1). The others are plain numbers.
+                      className={`h-9 w-auto min-w-9 px-2 ${
+                        item.page === page ? 'bg-card shadow-[0_1px_2px_oklch(0%_0_0/0.06)] hover:bg-card' : ''
+                      }`}
                       render={link(item.page)}
                     >
                       {item.page}
@@ -160,9 +170,9 @@ export function ApplicationPagination({
           </PaginationItem>
           <PaginationItem>
             {paging && page < pageCount ? (
-              <PaginationLast className={ICON} render={link(pageCount)} />
+              <PaginationLast className={end} render={link(pageCount)} />
             ) : (
-              <PaginationLast className={ICON} {...unavailable} />
+              <PaginationLast className={end} {...unavailable} />
             )}
           </PaginationItem>
         </PaginationContent>
