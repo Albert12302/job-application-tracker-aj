@@ -100,6 +100,18 @@ describe('pagination (§4.2)', () => {
     expect(previous.getAttribute('aria-disabled')).toBe('true');
     expect(previous.hasAttribute('href')).toBe(false);
     expect(nav.getByRole('link', { name: 'Next' }).getAttribute('href')).toContain('page=2');
+    // First is as unavailable as Previous; Last goes straight to the end.
+    expect(nav.getByRole('link', { name: 'First page' }).getAttribute('aria-disabled')).toBe('true');
+    expect(nav.getByRole('link', { name: 'Last page' }).getAttribute('href')).toContain('page=3');
+    expect(nav.getAllByRole('link').map((link) => link.getAttribute('aria-label') ?? link.textContent)).toEqual([
+      'First page',
+      'Previous',
+      'Page 1',
+      'Page 2',
+      'Page 3',
+      'Next',
+      'Last page',
+    ]);
     expect(screen.getByRole('columnheader', { name: /Date/ }).getAttribute('aria-sort')).toBe('descending');
     expect((await axe.run(container)).violations).toEqual([]);
   });
@@ -123,7 +135,25 @@ describe('pagination (§4.2)', () => {
     await waitFor(() => expect(rowNames()).toEqual(names(21, 23)));
     expect(screen.getByText('21–23 of 23')).toBeTruthy();
     expect(within(pages()).getByRole('link', { name: 'Next' }).getAttribute('aria-disabled')).toBe('true');
+    expect(within(pages()).getByRole('link', { name: 'Last page' }).getAttribute('aria-disabled')).toBe('true');
     expect(within(pages()).getByRole('link', { name: 'Previous' }).getAttribute('href')).toContain('page=2');
+  });
+
+  it('jumps to the last page and back to the first, focusing each new page', async () => {
+    const { user, router } = renderList();
+    await waitFor(() => expect(rowNames()).toEqual(names(1, 10)));
+
+    await user.click(within(pages()).getByRole('link', { name: 'Last page' }));
+    await waitFor(() => expect(rowNames()).toEqual(names(21, 23)));
+    expect(searchOf(router)).toMatchObject({ page: 3 });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('table')));
+
+    await user.click(within(pages()).getByRole('link', { name: 'First page' }));
+    await waitFor(() => expect(rowNames()).toEqual(names(1, 10)));
+    expect(searchOf(router)).toMatchObject({ page: 1 });
+    // Page 1 is current, and only page 1: the First link is no longer a link at all.
+    expect(within(pages()).getAllByRole('link').filter((link) => link.getAttribute('aria-current'))).toHaveLength(1);
+    expect(within(pages()).getByRole('link', { name: 'First page' }).hasAttribute('href')).toBe(false);
   });
 
   it('leaves focus alone after a Ctrl-click opens a page elsewhere, even when the page changes later', async () => {
@@ -272,6 +302,9 @@ describe('below 760px (§11)', () => {
 
     expect(within(pages()).queryByRole('link', { name: 'Page 1' })).toBeNull();
     expect(within(pages()).getByRole('link', { name: 'Next' })).toBeTruthy();
+    // With no numbers, First and Last are the way to either end.
+    expect(within(pages()).getByRole('link', { name: 'Last page' }).getAttribute('href')).toContain('page=3');
+    expect(within(pages()).getByRole('link', { name: 'First page' })).toBeTruthy();
     expect(screen.getByText('1–10 of 23')).toBeTruthy();
     expect(screen.queryByRole('columnheader')).toBeNull();
 

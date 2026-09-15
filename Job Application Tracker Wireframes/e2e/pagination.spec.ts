@@ -74,12 +74,21 @@ test('pages through every application newest first, none repeated or missing, wi
   await expect(rows(page)).toHaveText(companies(newestFirst.slice(20)));
   await expect(page.getByText('21–23 of 23', { exact: true })).toBeVisible();
   await expect(pageLink(page, 'Next')).toHaveAttribute('aria-disabled', 'true');
+  await expect(pageLink(page, 'Last page')).toHaveAttribute('aria-disabled', 'true');
+
+  // First page and Last page jump to either end.
+  await pageLink(page, 'First page').click();
+  await expect(rows(page)).toHaveText(companies(newestFirst.slice(0, 10)));
+  await expect(page).not.toHaveURL(/page=/);
+  await pageLink(page, 'Last page').click();
+  await expect(rows(page)).toHaveText(companies(newestFirst.slice(20)));
+  await expect(page).toHaveURL(/[?&]page=3/);
 
   // Linkable and reloadable, and Back goes to the page before.
   await page.reload();
   await expect(rows(page)).toHaveText(companies(newestFirst.slice(20)));
   await page.goBack();
-  await expect(rows(page)).toHaveText(companies(newestFirst.slice(10, 20)));
+  await expect(rows(page)).toHaveText(companies(newestFirst.slice(0, 10)));
 });
 
 test('the six applications sharing a date keep one order across the end of page 1 (§5.3)', async ({ page }) => {
@@ -202,7 +211,8 @@ test.describe('at 360px (§11)', () => {
 
     const next = pageLink(page, 'Next');
     const sort = page.getByRole('button', { name: 'Sort by date: Newest first' });
-    for (const control of [next, sort, page.getByRole('combobox', { name: 'Rows per page' })]) {
+    const ends = [pageLink(page, 'First page'), pageLink(page, 'Last page')];
+    for (const control of [next, sort, page.getByRole('combobox', { name: 'Rows per page' }), ...ends]) {
       expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
     // The page never scrolls sideways (§10.1).

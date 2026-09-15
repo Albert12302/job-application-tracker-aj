@@ -4,7 +4,9 @@ import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
+  PaginationFirst,
   PaginationItem,
+  PaginationLast,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
@@ -14,12 +16,13 @@ import { PAGE_SIZES, pageItems, rangeLabel, spokenRange, type PageSize, type Pag
 import type { ApplicationsSearch } from '@/domain/schemas';
 
 const CONTROL = 'h-9 max-[760px]:h-11';
+const ICON = 'size-9 max-[760px]:size-11';
 
 /**
- * Below the list (SPEC §4.2): rows per page, the "x–y of n" range, and Previous,
- * the numbered pages, and Next — a labelled <nav> of links, the current page
- * marked aria-current (§10.4). Below 760px the numbers go and the rest stays
- * (§11).
+ * Below the list (SPEC §4.2): rows per page, the "x–y of n" range, and First,
+ * Previous, the numbered pages, Next, and Last — a labelled <nav> of links, the
+ * current page marked aria-current (§10.4). Below 760px the numbers go and the
+ * rest stays (§11): there, First and Last are the only way to either end.
  *
  * The pages are links to the list's own URL, so a page can be opened in a new
  * tab, reloaded, and gone back to. `activeOptions.exact` keeps the router from
@@ -105,6 +108,13 @@ export function ApplicationPagination({
         <PaginationContent className="flex-wrap gap-1">
           <PaginationItem>
             {page > 1 ? (
+              <PaginationFirst className={ICON} render={link(1)} />
+            ) : (
+              <PaginationFirst className={ICON} {...unavailable} />
+            )}
+          </PaginationItem>
+          <PaginationItem>
+            {page > 1 ? (
               <PaginationPrevious className={CONTROL} render={link(page - 1)} />
             ) : (
               <PaginationPrevious className={CONTROL} {...unavailable} />
@@ -135,6 +145,13 @@ export function ApplicationPagination({
               <PaginationNext className={CONTROL} render={link(page + 1)} />
             ) : (
               <PaginationNext className={CONTROL} {...unavailable} />
+            )}
+          </PaginationItem>
+          <PaginationItem>
+            {paging && page < pageCount ? (
+              <PaginationLast className={ICON} render={link(pageCount)} />
+            ) : (
+              <PaginationLast className={ICON} {...unavailable} />
             )}
           </PaginationItem>
         </PaginationContent>

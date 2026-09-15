@@ -2,9 +2,17 @@ import * as React from "react"
 import { cn } from "cn"
 
 import { buttonVariants } from "@/components/ui/button"
-import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  MoreHorizontalIcon,
+} from "lucide-react"
 
 // Edited from the generated file:
+// - PaginationFirst and PaginationLast added (shadcn ships neither): icon-only, so each is named
+//   by aria-label and titled with the same words for a pointer user (§10.1).
 // - Links stay links. The generated PaginationLink rendered <a> through Button, which gives it
 //   role="button" and Space-to-activate; pagination is navigation, and aria-current="page"
 //   belongs on a link (SPEC §10.4). `render` takes the app's router <Link>.
@@ -100,6 +108,28 @@ function PaginationNext({
   )
 }
 
+function PaginationFirst({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) {
+  return (
+    <PaginationLink aria-label="First page" title="First page" className={className} {...props}>
+      <ChevronsLeftIcon aria-hidden="true" />
+    </PaginationLink>
+  )
+}
+
+function PaginationLast({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) {
+  return (
+    <PaginationLink aria-label="Last page" title="Last page" className={className} {...props}>
+      <ChevronsRightIcon aria-hidden="true" />
+    </PaginationLink>
+  )
+}
+
 function PaginationEllipsis({
   className,
   ...props
@@ -124,7 +154,9 @@ export {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
+  PaginationFirst,
   PaginationItem,
+  PaginationLast,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
