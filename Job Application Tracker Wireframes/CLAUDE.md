@@ -291,6 +291,7 @@ src/
       ApplicationPagination.tsx   rows per page, the range, and the pages as router links (§4.2)
       SortToggle.tsx              the sort as its own control below 760px (§11)
       JumpToBottom.tsx            the floating pill; moves focus to the pagination too
+      list-return.ts              the list's last URL state, for Back to applications (memory only)
       ApplicationRow.tsx
       ApplicationCards.tsx        below 760px (§11)
       ApplicationCard.tsx

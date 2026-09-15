@@ -23,6 +23,7 @@ import { ApplicationTable } from './ApplicationTable';
 import { BulkDeleteDialog } from './BulkDeleteDialog';
 import { applicationCount } from './delete-summary';
 import { JumpToBottom } from './JumpToBottom';
+import { useRememberListSearch } from './list-return';
 import { SelectionBar } from './SelectionBar';
 import { SortToggle } from './SortToggle';
 import { useSelection } from './use-selection';
@@ -42,6 +43,7 @@ export function ApplicationsScreen() {
   const { applications, url, matched, rows, paging } = view;
   const narrow = useMediaQuery(NARROW);
   const selection = useSelection(rows);
+  useRememberListSearch(url.search);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteFilter = useDeleteSavedFilter();
   // Here rather than in the builder, so a save finishes what it started even if the panel has gone.

@@ -5,6 +5,7 @@ import { sortApplications } from '@/domain/order';
 import type { Application } from '@/domain/schemas';
 import { applicationRow } from '@/test/factories';
 import { renderRoutes } from '@/test/render-routes';
+import { ApplicationDetailScreen } from './ApplicationDetailScreen';
 import { ApplicationsScreen } from './ApplicationsScreen';
 
 /**
@@ -27,10 +28,16 @@ vi.mock('@/queries/use-session', () => ({
 vi.mock('@/data/applications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/applications')>()),
   listApplications: (...args: unknown[]) => listApplications(...args),
+  getApplication: async (id: string) => TWENTY_THREE.find((row) => row.id === id) ?? null,
 }));
 
 vi.mock('@/data/saved-filters', () => ({
   listSavedFilters: async () => [],
+}));
+
+vi.mock('@/data/notes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/notes')>()),
+  listNotes: async () => [],
 }));
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -254,6 +261,24 @@ describe('below 760px (§11)', () => {
     expect(screen.getByRole('button', { name: 'Sort by date: Oldest first' })).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Your applications, oldest first, page 1 of 3' })).toBeTruthy();
     expect((await axe.run(container)).violations).toEqual([]);
+  });
+});
+
+describe('coming back from an application (§4.2)', () => {
+  it('returns to the list as it was left: the same search, order, and page', async () => {
+    const { user, router } = renderRoutes(
+      { '/applications': ApplicationsScreen, '/applications/$id': ApplicationDetailScreen },
+      '/applications?sort=date-asc&page=2&q=Company',
+    );
+    await waitFor(() => expect(rowNames()).toEqual(names(4, 13).reverse()));
+
+    await user.click(screen.getByRole('link', { name: 'Company 08' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Company 08' })).toBeTruthy();
+
+    await user.click(screen.getByRole('link', { name: 'Back to applications' }));
+    await waitFor(() => expect(rowNames()).toEqual(names(4, 13).reverse()));
+    expect(searchOf(router)).toMatchObject({ sort: 'date-asc', page: 2, q: 'Company' });
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveProperty('value', 'Company');
   });
 });
 

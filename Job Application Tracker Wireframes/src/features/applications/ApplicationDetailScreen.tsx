@@ -18,6 +18,7 @@ import { useNotes } from '@/queries/use-notes';
 import { CoverLetterSection } from './CoverLetterSection';
 import { DeleteApplicationDialog } from './DeleteApplicationDialog';
 import { FunnelIndicator } from './FunnelIndicator';
+import { useListReturn } from './list-return';
 import { NotesSection } from './NotesSection';
 import { DETAIL_PANEL, DETAIL_WIDTH, SECTION_HEADING } from './panel';
 import { StarToggle } from './StarToggle';
@@ -26,8 +27,10 @@ import { StatusSelect } from './StatusSelect';
 const BACK = 'inline-flex w-fit items-center gap-1.5 rounded-sm text-[13px] text-muted-foreground';
 
 function BackLink() {
+  // Back to the list as it was left — the same filter, search, order, and page (§4.2).
+  const listSearch = useListReturn();
   return (
-    <Link to="/applications" className={BACK}>
+    <Link to="/applications" search={listSearch} className={BACK}>
       <ChevronLeftIcon aria-hidden="true" className="size-4" />
       Back to applications
     </Link>
@@ -57,6 +60,7 @@ export function ApplicationDetailScreen() {
   const star = useToggleStar();
   const remove = useDeleteApplication(applicationId ?? '');
   const forget = useForgetApplication();
+  const listSearch = useListReturn();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (parsed.success && application.isPending) {
@@ -83,7 +87,11 @@ export function ApplicationDetailScreen() {
           <Button className="h-9 max-[760px]:h-11" onClick={() => void application.refetch()}>
             Retry
           </Button>
-          <Link to="/applications" className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}>
+          <Link
+            to="/applications"
+            search={listSearch}
+            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
+          >
             Back to list
           </Link>
         </ErrorState>
@@ -99,7 +107,11 @@ export function ApplicationDetailScreen() {
         <p className="text-sm text-muted-foreground">
           It may have been deleted, or the link may be wrong.
         </p>
-        <Link to="/applications" className={buttonVariants({ variant: 'outline', className: 'h-9 w-fit max-[760px]:h-11' })}>
+        <Link
+          to="/applications"
+          search={listSearch}
+          className={buttonVariants({ variant: 'outline', className: 'h-9 w-fit max-[760px]:h-11' })}
+        >
           Back to applications
         </Link>
       </div>
@@ -185,7 +197,8 @@ export function ApplicationDetailScreen() {
           remove.mutate(undefined, {
             onSuccess: async () => {
               setConfirmDelete(false);
-              await navigate({ to: '/applications' });
+              // A deleted last row of the last page lands on the page before (§4.2).
+              await navigate({ to: '/applications', search: listSearch });
               // Only once the screen showing it has gone, so it never flashes
               // "not found" on the way out.
               forget(found.id);

@@ -192,6 +192,12 @@ else, shows All. The rows shown are announced after each change of filter, searc
 size (§10.4): "Showing 11 to 20 of 42 applications." when there is more than one page, "Showing
 3 of 7 applications." for a narrowed list on one page.
 
+Leaving the list for an application and coming back — the detail screen's "Back to applications",
+the edit screen's links back, and the return after deleting from the detail screen — lands on
+the list as it was left: the same filter, search, order, page, and page size. That memory lives
+in the tab only, never in storage (it holds the search text), and belongs to the signed-in user.
+The header's Home link opens the default list, and Add returns to it (§4.3).
+
 Table columns: select checkbox · star · date · company · position · location · status tag · 📎
 (cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
 the star or the checkbox acts on it without opening the row.
@@ -1108,6 +1114,10 @@ the prototype is the reference for those.
   number, which at the 5,000 soft cap is 500 of them. Following a page link moves focus to the new
   page's start, since otherwise a keyboard user is left at the bottom of it; Jump to bottom moves
   focus to the pagination for the same reason, and appears on the list only, where §4.2 puts it.
+- **Back to applications returns to the list as it was left (§4.2).** It went to the default list,
+  which lost the filter since step 5 and, with pages, the page too: open the 23rd application,
+  come back, and land on page 1. Kept in memory rather than `sessionStorage`, because the search
+  is user content; a reload of the detail screen goes back to the default list.
 - **Cover letters gain Preview, for PDFs only, in a new tab (§4.4, §7.3, §8.2).** Asked for. Word
   files get none: browsers cannot show them, and converting one to HTML would mean rendering
   untrusted markup in the app, behind a sanitiser, with an approximate layout and still nothing
