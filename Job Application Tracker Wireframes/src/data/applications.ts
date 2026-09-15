@@ -78,6 +78,17 @@ export async function countApplications(userId: string): Promise<number> {
   return count ?? 0;
 }
 
+/** How many applications hold a cover letter — the files half of §9.7's count. */
+export async function countCoverLetters(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .not('cover_letter_path', 'is', null);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /**
  * Add (§4.3): the application, its creation status_history row, and the first
  * note, in one transaction (create_application). An absent optional is left

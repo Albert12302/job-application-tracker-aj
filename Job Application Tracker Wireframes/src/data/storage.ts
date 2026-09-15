@@ -148,3 +148,40 @@ export function removeAvatarObject(path: string): Promise<void> {
 export function removeCoverLetterObject(path: string): Promise<void> {
   return removeObject(COVER_LETTERS, path);
 }
+
+/** Storage's list is paged; this is its per-request maximum here, not a total. */
+const LIST_PAGE = 100;
+
+/** Every object in the user's own folder of `bucket`, however many. */
+async function listOwnObjects(bucket: string, userId: string): Promise<string[]> {
+  const paths: string[] = [];
+  for (let offset = 0; ; offset += LIST_PAGE) {
+    const { data, error } = await supabase.storage.from(bucket).list(userId, { limit: LIST_PAGE, offset });
+    if (error) throw error;
+    // An id of null is a folder placeholder, not a stored object.
+    paths.push(...(data ?? []).filter((object) => object.id !== null).map((object) => `${userId}/${object.name}`));
+    if (!data || data.length < LIST_PAGE) return paths;
+  }
+}
+
+/**
+ * Everything this user has stored, in both buckets — the first half of an
+ * account deletion (SPEC §9.7).
+ *
+ * The folder is listed rather than derived from `cover_letter_path` and
+ * `avatar_path`, so a file whose row was already lost goes too. After this the
+ * account is deleted and there is no owner left to find an orphan by.
+ *
+ * Unlike removeObject, a path that is already gone is not an error: this is
+ * destroying files, not tracking them, and a retry after a half-finished
+ * deletion has to be able to finish (§9.7).
+ */
+export async function removeAllOwnObjects(userId: string): Promise<void> {
+  for (const bucket of [COVER_LETTERS, AVATARS]) {
+    const paths = await listOwnObjects(bucket, userId);
+    for (let start = 0; start < paths.length; start += LIST_PAGE) {
+      const { error } = await supabase.storage.from(bucket).remove(paths.slice(start, start + LIST_PAGE));
+      if (error) throw error;
+    }
+  }
+}

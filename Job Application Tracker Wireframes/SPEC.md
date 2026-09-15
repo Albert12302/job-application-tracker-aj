@@ -327,7 +327,8 @@ It is the one place current status is used, because its segments have to add up 
 
 ### 4.6 Profile
 Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, application
-count, **Export my data** (§9.8), sign out.
+count, **Export my data** (§9.8), sign out, and **Delete my account** (§9.7) set apart
+under its own heading — not another profile control, and not on the way to signing out.
 
 A chosen photo is checked before upload, in this order, and the first failure is shown under
 the avatar (§7.3):
@@ -828,6 +829,7 @@ Nothing ships with an unhandled failure.
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
 | Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
+| Delete account (dialog) | "Counting what goes…" in place of the sentence, confirm disabled until counted; then "Removing your files…" and "Deleting your account…" in the confirm button, with the dialog's other controls disabled and the same words in a live region (§10.4) | n/a | Stops where it failed, dialog open, confirming again carries on (§9.7). On Storage: "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again." On the account: "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish." Both with an error reference. A count that will not load does not block the delete: the sentence loses its numbers instead |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
 | Offline | n/a | n/a | Persistent banner: "You're offline. Changes won't save." Disable mutations |
 
@@ -931,12 +933,27 @@ rules are specific:
   `auth.users` row and let the database cascade take applications, notes, history, saved
   filters, and the profile. A failed Storage delete aborts before the account is gone, so a
   retry is possible; the reverse order leaves orphaned files with no owner to find them by.
-- One code path, `services/delete-account.ts`, mirroring §9.2.
+- One code path, `services/delete-account.ts`, mirroring §9.2. The `auth.users` delete needs
+  the `service_role` key, which the browser must never hold (§7.4), so it goes through a third
+  edge function, `supabase/functions/delete-account`. The function takes no id: whose account
+  goes comes from the token Auth vouches for, so it cannot be aimed at anyone else. Storage is
+  *not* its business — the user already holds delete on their own folder, and the client must
+  finish there before the function is called.
 - Writes a `security_events` row (`account_deletion`) — the one record that survives, holding
-  a user id and a timestamp and nothing else. `app_errors.user_id` and
-  `security_events.user_id` are `on delete set null`, so older rows keep their stack traces
-  and lose the person.
+  a user id and a timestamp and nothing else. It is written **inside the edge function, with
+  the service role**, after the delete succeeds: only then is it true, and only the service
+  role can name a user who no longer exists (`force_security_event_owner` exempts it).
+  `security_events.user_id` therefore has **no** foreign key to `auth.users`; it keeps an
+  opaque UUID for the table's 90-day retention. `app_errors.user_id` is still
+  `on delete set null`, so stack traces keep their traces and lose the person.
+- **A retry has to be able to finish.** Failing on Storage leaves the account and all its data
+  intact; failing on the account leaves the files gone and the account present — the §9.4
+  broken-record shape, and unavoidable given the order. The dialog says which of the two
+  happened rather than a flat "failed", stays open, and confirming again carries on: removing
+  an object that is already gone is not an error on this path.
 - Signs out all sessions and returns to sign-in with "Your account and data have been deleted."
+  Deleting the user revokes every refresh token server-side, which *is* signing out
+  everywhere; what remains is clearing this browser, so the sign-out afterwards is local.
 
 ### 9.8 Data export
 In scope, and built **before** deletion — deleting without an exit is a hostage situation.
@@ -1098,6 +1115,38 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-15
+- **§6 step 7 finished: account deletion (§9.7), built after export.**
+- **Deletion runs through a third edge function (§7.4, §9.7).** Removing an `auth.users` row
+  needs the service role, and the browser must never hold it, so `supabase/functions/delete-account`
+  joins `sign-in` and `upload` as the places that key exists. A `SECURITY DEFINER` Postgres
+  function deleting from `auth.users` was the alternative and was rejected: §7.6 says avoid
+  definer functions, and those tables are GoTrue's — anything its own delete does beyond the row
+  cascade would silently become ours. The function takes no id; the token says who.
+- **§9.7 contradicted itself about the surviving record, and the schema has been corrected.**
+  It asked for one row that outlives the account "holding a user id and a timestamp", while
+  `security_events.user_id` was `on delete set null` — so the cascade blanked the id on the very
+  row that exists to name it, and it could not be inserted afterwards either, because the foreign
+  key would reject an id no longer in `auth.users`. The constraint is dropped (migration
+  `20260915192815`); the column keeps an opaque UUID that resolves to nothing. The trade, stated
+  plainly: every `security_events` row now keeps its user id for the table's 90-day retention
+  rather than losing it the moment an account goes — which is what makes "what happened to this
+  account before it was deleted" answerable at all. `app_errors` is unchanged and still nulls.
+- **The record is written by the function, after the delete succeeds.** Written before it, the
+  row would claim a deletion that might then fail; written by the client after it, there is no
+  `auth.uid()` left. The service role has both properties, and `force_security_event_owner`
+  already exempts it for exactly this reason (the sign-in function writes for a user with no
+  session).
+- **The dialog says which half failed, because they leave different worlds (§8.2, §9.7).** Files
+  go first so a failed Storage delete stops before the account is gone and a retry still works;
+  the cost is that a failure *after* the files leaves rows pointing at objects that no longer
+  exist. Rather than a flat "failed", the copy says whether the account is still whole or only
+  its files are gone, and confirming again carries on — re-removing an object that is already
+  gone is not an error on this path.
+- **The deletion dialog's counts are counted when it opens (§9.7).** §9.7 did not say where
+  "N applications, N notes, N files" comes from. Three head counts, never cached across the
+  dialog, so the number shown before an irreversible act is the number that is true now; files
+  are the cover letters plus the avatar, which is exactly what the export puts in `files/`, so
+  the two agree. As in §9.2, a count that cannot be read does not block the delete.
 - **§6 step 7 begun: data export built first (§9.8).** Export ships before deletion, as §6 and
   §9.8 require — deleting without an exit is a hostage situation, so the way out exists before
   the door closes.

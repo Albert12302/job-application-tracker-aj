@@ -7,6 +7,7 @@ import { useProfile } from '@/queries/use-profile';
 import { useSignedInUser } from '@/queries/use-session';
 import { ApplicationCount } from './ApplicationCount';
 import { AvatarUpload } from './AvatarUpload';
+import { DeleteAccountButton } from './DeleteAccountButton';
 import { ExportDataButton } from './ExportDataButton';
 import { SignOutButton } from './SignOutButton';
 
@@ -63,6 +64,7 @@ export function ProfileScreen() {
       </div>
       <ExportDataButton />
       <SignOutButton />
+      <DeleteAccountButton />
     </section>
   );
 }

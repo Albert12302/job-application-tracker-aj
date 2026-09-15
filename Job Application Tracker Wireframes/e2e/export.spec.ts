@@ -21,7 +21,13 @@ import { apiActor, startSignedIn } from './session.js';
 type ZipEntries = Record<string, Uint8Array>;
 
 let session: string;
-let expected: { applications: { id: string; company: string }[]; filters: { name: string }[] };
+let expected: {
+  applications: { id: string; company: string }[];
+  filters: { name: string }[];
+  /** How many notes and history rows each application should carry, per the database. */
+  notesPer: Map<string, number>;
+  historyPer: Map<string, number>;
+};
 
 test.beforeAll(async () => {
   const { client, session: stored } = await apiActor('dev-a@example.test');
@@ -29,8 +35,22 @@ test.beforeAll(async () => {
 
   const applications = await client.from('applications').select('id, company').order('id');
   const filters = await client.from('saved_filters').select('name').order('created_at');
+  const notes = await client.from('notes').select('application_id');
+  const history = await client.from('status_history').select('application_id');
   expect(applications.error, 'could not read dev-a — run npm run db:reset').toBeNull();
-  expected = { applications: applications.data!, filters: filters.data! };
+
+  const tally = (rows: { application_id: string }[]) => {
+    const counts = new Map<string, number>();
+    for (const row of rows) counts.set(row.application_id, (counts.get(row.application_id) ?? 0) + 1);
+    return counts;
+  };
+
+  expected = {
+    applications: applications.data!,
+    filters: filters.data!,
+    notesPer: tally(notes.data!),
+    historyPer: tally(history.data!),
+  };
 });
 
 test.beforeEach(async ({ page }) => {
@@ -68,13 +88,19 @@ test('exports one zip of applications, saved filters and the profile (§9.8)', a
   // Every application the database has for this user, and only those.
   expect([...applications].map((a) => a.id).sort()).toEqual(expected.applications.map((a) => a.id).sort());
 
-  // Nested, not flattened — the part §9.8 says CSV would lose.
+  // Nested, not flattened — the part §9.8 says CSV would lose. Each application
+  // carries exactly its own notes and its own history, no more and no fewer:
+  // the seed spreads both unevenly, so a mis-grouping would show here.
   for (const application of applications) {
-    expect(Array.isArray(application.notes), `${application.company} notes`).toBe(true);
-    expect(Array.isArray(application.status_history), `${application.company} history`).toBe(true);
+    expect(application.notes.length, `${application.company} notes`).toBe(expected.notesPer.get(application.id) ?? 0);
+    expect(application.status_history.length, `${application.company} history`).toBe(
+      expected.historyPer.get(application.id) ?? 0,
+    );
   }
-  // Created applications always have at least their creation row (§2).
-  expect(applications.every((a) => a.status_history.length > 0)).toBe(true);
+  // And between them they account for every row, so none was dropped on the way.
+  expect(applications.reduce((total, a) => total + a.status_history.length, 0)).toBe(
+    [...expected.historyPer.values()].reduce((total, n) => total + n, 0),
+  );
 
   expect((readJson(entries, 'saved-filters.json') as { name: string }[]).map((f) => f.name)).toEqual(
     expected.filters.map((f) => f.name),
@@ -100,12 +126,12 @@ test('says what it is doing while it works, and that it is done (§10.4)', async
 
   const busy = page.getByRole('button', { name: 'Preparing your data…' });
   await expect(busy).toBeDisabled();
-  await expect(page.getByRole('status')).toHaveText('Preparing your data…');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Preparing your data…');
 
   release();
   await downloaded;
 
-  await expect(page.getByRole('status')).toHaveText('Your export is ready.');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Your export is ready.');
   await expect(page.getByRole('button', { name: 'Export my data' })).toBeEnabled();
 });
 

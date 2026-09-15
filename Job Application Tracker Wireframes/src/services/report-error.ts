@@ -44,6 +44,8 @@ export type ErrorAction =
   | 'create_saved_filter'
   | 'delete_saved_filter'
   | 'export_data'
+  | 'load_deletion_summary'
+  | 'delete_account'
   | 'render';
 
 export type ErrorContext = { action: ErrorAction };

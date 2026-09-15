@@ -42,7 +42,7 @@ export function ExportDataButton() {
 
       {/* Always mounted: a live region added to the page at the same moment as
           its text is not reliably announced. */}
-      <span role="status" className="sr-only">
+      <span role="status" aria-label="Export progress" className="sr-only">
         {exportData.isPending ? label : exportData.isSuccess ? 'Your export is ready.' : ''}
       </span>
 

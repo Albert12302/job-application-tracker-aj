@@ -26,4 +26,6 @@ export const keys = {
   coverLetterSize: (userId: string, path: string) => ['cover-letter', userId, 'size', path] as const,
   /** A mutation key, so the detail screen can show an upload the add form started (§8.2). */
   coverLetterUpload: (userId: string) => ['cover-letter', userId, 'upload'] as const,
+  /** What an account deletion would destroy, counted when its dialog opens (§9.7). */
+  deletionSummary: (userId: string) => ['deletion-summary', userId] as const,
 };
