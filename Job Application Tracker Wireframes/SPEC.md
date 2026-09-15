@@ -1114,6 +1114,12 @@ the prototype is the reference for those.
   number, which at the 5,000 soft cap is 500 of them. Following a page link moves focus to the new
   page's start, since otherwise a keyboard user is left at the bottom of it; Jump to bottom moves
   focus to the pagination for the same reason, and appears on the list only, where §4.2 puts it.
+- **A seventh local seed user, `dev-g`, for the pagination tests.** No other seed user has more
+  than one page of applications, and creating 23 during a run would spend most of `dev-d`'s write
+  limit (§7.1). Read-only, so its tests run in parallel in both browsers.
+- **Selects are 44px tall on phones (§11).** The status select and the new rows-per-page select
+  measured 32px below 760px: the generated component's own height outranked the phone height.
+  Found by measuring the new control; the status select had been short since step 2.
 - **Back to applications returns to the list as it was left (§4.2).** It went to the default list,
   which lost the filter since step 5 and, with pages, the page too: open the 23rd application,
   come back, and land on page 1. Kept in memory rather than `sessionStorage`, because the search

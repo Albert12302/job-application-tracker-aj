@@ -27,6 +27,9 @@
 -- User F is for the saved-filter tests in e2e/filters.spec.ts, which save and delete
 -- filters. dev-a's two seeded filters are read by the read-only filter tests, so a
 -- filter saved there mid-run would change what they see.
+--   dev-g@example.test / devpassword1234
+-- User G is for e2e/pagination.spec.ts, read-only: 23 applications, enough for three
+-- pages of 10, which no other seed user has. Nothing writes as dev-g.
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -55,6 +58,10 @@ values
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
   ('66666666-6666-6666-6666-666666666666', '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'dev-f@example.test',
+   extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
+   now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
+  ('77777777-7777-7777-7777-777777777777', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'dev-g@example.test',
    extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
 on conflict (id) do nothing;
@@ -85,7 +92,9 @@ values
   (gen_random_uuid(), '55555555-5555-5555-5555-555555555555', '55555555-5555-5555-5555-555555555555',
    'email', '{"sub":"55555555-5555-5555-5555-555555555555","email":"dev-e@example.test"}', now(), now()),
   (gen_random_uuid(), '66666666-6666-6666-6666-666666666666', '66666666-6666-6666-6666-666666666666',
-   'email', '{"sub":"66666666-6666-6666-6666-666666666666","email":"dev-f@example.test"}', now(), now())
+   'email', '{"sub":"66666666-6666-6666-6666-666666666666","email":"dev-f@example.test"}', now(), now()),
+  (gen_random_uuid(), '77777777-7777-7777-7777-777777777777', '77777777-7777-7777-7777-777777777777',
+   'email', '{"sub":"77777777-7777-7777-7777-777777777777","email":"dev-g@example.test"}', now(), now())
 on conflict do nothing;
 
 update public.profiles set name = 'Dev A' where id = '11111111-1111-1111-1111-111111111111';
@@ -93,6 +102,7 @@ update public.profiles set name = 'Dev B' where id = '22222222-2222-2222-2222-22
 update public.profiles set name = 'Dev D' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set name = 'Dev E' where id = '55555555-5555-5555-5555-555555555555';
 update public.profiles set name = 'Dev F' where id = '66666666-6666-6666-6666-666666666666';
+update public.profiles set name = 'Dev G' where id = '77777777-7777-7777-7777-777777777777';
 
 -- Applications for user A, spread across the funnel so stats and the
 -- breakdown bar have something to render.
@@ -143,6 +153,66 @@ values
   ('f0000000-0000-0000-0000-000000000003', '66666666-6666-6666-6666-666666666666',
    ((current_date - 3)::timestamp at time zone 'utc'),  'Relecloud', 'UI Engineer', 'Portland, OR',
    'Dashboards for the cloud console.', 'Offer', false, false)
+on conflict (id) do nothing;
+
+-- Twenty-three applications for user G, for e2e/pagination.spec.ts: three pages of 10.
+-- Newest first they run Alpine Ski House … Contoso Pharmaceuticals, except that:
+-- - six share one date and, inserted in one statement, one created_at — so only their ids
+--   order them, and the ids below are deliberately out of name order. By id they are Nod,
+--   Lamna, Trey (rows 8–10) | Lucerne, Northwind Health, Humongous (rows 11–13): the tie
+--   straddles the end of page 1.
+-- - Blue Yonder Airlines is dated the 1st of a month, which a date read in local time shows
+--   as the last day of the month before west of Greenwich (§5.4). It is always older than
+--   Fabrikam Residences (33 days) and newer than Contoso Pharmaceuticals (90).
+insert into public.applications
+  (id, user_id, date_applied, company, position, location, status, referral, starred)
+values
+  ('77770000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 2)::timestamp at time zone 'utc'),  'Alpine Ski House', 'Frontend Engineer', 'Denver, CO', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000002', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 3)::timestamp at time zone 'utc'),  'Bellows College', 'Web Developer', 'Remote', 'Interview', false, true),
+  ('77770000-0000-0000-0000-000000000003', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 5)::timestamp at time zone 'utc'),  'Coho Winery', 'UI Engineer', 'Napa, CA', 'Applied', true, false),
+  ('77770000-0000-0000-0000-000000000004', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 6)::timestamp at time zone 'utc'),  'Consolidated Messenger', 'Product Engineer', 'Remote', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000005', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 8)::timestamp at time zone 'utc'),  'Datum Corporation', 'Senior Engineer', 'Chicago, IL', 'Callback', false, false),
+  ('77770000-0000-0000-0000-000000000006', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 9)::timestamp at time zone 'utc'),  'First Up Consultants', 'Frontend Developer', 'Remote', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000007', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 11)::timestamp at time zone 'utc'), 'Graphic Design Institute', 'Design Engineer', 'Austin, TX', 'Rejected', false, false),
+  ('77770000-0000-0000-0000-000000000013', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Humongous Insurance', 'Frontend Engineer', 'Hartford, CT', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000009', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Lamna Healthcare', 'Web Engineer', 'Remote', 'Interview', true, false),
+  ('77770000-0000-0000-0000-000000000011', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Lucerne Publishing', 'UI Developer', 'New York, NY', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000008', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Nod Publishers', 'Frontend Engineer', 'Remote', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000012', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Northwind Health', 'Product Engineer', 'Seattle, WA', 'Interview', false, false),
+  ('77770000-0000-0000-0000-000000000010', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 12)::timestamp at time zone 'utc'), 'Trey Research', 'Senior Engineer', 'Remote', 'Withdrawn', false, false),
+  ('77770000-0000-0000-0000-000000000014', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 14)::timestamp at time zone 'utc'), 'Southridge Video', 'Web Developer', 'Los Angeles, CA', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000015', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 16)::timestamp at time zone 'utc'), 'VanArsdel', 'Frontend Engineer', 'Remote', 'Interview', false, false),
+  ('77770000-0000-0000-0000-000000000016', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 18)::timestamp at time zone 'utc'), 'Woodgrove Bank', 'UI Engineer', 'Charlotte, NC', 'Offer', true, true),
+  ('77770000-0000-0000-0000-000000000017', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 20)::timestamp at time zone 'utc'), 'Wingtip Toys', 'Design Engineer', 'Remote', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000018', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 23)::timestamp at time zone 'utc'), 'School of Fine Art', 'Web Engineer', 'Boston, MA', 'Rejected', false, false),
+  ('77770000-0000-0000-0000-000000000019', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 26)::timestamp at time zone 'utc'), 'Munson''s Pickles', 'Frontend Developer', 'Remote', 'Interview', false, false),
+  ('77770000-0000-0000-0000-000000000020', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 29)::timestamp at time zone 'utc'), 'Tasmanian Traders', 'Product Engineer', 'Portland, OR', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000021', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 33)::timestamp at time zone 'utc'), 'Fabrikam Residences', 'UI Developer', 'Remote', 'Callback', false, false),
+  ('77770000-0000-0000-0000-000000000022', '77777777-7777-7777-7777-777777777777',
+   (date_trunc('month', (current_date - 40)::timestamp) at time zone 'utc'), 'Blue Yonder Airlines', 'Senior Engineer', 'Dallas, TX', 'Applied', false, false),
+  ('77770000-0000-0000-0000-000000000023', '77777777-7777-7777-7777-777777777777',
+   ((current_date - 90)::timestamp at time zone 'utc'), 'Contoso Pharmaceuticals', 'Frontend Engineer', 'Remote', 'Applied', false, false)
 on conflict (id) do nothing;
 
 insert into public.notes (application_id, body, created_at)

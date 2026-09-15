@@ -173,6 +173,9 @@ Three layers, each with a job:
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
   engine is not its subject, and prefer `page.route` for failures over real writes. A suite that
   writes a lot gets its own seed user instead: `dev-e` belongs to `bulk-delete.spec.ts` alone.
+  `dev-g` belongs to `pagination.spec.ts`: 23 applications, read-only, with a date tie across the
+  end of page 1 and one on the 1st of a month — nothing may write as `dev-g`, and the spec takes
+  its expected order from the database rather than from a list in the test.
   `dev-f` belongs to the saving-and-deleting half of `filters.spec.ts`, which runs in Chromium
   only and serially, because its tests change one user's saved filters and "Custom N"; the
   reading half asserts `dev-a`'s seeded tabs exactly (`All (7)`, `Live (3)`, …), so a change to
@@ -193,6 +196,9 @@ Three layers, each with a job:
   "No cover letter attached.", and a filename matches "Uploading *name*…" — either passes before
   the thing it waits for has happened. Use `{ exact: true }` for any text that can appear inside
   other text.
+
+  **WebKit does not focus a button on click**, as Safari on macOS does not. A test asserting where
+  focus stays after pressing a button presses it from the keyboard (`focus()` then `Enter`).
 
   **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
   about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
@@ -477,6 +483,11 @@ supabase/
 - **Navigation within a screen passes `resetScroll: false`.** `scrollRestoration` is on, and the
   router scrolls to the top on every navigation otherwise — away from a control at the bottom of
   the list that just changed the URL.
+- **A height passed to a generated primitive has to be able to win.** Generated classes like
+  `data-[size=default]:h-8` carry an attribute selector, which outranks a caller's plain `h-11`
+  whatever tailwind-merge does — so `max-[760px]:h-11` silently did nothing on every select,
+  and phones got 32px instead of §11's 44. `select.tsx` now sizes with plain classes. Measure a
+  new control's height at 360px (`boundingBox()`), don't read it off the class list.
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

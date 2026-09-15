@@ -45,12 +45,13 @@ export function ApplicationTableHeader({
           {onSort ? (
             <button
               type="button"
+              // One name in every browser: WebKit joined visible and sr-only text differently.
+              aria-label={`Date, show ${sort === 'date-asc' ? 'newest' : 'oldest'} first`}
               onClick={onSort}
               className="-ml-1.5 inline-flex h-8 cursor-pointer items-center gap-1 rounded-md px-1.5 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
             >
               Date
               <Chevron aria-hidden="true" className="size-3.5" />
-              <span className="sr-only">, show {sort === 'date-asc' ? 'newest' : 'oldest'} first</span>
             </button>
           ) : (
             <span className="inline-flex items-center gap-1">
