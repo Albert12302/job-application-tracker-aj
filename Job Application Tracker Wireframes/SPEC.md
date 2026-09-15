@@ -1117,6 +1117,12 @@ the prototype is the reference for those.
 - **A seventh local seed user, `dev-g`, for the pagination tests.** No other seed user has more
   than one page of applications, and creating 23 during a run would spend most of `dev-d`'s write
   limit (§7.1). Read-only, so its tests run in parallel in both browsers.
+- **Pagination measured, and form-control borders darkened a step (§10.1).** The current page's
+  edge, the select, the phone sort control, and the Jump to bottom pill sit on the page background,
+  where the form-control border measured 2.97:1 — under the 3:1 a control boundary and a state
+  indicator need; the search box had the same shortfall since step 5. The border token darkened
+  from 0.65 to 0.63 lightness: 3.2:1 on the page, 3.5:1 on a card. Page numbers are 6.9:1 (current
+  15.1:1), the pill's text 9.0:1, and the focus ring 4.6:1 on the page.
 - **Selects are 44px tall on phones (§11).** The status select and the new rows-per-page select
   measured 32px below 760px: the generated component's own height outranked the phone height.
   Found by measuring the new control; the status select had been short since step 2.
