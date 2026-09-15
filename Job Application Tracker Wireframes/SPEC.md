@@ -1097,9 +1097,7 @@ the prototype is the reference for those.
   query, a second copy of the rules that Postgres and JavaScript would not match identically (case
   folding), and a count request per tab. A Postgres function that filters and counts was considered
   and not built ahead of need: unused, it would speed nothing up and drift from the rules the app
-  runs. Revisit when loading the list gets slow — likeliest with thousands of applications carrying
-  long pasted descriptions — and then build that function, not PostgREST filter strings; the switch
-  is one hook, `use-filtered-applications.ts`.
+  runs. When to revisit, and in what order, is under Open questions.
 - **Order, page, and page size join the filter and search in the URL (§4.2).** §4.2 named only the
   filter and search; the build conventions already listed all five. A page to come back to after a
   reload or a shared link is the same need the filter had. Page size starts at 10, as in the
@@ -1427,6 +1425,22 @@ the prototype is the reference for those.
   from the first status-change feature.
 
 ### Open questions
+- **The list downloads every application (§4.2, §5.3; decided 2026-09-14).** The trigger is the
+  size of one person's set, not the number of users: each user loads only their own rows, so adding
+  users slows no one's list. Nearly all of the download is `description` (up to 15,000 characters),
+  which the list never shows — roughly 0.4 KB an application without it, 4 KB with a pasted job ad,
+  so about 4 MB at 1,000 applications and 20 MB at the 5,000 soft cap, before compression.
+  **Revisit when the list takes more than a second or two to appear on a phone**, likeliest past
+  about 1,000 applications with long descriptions. Then, in this order:
+  1. Read the list without `description`, and fetch descriptions in a second request only while
+     a saved filter has a text match — the only thing on the list that reads them. No migration,
+     and matching stays in `domain/filters.ts` alone, so counts and rows cannot disagree.
+  2. Only if that is not enough (a user who relies on text filters): one Postgres function that
+     returns the page, the total, and every tab count in one call, with an index on the list order
+     — a migration. Its SQL matching must pass the same test cases as `domain/filters.ts`, or the
+     two copies drift. Not PostgREST filter strings, which need escaping of `%`, `,` and `(`.
+
+  Either way the change is confined to `use-filtered-applications.ts` and the data layer beneath it.
 - No alerting on `app_errors` — accepted at two users (§7.7), revisit before real ones.
 - The `rate_limits` fixed window allows up to 2x a limit across a boundary. Accepted; if abuse
   ever makes it matter, the table can hold one row per event instead.
