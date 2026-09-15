@@ -239,6 +239,8 @@ src/
     status.ts                 STATUSES, funnel order, terminal states, color tokens
     date.ts                   the ONLY place date_applied converts or formats (§5.4)
     filters.ts                matchesFilter(app, criteria)  (§5.1)
+    order.ts                  newest / oldest first, a total order (§5.3)
+    pagination.ts             the page window, range label, numbered pages (§4.2)
     location.ts               normalizeLocation()           (§5.2)
     stats.ts                  computeStats(apps, history)   (§4.5) — furthest stage reached
     schemas.ts                Zod schemas + inferred types — the source of truth for
@@ -285,7 +287,10 @@ src/
     applications/
       ApplicationsScreen.tsx      the list and its three states (§8.2)
       ApplicationTable.tsx        at 760px and wider
-      ApplicationTableHeader.tsx  shared with the loading skeleton
+      ApplicationTableHeader.tsx  shared with the loading skeleton; the date header is the sort
+      ApplicationPagination.tsx   rows per page, the range, and the pages as router links (§4.2)
+      SortToggle.tsx              the sort as its own control below 760px (§11)
+      JumpToBottom.tsx            the floating pill; moves focus to the pagination too
       ApplicationRow.tsx
       ApplicationCards.tsx        below 760px (§11)
       ApplicationCard.tsx
@@ -321,8 +326,10 @@ src/
       LocationCombobox.tsx        type to narrow the places already used; picks only from them (§4.2)
       StatusChips.tsx             native checkboxes drawn as status tags
       TriStateChoice.tsx          native radios drawn as tabs
-      use-list-filters.ts         `filter` and `q` in the URL
-      use-filtered-applications.ts  rows and tab counts over the whole set (§5.3)
+      use-list-filters.ts         the list's URL state: `filter`, `q`, `sort`, `page`, `pageSize`
+      use-filtered-applications.ts  tab counts over the whole set (§5.3), then sorted, filtered,
+                                  and cut to the page — the one place that would change if the
+                                  database ever pages instead (SPEC §14, 2026-09-14)
     stats/
       StatsScreen.tsx             the three states (§8.2) and the summary
       StatCard.tsx
@@ -343,10 +350,8 @@ src/
                               `yes n | npx shadcn@latest add <name>` so those edits survive.
     EmptyState.tsx            app-level primitives shadcn does not ship (SPEC §8)
     ErrorState.tsx
-    Pagination.tsx            wraps shadcn pagination with our page-size + range label
-    LiveRegion.tsx
 
-  hooks/                      generic: useDebounce, useMediaQuery, usePagination
+  hooks/                      generic: useMediaQuery, prefersReducedMotion
   styles/globals.css          Tailwind layers + the audited palette (§3) as CSS variables
                               wired into the shadcn theme tokens
   test/                       setup, factories, a11y helpers
@@ -460,6 +465,17 @@ supabase/
   Preview (PDF only) is the one exception: a blank tab opened during the click, `opener` cut,
   then sent to a signed URL without `download` (`features/applications/preview-tab.ts`), so the
   PDF renders inline on Storage's origin. Never a `blob:` URL — that would render it as the app.
+- **A link that looks like a button is a router `<Link>` with `buttonVariants`, never rendered
+  through `Button`.** Base UI's `Button` with `nativeButton={false}` gives whatever it renders
+  `role="button"` and Space-to-activate, so a link loses its link role (and `aria-current` means
+  nothing on it). `components/ui/pagination.tsx` was edited for this.
+- **Links to the route already on screen take `activeOptions={{ exact: true }}`.** The router
+  marks a link `aria-current="page"` when its search is a *partial* match of the current one, and
+  a link at every default (page 1, stripped from the URL) partially matches every list URL — the
+  Previous link would announce itself as the current page.
+- **Navigation within a screen passes `resetScroll: false`.** `scrollRestoration` is on, and the
+  router scrolls to the top on every navigation otherwise — away from a control at the bottom of
+  the list that just changed the URL.
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

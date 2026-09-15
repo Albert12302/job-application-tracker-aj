@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import type { ListSort } from '@/domain/order';
 import { ApplicationTableHeader } from './ApplicationTableHeader';
 
 const ROWS = [0, 1, 2, 3, 4];
@@ -10,7 +11,7 @@ const CELLS = ['size-4', 'size-4', 'w-12', 'w-28', 'w-32', 'w-24', 'w-16 rounded
  * Five skeleton rows in the real table shell (§8.2), or five card shapes below
  * 760px. Hidden from screen readers; the screen announces "Loading" instead.
  */
-export function ApplicationListSkeleton({ narrow }: { narrow: boolean }) {
+export function ApplicationListSkeleton({ narrow, sort }: { narrow: boolean; sort: ListSort }) {
   if (narrow) {
     return (
       <ul aria-hidden="true" className="divide-y">
@@ -31,7 +32,7 @@ export function ApplicationListSkeleton({ narrow }: { narrow: boolean }) {
   return (
     <div aria-hidden="true">
       <Table>
-        <ApplicationTableHeader />
+        <ApplicationTableHeader sort={sort} />
         <TableBody>
           {ROWS.map((row) => (
             <TableRow key={row} className="hover:bg-transparent">

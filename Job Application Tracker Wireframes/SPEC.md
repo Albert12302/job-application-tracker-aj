@@ -178,13 +178,19 @@ Controls, top to bottom:
   a filter's location must match exactly, so a place no application has could never match.
   An empty box, the default, is "Any location". Saving adds the tab, makes it the active filter, closes the panel, and returns focus to
   `+ Filter`; Cancel closes it without saving.
-- **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction.
+- **Sort** — date column header toggles newest ↔ oldest, chevron indicates direction. The column
+  carries `aria-sort`, and the header is a button named for what it does ("Date, show oldest
+  first"). Changing the order goes back to page 1 and is announced ("Sorted oldest first.").
 
-The filter and the search live in the URL (`?filter=Offer`, `?filter=<saved filter id>`,
-`?q=acme`), so a filtered list can be linked to and survives a reload. Typing replaces the
-history entry rather than adding one per keystroke. A link to a saved filter waits for saved
-filters to load; one that no longer exists, or belongs to someone else, shows All. The number
-of applications shown is announced after each change of filter or search (§10.4).
+The filter, the search, the order, the page, and the page size all live in the URL
+(`?filter=Offer`, `?filter=<saved filter id>`, `?q=acme`, `?sort=date-asc`, `?page=2`,
+`?pageSize=25`), each left out while at its default, so a list can be linked to and survives a
+reload. Typing replaces the history entry rather than adding one per keystroke; every other
+change adds one, so Back undoes it. A malformed value falls back to its default. A link to a
+saved filter waits for saved filters to load; one that no longer exists, or belongs to someone
+else, shows All. The rows shown are announced after each change of filter, search, page, or page
+size (§10.4): "Showing 11 to 20 of 42 applications." when there is more than one page, "Showing
+3 of 7 applications." for a narrowed list on one page.
 
 Table columns: select checkbox · star · date · company · position · location · status tag · 📎
 (cover letter present) · referral Y/N · chevron. Clicking a row opens the detail screen; clicking
@@ -193,14 +199,31 @@ the star or the checkbox acts on it without opening the row.
 **Selecting rows to delete.** Each row has a checkbox, and the header has one that selects every
 row on screen (mixed when only some are). Once any row is ticked, a bar appears above the list:
 "*N* selected", **Clear**, and **Delete *N* applications**, which confirms first (§9.2). Only rows
-on screen can be selected: once search, filters, or pages exist (§6 steps 5–6), select-all covers
-the visible rows only, and changing the filter or page clears the selection. The selection is
+on screen can be selected: select-all covers the rows on the current page only, and changing the
+filter, the search, the order, the page, or the page size clears the selection. The selection is
 screen state, not part of the URL, and leaving the list clears it.
 
-Pagination below the table: rows per page (10 / 25 / 50), `x–y of n` range label, Previous /
-Next, numbered pages. Changing page size or any filter resets to page 1.
+Pagination below the table: rows per page (10 / 25 / 50, starting at 10), `x–y of n` range label,
+Previous / Next, numbered pages. Changing page size, the order, the search, or any filter resets
+to page 1. The *n* is every application the filter and search let through, across all pages;
+the tab counts stay over the whole set (§5.3).
+- The pages are a `<nav>` labelled "Pages" of links, the current page marked
+  `aria-current="page"` (§10.4). Previous on the first page and Next on the last are shown but
+  unavailable, and are not tab stops.
+- Numbered pages show the first, the last, and the current page with its neighbours, with "…"
+  for the rest — at most seven, however many pages there are. A "…" never stands for a single
+  page; that page is shown instead.
+- Following a page link moves the view to the top of the list and focus to the list, whose name
+  says which page it is ("Your applications, newest first, page 2 of 5").
+- A page past the end — a stale link, or the last rows of the last page deleted — shows the last
+  page, and the URL is corrected to match without a history entry.
+- While the list loads, the pagination shows disabled with no range; in the empty, no-matches,
+  and error states it is not shown.
 
-A floating **Jump to bottom** pill appears when more than ~100px of scroll remains.
+A floating **Jump to bottom** pill appears on the list when more than ~100px of scroll remains.
+It is a button after the list in the tab order. Pressing it scrolls to the bottom — instantly under
+`prefers-reduced-motion` — and moves focus to the pagination, since the pill disappears once the
+bottom is near.
 
 Empty state when a filter or search matches nothing.
 
@@ -367,6 +390,11 @@ and they need the user's zone stored on the profile.
 ### 5.3 Counts and sorting
 Tab counts and stats always reflect the full application set for the user, never the current
 page or search. Default sort is date descending.
+
+Newest first is date applied, newest first (compared as UTC dates, §5.4); within one day the most
+recently added first; then by id, so no two applications ever tie and none repeats or goes missing
+between pages. Oldest first is exactly that order reversed, so the last page of one is the first
+page of the other.
 
 ---
 
@@ -771,7 +799,7 @@ Nothing ships with an unhandled failure.
 
 | Surface | Loading | Empty | Error |
 |---|---|---|---|
-| Application list | 5 skeleton rows in the table shell; controls visible but disabled | **No applications yet** — headline, one line of copy, "Add application" button | "Couldn't load your applications." + Retry. Keep header and nav usable |
+| Application list | 5 skeleton rows in the table shell; controls visible but disabled, the pagination with no range | **No applications yet** — headline, one line of copy, "Add application" button; no pagination | "Couldn't load your applications." + Retry, no pagination. Keep header and nav usable |
 | List, filtered | skeleton rows | **No matches** — name the active filter/search: "No applications in *Offer* match "acme".", "No applications in *Offer*.", or "No applications match "acme"." — and offer "Clear filters", which resets the filter to All and empties the search. A user with no applications at all sees **No applications yet** instead, whatever the filter | as above |
 | Detail | skeleton of header, funnel, notes | n/a | "Couldn't load this application." + Retry + Back to list. If the id does not exist or is not the user's: "Application not found" + Back (never reveal that it exists but belongs to someone else) |
 | Stats | skeleton bars at fixed height | **Nothing to chart yet** — "Add your first application to see stats." | "Couldn't load stats." + Retry, inline, list nav still works |
@@ -989,7 +1017,9 @@ Breakpoint: **760px**. Below it, the following changes apply.
   cover-letter and referral marks. Nothing is dropped, it is re-ordered by importance. With no
   header row to hold select-all, the selection bar offers **Select all *N*** instead.
 - **Sort moves out of the table header** into its own control above the list, labelled
-  "Newest first" / "Oldest first" rather than an unlabelled chevron.
+  "Newest first" / "Oldest first" rather than an unlabelled chevron. The words are the order in
+  effect; screen readers hear "Sort by date: Newest first", so they read as the order, not the
+  action.
 - **Numbered pages are hidden**; Previous / Next and the range label remain. Ten numbered
   targets do not fit at a usable size.
 - **Controls go full-width and stack** — search above the add button, both edge to edge.
@@ -1053,6 +1083,31 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-14
+- **§6 step 6 built: sort and pagination, with pages cut in the browser (§4.2, §5.3).** The list
+  already reads every application for the tab counts (2026-09-13), so sorting and paging happen
+  over that same set rather than asking the database for one page at a time. One matching rule
+  (`domain/filters.ts`) then produces the tab counts, the range's *n*, and the rows, so they can
+  never disagree; paging from the database would have needed each saved filter rewritten as a
+  query, a second copy of the rules that Postgres and JavaScript would not match identically (case
+  folding), and a count request per tab. A Postgres function that filters and counts was considered
+  and not built ahead of need: unused, it would speed nothing up and drift from the rules the app
+  runs. Revisit when loading the list gets slow — likeliest with thousands of applications carrying
+  long pasted descriptions — and then build that function, not PostgREST filter strings; the switch
+  is one hook, `use-filtered-applications.ts`.
+- **Order, page, and page size join the filter and search in the URL (§4.2).** §4.2 named only the
+  filter and search; the build conventions already listed all five. A page to come back to after a
+  reload or a shared link is the same need the filter had. Page size starts at 10, as in the
+  prototype, and is not remembered between visits.
+- **A total order, and what resets and clears (§4.2, §5.3).** Pages cut from an order with ties
+  could show a row twice or never; within a day the order now falls back to when the application
+  was added, then its id. Oldest first is the exact reverse. The order, like the page size, resets
+  to page 1 (the prototype did), and a change of order clears the selection, since the rows on
+  screen change.
+- **What §4.2 left open about pages.** A page past the end shows the last page rather than "No
+  matches" while earlier pages hold rows. Numbered pages are windowed: the prototype showed every
+  number, which at the 5,000 soft cap is 500 of them. Following a page link moves focus to the new
+  page's start, since otherwise a keyboard user is left at the bottom of it; Jump to bottom moves
+  focus to the pagination for the same reason, and appears on the list only, where §4.2 puts it.
 - **Cover letters gain Preview, for PDFs only, in a new tab (§4.4, §7.3, §8.2).** Asked for. Word
   files get none: browsers cannot show them, and converting one to HTML would mean rendering
   untrusted markup in the app, behind a sanitiser, with an approximate layout and still nothing

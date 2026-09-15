@@ -93,12 +93,11 @@ const findSearch = async () => {
   return search;
 };
 
-/** The applications on screen, by the link each row's company is. */
-const rowNames = () =>
-  screen
-    .queryAllByRole('link')
-    .map((link) => link.textContent)
-    .filter((name) => name !== 'Add application');
+/** The applications on screen, by the link each row's company is — none while the table is not there. */
+const rowNames = () => {
+  const table = screen.queryByRole('table');
+  return table ? within(table).queryAllByRole('link').map((link) => link.textContent) : [];
+};
 
 const selectedText = () => screen.queryByText('1 selected', { selector: 'p:not([role])' });
 
