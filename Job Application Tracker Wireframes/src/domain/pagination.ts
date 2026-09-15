@@ -45,24 +45,32 @@ export function spokenRange({ start, end, total }: PageWindow): string {
 
 export type PageItem = { kind: 'page'; page: number } | { kind: 'gap'; before: number };
 
+/** How many items the numbered pages take once there are more pages than fit. */
+export const PAGE_ITEM_SLOTS = 7;
+
+const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
 /**
  * The numbered pages to offer: the first, the last, and the current page with
- * its neighbours, with a gap where pages are left out — at most seven items
- * however many pages there are. A gap never stands for a single page: that page
- * is shown instead, since the gap would take the same room.
+ * its neighbours, with a gap where pages are left out.
+ *
+ * Always exactly seven items once there are seven pages or more, so the bar
+ * keeps one width and nothing beside it moves as the page changes. Near either
+ * end the extra room goes to more pages ("1 2 3 4 5 … 25") rather than to a
+ * shorter row. A gap always stands for at least two pages — one page would take
+ * the same room as the gap, so it is shown instead.
  */
 export function pageItems(page: number, pageCount: number): PageItem[] {
-  const wanted = [...new Set([1, page - 1, page, page + 1, pageCount])]
-    .filter((candidate) => candidate >= 1 && candidate <= pageCount)
-    .sort((a, b) => a - b);
+  if (pageCount <= PAGE_ITEM_SLOTS) return range(1, pageCount).map((n) => ({ kind: 'page', page: n }));
 
-  const items: PageItem[] = [];
-  let previous = 0;
-  for (const candidate of wanted) {
-    if (candidate - previous === 2) items.push({ kind: 'page', page: previous + 1 });
-    else if (candidate - previous > 2) items.push({ kind: 'gap', before: candidate });
-    items.push({ kind: 'page', page: candidate });
-    previous = candidate;
-  }
+  // The run around the current page: three wide, slid inward so it never meets either end.
+  const runStart = Math.max(Math.min(page - 1, pageCount - 4), 3);
+  const runEnd = Math.min(Math.max(page + 1, 5), pageCount - 2);
+
+  const items: PageItem[] = [{ kind: 'page', page: 1 }];
+  items.push(runStart > 3 ? { kind: 'gap', before: runStart } : { kind: 'page', page: 2 });
+  for (const n of range(runStart, runEnd)) items.push({ kind: 'page', page: n });
+  items.push(runEnd < pageCount - 2 ? { kind: 'gap', before: pageCount } : { kind: 'page', page: pageCount - 1 });
+  items.push({ kind: 'page', page: pageCount });
   return items;
 }

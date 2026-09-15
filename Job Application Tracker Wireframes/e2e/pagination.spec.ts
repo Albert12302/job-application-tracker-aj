@@ -50,6 +50,36 @@ const rows = (page: Page) => page.getByRole('table').getByRole('link');
 const pages = (page: Page) => page.getByRole('navigation', { name: 'Pages' });
 const pageLink = (page: Page, name: string) => pages(page).getByRole('link', { name, exact: true });
 
+test('the page numbers keep one width on every page, so the controls beside them never move', async ({ page }) => {
+  // 250 applications — 25 pages — made from dev-g's own rows with fresh ids; nothing is written.
+  await page.route(
+    (url) => url.pathname.endsWith('/rest/v1/applications') && url.searchParams.get('select') === '*',
+    async (route) => {
+      const response = await route.fetch();
+      const seeded = (await response.json()) as Seeded[];
+      await route.fulfill({
+        response,
+        json: Array.from({ length: 250 }, (_, i) => ({ ...seeded[i % seeded.length], id: crypto.randomUUID() })),
+      });
+    },
+  );
+  const edges = new Set<string>();
+  for (const [n, numbers] of [
+    [1, '1 2 3 4 5 25'],
+    [5, '1 4 5 6 25'],
+    [12, '1 11 12 13 25'],
+    [25, '1 21 22 23 24 25'],
+  ] as const) {
+    await page.goto(`/applications?page=${n}`);
+    await expect(pageLink(page, `Page ${n}`)).toHaveAttribute('aria-current', 'page');
+    await expect(pages(page).getByRole('link', { name: /^Page \d+$/ })).toHaveText(numbers.split(' '));
+    await expect(pages(page).getByRole('listitem')).toHaveCount(11); // «, ‹, seven, ›, »
+    const box = (await pages(page).boundingBox())!;
+    edges.add(`${Math.round(box.x)}:${Math.round(box.width)}`);
+  }
+  expect([...edges]).toHaveLength(1);
+});
+
 test('pages through every application newest first, none repeated or missing, with the range over all of them', async ({ page }) => {
   await page.goto('/applications');
   await expect(rows(page)).toHaveText(companies(newestFirst.slice(0, 10)));
@@ -208,6 +238,16 @@ test.describe('at 360px (§11)', () => {
     await expect(cards.getByRole('link')).toHaveText(companies(newestFirst.slice(0, 10)));
     await expect(pages(page).getByRole('link', { name: /^Page / })).toHaveCount(0);
     await expect(page.getByText('1–10 of 23', { exact: true })).toBeVisible();
+    await expect(pages(page).getByText('Page 1 of 3', { exact: true })).toBeVisible();
+    // «  ‹  Page 1 of 3  ›  » on one line, even this narrow: every item centred on the same line
+    // (the words are shorter than the 44px arrows, so their edges differ but not their middles).
+    const middles = await pages(page).getByRole('listitem').evaluateAll((items) =>
+      items.map((item) => {
+        const box = item.getBoundingClientRect();
+        return Math.round((box.top + box.bottom) / 2);
+      }),
+    );
+    expect(Math.max(...middles) - Math.min(...middles)).toBeLessThanOrEqual(1);
 
     const next = pageLink(page, 'Next');
     const sort = page.getByRole('button', { name: 'Sort by date: Newest first' });
@@ -226,5 +266,6 @@ test.describe('at 360px (§11)', () => {
     await next.click();
     await expect(page.getByRole('list', { name: 'Your applications, oldest first, page 2 of 3' })).toBeFocused();
     await expect(page.getByText('11–20 of 23', { exact: true })).toBeVisible();
+    await expect(pages(page).getByText('Page 2 of 3', { exact: true })).toBeVisible();
   });
 });

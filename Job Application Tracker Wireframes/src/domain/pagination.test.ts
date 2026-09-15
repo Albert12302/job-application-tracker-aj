@@ -67,19 +67,50 @@ describe('pageItems', () => {
   });
 
   it('keeps the first, the last, and the neighbours of the current page', () => {
-    expect(show(pageItems(1, 10))).toBe('1 2 … 10');
+    expect(show(pageItems(12, 25))).toBe('1 … 11 12 13 … 25');
     expect(show(pageItems(6, 10))).toBe('1 … 5 6 7 … 10');
-    expect(show(pageItems(10, 10))).toBe('1 … 9 10');
   });
 
-  it('shows the one page a gap would have hidden', () => {
-    expect(show(pageItems(4, 10))).toBe('1 2 3 4 5 … 10');
-    expect(show(pageItems(7, 10))).toBe('1 … 6 7 8 9 10');
+  it('gives the room near either end to more pages, not a shorter row', () => {
+    expect(show(pageItems(1, 25))).toBe('1 2 3 4 5 … 25');
+    expect(show(pageItems(4, 25))).toBe('1 2 3 4 5 … 25');
+    expect(show(pageItems(5, 25))).toBe('1 … 4 5 6 … 25');
+    expect(show(pageItems(21, 25))).toBe('1 … 20 21 22 … 25');
+    expect(show(pageItems(22, 25))).toBe('1 … 21 22 23 24 25');
+    expect(show(pageItems(25, 25))).toBe('1 … 21 22 23 24 25');
   });
 
-  it('stays at seven items or fewer at the soft cap (5,000 rows, 10 a page)', () => {
-    for (const page of [1, 2, 3, 250, 498, 499, 500]) {
-      expect(pageItems(page, 500).length).toBeLessThanOrEqual(7);
+  it('is exactly seven items on every page once there are seven pages or more, so the bar never changes width', () => {
+    for (const pageCount of [7, 8, 9, 10, 25, 500]) {
+      for (let page = 1; page <= pageCount; page++) {
+        expect(pageItems(page, pageCount), `page ${page} of ${pageCount}`).toHaveLength(7);
+      }
+    }
+  });
+
+  it('always shows the first, the last, and the current page, in order, with no page twice', () => {
+    for (const pageCount of [1, 2, 6, 7, 8, 25]) {
+      for (let page = 1; page <= pageCount; page++) {
+        const numbers = pageItems(page, pageCount).flatMap((item) => (item.kind === 'page' ? [item.page] : []));
+        expect(numbers).toContain(1);
+        expect(numbers).toContain(page);
+        expect(numbers.at(-1)).toBe(pageCount);
+        expect(numbers).toEqual([...new Set(numbers)].sort((a, b) => a - b));
+      }
+    }
+  });
+
+  it('never lets a gap stand for a single page', () => {
+    for (const pageCount of [8, 9, 10, 25]) {
+      for (let page = 1; page <= pageCount; page++) {
+        const items = pageItems(page, pageCount);
+        items.forEach((item, i) => {
+          if (item.kind !== 'gap') return;
+          const before = items[i - 1];
+          const after = items[i + 1];
+          expect(before?.kind === 'page' && after?.kind === 'page' && after.page - before.page).toBeGreaterThanOrEqual(3);
+        });
+      }
     }
   });
 

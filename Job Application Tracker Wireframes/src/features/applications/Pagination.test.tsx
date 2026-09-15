@@ -95,6 +95,8 @@ describe('pagination (§4.2)', () => {
     expect(nav.getByRole('link', { name: 'Page 1' }).getAttribute('aria-current')).toBe('page');
     expect(nav.getAllByRole('link').filter((link) => link.getAttribute('aria-current'))).toHaveLength(1);
     expect(nav.getByRole('link', { name: 'Page 3' })).toBeTruthy();
+    // The numbers say the page on a desktop; the words are for phones only.
+    expect(nav.queryByText(/^Page \d+ of \d+$/)).toBeNull();
     // Nowhere to go back to: still read as a link, but unavailable and not a tab stop.
     const previous = nav.getByRole('link', { name: 'Previous' });
     expect(previous.getAttribute('aria-disabled')).toBe('true');
@@ -302,7 +304,8 @@ describe('below 760px (§11)', () => {
 
     expect(within(pages()).queryByRole('link', { name: 'Page 1' })).toBeNull();
     expect(within(pages()).getByRole('link', { name: 'Next' })).toBeTruthy();
-    // With no numbers, First and Last are the way to either end.
+    // With no numbers, the page is named in words, and First and Last are the way to either end.
+    expect(within(pages()).getByText('Page 1 of 3')).toBeTruthy();
     expect(within(pages()).getByRole('link', { name: 'Last page' }).getAttribute('href')).toContain('page=3');
     expect(within(pages()).getByRole('link', { name: 'First page' })).toBeTruthy();
     expect(screen.getByText('1–10 of 23')).toBeTruthy();
@@ -312,6 +315,9 @@ describe('below 760px (§11)', () => {
     await waitFor(() => expect(rowNames()).toEqual(names(14, 23).reverse()));
     expect(screen.getByRole('button', { name: 'Sort by date: Oldest first' })).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Your applications, oldest first, page 1 of 3' })).toBeTruthy();
+
+    await user.click(within(pages()).getByRole('link', { name: 'Next' }));
+    await waitFor(() => expect(within(pages()).getByText('Page 2 of 3')).toBeTruthy());
     expect((await axe.run(container)).violations).toEqual([]);
   });
 });

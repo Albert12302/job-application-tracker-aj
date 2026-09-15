@@ -22,7 +22,8 @@ const ICON = 'size-9 max-[760px]:size-11';
  * Below the list (SPEC §4.2): rows per page, the "x–y of n" range, and First,
  * Previous, the numbered pages, Next, and Last — a labelled <nav> of links, the
  * current page marked aria-current (§10.4). Below 760px the numbers go and the
- * rest stays (§11): there, First and Last are the only way to either end.
+ * rest stays (§11): there, First and Last are the only way to either end, and
+ * "Page 12 of 25" between Previous and Next says where this is.
  *
  * The pages are links to the list's own URL, so a page can be opened in a new
  * tab, reloaded, and gone back to. `activeOptions.exact` keeps the router from
@@ -67,6 +68,9 @@ export function ApplicationPagination({
   );
   // No href, so not focusable; still read as a link that is unavailable.
   const unavailable = { role: 'link', 'aria-disabled': true } as const;
+  // On a phone Previous and Next are chevrons, like First and Last, to leave room for
+  // "Page 12 of 25" on one line at 320px; screen readers still hear "Previous" and "Next".
+  const step = narrow ? { className: ICON, iconOnly: true } : { className: CONTROL };
 
   return (
     <div
@@ -104,8 +108,8 @@ export function ApplicationPagination({
         ) : null}
       </div>
 
-      <Pagination aria-label="Pages">
-        <PaginationContent className="flex-wrap gap-1">
+      <Pagination aria-label="Pages" className="max-[760px]:w-full">
+        <PaginationContent className="flex-wrap gap-1 max-[760px]:w-full max-[760px]:justify-between">
           <PaginationItem>
             {page > 1 ? (
               <PaginationFirst className={ICON} render={link(1)} />
@@ -115,16 +119,23 @@ export function ApplicationPagination({
           </PaginationItem>
           <PaginationItem>
             {page > 1 ? (
-              <PaginationPrevious className={CONTROL} render={link(page - 1)} />
+              <PaginationPrevious {...step} render={link(page - 1)} />
             ) : (
-              <PaginationPrevious className={CONTROL} {...unavailable} />
+              <PaginationPrevious {...step} {...unavailable} />
             )}
           </PaginationItem>
+          {paging && narrow ? (
+            // No numbers on a phone, so say which page this is (§11).
+            <PaginationItem className="px-1 text-[13px] whitespace-nowrap">
+              Page {page} of {pageCount}
+            </PaginationItem>
+          ) : null}
           {paging && !narrow
             ? pageItems(page, pageCount).map((item) =>
                 item.kind === 'gap' ? (
                   <PaginationItem key={`gap-${item.before}`}>
-                    <PaginationEllipsis className="h-9 w-6 text-muted-foreground" />
+                    {/* As wide as a number, so the seven items keep one width whatever the page. */}
+                    <PaginationEllipsis className="h-9 w-9 text-muted-foreground" />
                   </PaginationItem>
                 ) : (
                   <PaginationItem key={item.page}>
@@ -142,9 +153,9 @@ export function ApplicationPagination({
             : null}
           <PaginationItem>
             {paging && page < pageCount ? (
-              <PaginationNext className={CONTROL} render={link(page + 1)} />
+              <PaginationNext {...step} render={link(page + 1)} />
             ) : (
-              <PaginationNext className={CONTROL} {...unavailable} />
+              <PaginationNext {...step} {...unavailable} />
             )}
           </PaginationItem>
           <PaginationItem>

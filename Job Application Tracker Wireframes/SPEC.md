@@ -218,8 +218,10 @@ the tab counts stay over the whole set (§5.3).
   `aria-current="page"` (§10.4). First and Previous on the first page, and Next and Last on the
   last, are shown but unavailable, and are not tab stops.
 - Numbered pages show the first, the last, and the current page with its neighbours, with "…"
-  for the rest — at most seven, however many pages there are. A "…" never stands for a single
-  page; that page is shown instead.
+  for the rest. From seven pages up they are always exactly seven items, each as wide as the
+  next, so the bar keeps one width and nothing beside it moves as the page changes: near either
+  end the room goes to more pages (`1 2 3 4 5 … 25`, `1 … 11 12 13 … 25`, `1 … 21 22 23 24 25`).
+  A "…" always stands for at least two pages; a single page is shown instead.
 - Following a page link moves the view to the top of the list and focus to the list, whose name
   says which page it is ("Your applications, newest first, page 2 of 5").
 - A page past the end — a stale link, or the last rows of the last page deleted — shows the last
@@ -1027,8 +1029,11 @@ Breakpoint: **760px**. Below it, the following changes apply.
   "Newest first" / "Oldest first" rather than an unlabelled chevron. The words are the order in
   effect; screen readers hear "Sort by date: Newest first", so they read as the order, not the
   action.
-- **Numbered pages are hidden**; First / Previous / Next / Last and the range label remain. Ten
-  numbered targets do not fit at a usable size, so First and Last are the way to either end.
+- **Numbered pages are hidden**; the range label remains, and the pages read
+  `«  ‹  Page 12 of 25  ›  »` — First, Previous, where this is, Next, Last. Ten numbered targets do
+  not fit at a usable size, so First and Last are the way to either end. Previous and Next are
+  chevrons here rather than words, still named "Previous" and "Next" for screen readers: with the
+  words, the row does not fit on one line beside 44px targets at 360px, let alone 320px.
 - **Controls go full-width and stack** — search above the add button, both edge to edge.
 - **Control height goes 36px → 44px** for every input, select, and button; the star tap area
   is a 44×44 box around a 19px icon.
@@ -1116,6 +1121,12 @@ the prototype is the reference for those.
 - **Pagination gains First page and Last page arrows (§4.2, §11).** Asked for. On a desktop the
   first and last numbers are already always shown, so the arrows repeat them there; on a phone,
   where the numbers are hidden, they are the only way to either end without paging one at a time.
+- **The page numbers keep one width, and a phone names the page (§4.2, §11).** Asked for, after
+  seeing 25 pages: the numbers ran four to seven items wide depending on the page, so First and
+  Previous shifted under the pointer while paging. They are now always seven slots of equal width.
+  A phone showed only "111–120 of 250", leaving the page number to be worked out, so it now says
+  "Page 12 of 25" — and Previous and Next became chevrons there to fit it on one line at 320px,
+  measured: 357px wide with the words against 292px available.
 - **A seventh local seed user, `dev-g`, for the pagination tests.** No other seed user has more
   than one page of applications, and creating 23 during a run would spend most of `dev-d`'s write
   limit (§7.1). Read-only, so its tests run in parallel in both browsers.

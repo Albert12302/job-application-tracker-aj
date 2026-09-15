@@ -16,8 +16,9 @@ import {
 // - Links stay links. The generated PaginationLink rendered <a> through Button, which gives it
 //   role="button" and Space-to-activate; pagination is navigation, and aria-current="page"
 //   belongs on a link (SPEC §10.4). `render` takes the app's router <Link>.
-// - Previous and Next keep their words at every width (§11 keeps them on phones), and their
-//   visible word is their name rather than a longer aria-label.
+// - Previous and Next keep their word as their name at every width, rather than a longer
+//   aria-label. `iconOnly` hides the word from sight only, for phones, where the words and
+//   "Page 12 of 25" do not fit beside 44px arrows (§11).
 // - The <nav> takes its label from the caller, and drops the role it already has.
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
@@ -74,19 +75,26 @@ function PaginationLink({
   })
 }
 
+type PaginationStepProps = React.ComponentProps<typeof PaginationLink> & {
+  text?: string
+  /** Just the chevron, the word kept for screen readers — where the words do not fit. */
+  iconOnly?: boolean
+}
+
 function PaginationPrevious({
   className,
   text = "Previous",
+  iconOnly = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
+}: PaginationStepProps) {
   return (
     <PaginationLink
-      size="default"
-      className={cn("pl-1.5!", className)}
+      size={iconOnly ? "icon" : "default"}
+      className={cn(!iconOnly && "pl-1.5!", className)}
       {...props}
     >
       <ChevronLeftIcon aria-hidden="true" data-icon="inline-start" />
-      <span>{text}</span>
+      <span className={iconOnly ? "sr-only" : undefined}>{text}</span>
     </PaginationLink>
   )
 }
@@ -94,15 +102,16 @@ function PaginationPrevious({
 function PaginationNext({
   className,
   text = "Next",
+  iconOnly = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
+}: PaginationStepProps) {
   return (
     <PaginationLink
-      size="default"
-      className={cn("pr-1.5!", className)}
+      size={iconOnly ? "icon" : "default"}
+      className={cn(!iconOnly && "pr-1.5!", className)}
       {...props}
     >
-      <span>{text}</span>
+      <span className={iconOnly ? "sr-only" : undefined}>{text}</span>
       <ChevronRightIcon aria-hidden="true" data-icon="inline-end" />
     </PaginationLink>
   )
