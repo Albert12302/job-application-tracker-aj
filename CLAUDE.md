@@ -626,7 +626,9 @@ limit, and do not add a new limit without deciding where it lives:
 - `supabase/functions/sign-in` — the per-account lockout **and** the per-IP sign-in limit
   (the only code that sees the caller's address). The client calls this function instead of
   `signInWithPassword`. Its limit decisions are pure functions in `limits.ts`, unit-tested;
-  keep Deno APIs in `index.ts`.
+  keep Deno APIs in `index.ts`. The block rule is the one exception, written twice on purpose:
+  `begin_sign_in_attempt` must decide it before writing, or a blocked caller's momentary row
+  counts against someone else's account. Change both together; the e2e parity test catches drift.
 - `supabase/functions/upload` — the 20-an-hour upload limit, via `consume_rate_limit` called
   **as the user**. It is Storage's only writer and stores with the service role, whose
   `auth.uid()` is null, so a trigger on `storage.objects` would count nothing.

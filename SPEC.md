@@ -530,12 +530,17 @@ it is stored only as a peppered hash. A successful sign-in clears the account's 
 not the address's — one valid account must not reset an address that is spraying others.
 Blocked responses carry the wait in minutes, and the body never says which limit tripped.
 
-Both limits hold for attempts that arrive **at the same time**. The function reads the
-counts and records the attempt as *pending* in one locked transaction
-(`begin_sign_in_attempt`), and a pending attempt counts as a failure for every later reader.
-Ten simultaneous guesses therefore see 0, 1, 2 … 9 attempts before them, not ten copies of the
-same count. When the attempt finishes, its row becomes a failure or a success. A blocked
-attempt, or one Auth could not answer, deletes its row and counts nothing. A row left pending by
+Both limits hold for attempts that arrive **at the same time**. In one locked transaction
+(`begin_sign_in_attempt`), the database reads the counts, decides whether the attempt is
+blocked, and records it as *pending* only if it is not. A pending attempt counts as a failure
+for every later reader. Ten simultaneous guesses therefore see 0, 1, 2 … 9 attempts before
+them, not ten copies of the same count. When the attempt finishes, its row becomes a failure or
+a success. A blocked attempt writes **nothing**, not even for a moment: if it did, a caller whose
+address is already blocked could keep five pending rows on someone else's account and lock its
+owner out without a guess reaching Auth. The block rule therefore exists in SQL as well as in
+`limits.ts` (which computes the wait), and an e2e test holds the two together. An attempt Auth
+could not answer deletes its row and counts nothing; that write, like every write that settles an
+attempt, is retried before giving up. A row left pending by
 a function that died keeps counting as a failure until it ages out, so the limit fails closed —
 except that a successful sign-in clears it with the account's failures once it is older than
 any live request could be (7 minutes; hosted functions end at 150 s on Free, 400 s on paid).
@@ -1193,8 +1198,10 @@ the prototype is the reference for those.
   closed and the passwords come from a password manager, and revisited before sign-up opens.
 - **The sign-in limits now hold under concurrent requests (§7.1).** The function read the
   failure count, called Auth, and only then recorded the failure, so simultaneous attempts all
-  read the same count and all got a guess. `begin_sign_in_attempt` now reads the counts and
-  records the attempt as pending in one locked transaction. Ten concurrent calls were measured
+  read the same count and all got a guess. `begin_sign_in_attempt` now reads the counts, decides
+  the block, and records an unblocked attempt as pending, in one locked transaction. Deciding the
+  block there, before any write, keeps a blocked caller from adding to another account's count
+  (found in review). Ten concurrent calls were measured
   seeing 0 through 9 earlier attempts; the same function without its locks let three of them
   read the same count. The local edge runtime answers sign-ins one at a time, so the race never
   showed locally.

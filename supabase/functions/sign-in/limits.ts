@@ -1,5 +1,10 @@
 // Sign-in limits (SPEC §7.1) as pure decisions. No imports and no Deno APIs,
 // so index.ts runs exactly the code the unit tests (limits.test.ts, Vitest) cover.
+//
+// The block rule in accountLockout and ipBlockedUntil is also written in SQL, in
+// begin_sign_in_attempt (migration 20260916181344), which decides it before
+// writing anything. Change one, change both: e2e/sign-in-function.spec.ts checks
+// the SQL against these.
 
 export const MINUTE = 60_000;
 

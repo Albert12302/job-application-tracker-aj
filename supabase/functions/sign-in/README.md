@@ -39,10 +39,13 @@ address's. The decisions live in `limits.ts` — pure, no Deno APIs — and `lim
 covers them under Vitest (`npm test`).
 
 Concurrency: the counts come from `begin_sign_in_attempt` (migration `20260916181344`), which
-locks the account and address hashes, reads their recent failures, and inserts this attempt as
-`pending` in one transaction. Pending rows count as failures, so simultaneous attempts see each
-other. Every path then settles its own row: `failure` or `success`, or deleted when blocked or
-when Auth is rate-limited or down. A success also clears the account's pending rows older than
+locks the account and address hashes, reads their recent failures, decides the block, and — only
+when not blocked — inserts this attempt as `pending`, in one transaction. Pending rows count as
+failures, so simultaneous attempts see each other. A blocked attempt writes nothing, so a blocked
+address cannot pile pending rows onto someone else's account. That means the block rule lives in
+SQL too; change `accountLockout` or `ipBlockedUntil` and the migration together, and the e2e
+parity test tells you if they drift. Every unblocked path then settles its own row, with retries:
+`failure` or `success`, or deleted when Auth is rate-limited or down. A success also clears the account's pending rows older than
 `STALE_PENDING_MS` (7 minutes, above hosted Supabase's function time limit): those requests died
 unsettled, and would otherwise count against a user who has just signed in. Never go back to reading the counts with plain selects — the
 check and the record would separate again, and parallel guesses would all read the same count.
@@ -106,7 +109,11 @@ failure window, which is harmless.
 6. Ten concurrent `begin_sign_in_attempt` calls for one account each see a different number of
    earlier attempts (0–9). Called on the database directly, because the local edge runtime
    answers sign-ins one at a time and cannot stage the race.
-7. No attempt is left `pending` once the tests above have finished.
+7. An address already blocked floods one account: nothing is written for that account, and its
+   owner, from another address, finds no failures counted.
+8. The database's block decision matches `accountLockout` / `ipBlockedUntil` at the edges of
+   each rule (four failures, exactly 15 minutes, the lock's last minute, the hour's edge).
+9. No attempt from this run is left `pending` once the tests above have finished.
 
 The per-IP block has no e2e test: locally every caller is the same Docker address and a
 client cannot fake another (which is the point), so "a second address still gets in" cannot

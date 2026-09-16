@@ -75,27 +75,43 @@ const hashIp = (ip: string) => sha256(`${PEPPER}ip:${ip}`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const times = (timestamps: string[]) => timestamps.map((t) => Date.parse(t));
 
-type Reservation = { id: string; account: string[]; ip: string[] };
+/** `id` is null when the database found the attempt blocked and recorded nothing. */
+type Reservation = { id: string | null; now: string; account: string[]; ip: string[] };
 
 /**
- * Records this attempt as pending and returns the failures before it, newest
- * first, in one locked transaction (migration 20260916181344). Pending attempts
- * count as failures, so requests arriving together see each other instead of
- * all reading the same count.
+ * Reads the failures before this attempt, newest first, and records it as pending
+ * unless it is blocked — in one locked transaction (migration 20260916181344).
+ * Pending attempts count as failures, so requests arriving together see each
+ * other instead of all reading the same count. A blocked attempt writes nothing,
+ * so it can never add to anyone's count.
  */
-function reserveAttempt(emailHash: string, ipHash: string, now: number) {
+function reserveAttempt(emailHash: string, ipHash: string) {
   return admin.rpc('begin_sign_in_attempt', {
     p_email_hash: emailHash,
     p_ip_hash: ipHash,
-    p_account_since: new Date(now - ACCOUNT_WINDOW_MS - ACCOUNT_LOCKOUT_MS).toISOString(),
-    p_account_limit: ACCOUNT_MAX_FAILURES,
-    p_ip_since: new Date(now - IP_WINDOW_MS).toISOString(),
-    p_ip_limit: IP_MAX_FAILURES,
+    p_account_max: ACCOUNT_MAX_FAILURES,
+    p_account_window_ms: ACCOUNT_WINDOW_MS,
+    p_account_lockout_ms: ACCOUNT_LOCKOUT_MS,
+    p_ip_max: IP_MAX_FAILURES,
+    p_ip_window_ms: IP_WINDOW_MS,
   });
 }
 
-/** Removes an attempt that must count for nothing: blocked, or Auth unavailable. */
-const discardAttempt = (id: string) => admin.from('sign_in_attempts').delete().eq('id', id);
+/**
+ * A write that settles an attempt's row, retried: a lost write leaves the row
+ * pending, and pending counts as a failure for the whole window.
+ */
+async function settleAttempt(write: () => PromiseLike<{ error: unknown }>): Promise<void> {
+  for (let tries = 0; tries < 3; tries++) {
+    if (tries) await sleep(100 * 2 ** tries);
+    const { error } = await write();
+    if (!error) return;
+  }
+  console.error('sign-in: an attempt could not be settled and counts as a failure until it ages out');
+}
+
+/** Removes an attempt that must count for nothing: Auth rate limited or unavailable. */
+const discardAttempt = (id: string) => settleAttempt(() => admin.from('sign_in_attempts').delete().eq('id', id));
 
 Deno.serve(async (req) => {
   const startedAt = Date.now();
@@ -128,25 +144,29 @@ Deno.serve(async (req) => {
   if (email.length > 254 || password.length > 128) return settle({ error: GENERIC }, 400);
 
   const [emailHash, ipHash] = await Promise.all([hashEmail(email), hashIp(clientIp(req.headers))]);
-  const now = Date.now();
-
-  const reserved = await reserveAttempt(emailHash, ipHash, now);
+  const reserved = await reserveAttempt(emailHash, ipHash);
 
   // Fail closed: if a counter cannot be read, its limit cannot be enforced.
   if (reserved.error || !reserved.data) return settle({ error: UNAVAILABLE }, 503);
   const attempt = reserved.data as Reservation;
+  // The database's instant, the one it decided with, so both sides see the same times.
+  const now = Date.parse(attempt.now);
 
   const ipUntil = ipBlockedUntil(times(attempt.ip), now, IP_MAX_FAILURES);
   const { inWindow, lockedUntil } = accountLockout(times(attempt.account), now);
   const blockedUntil = Math.max(ipUntil, lockedUntil);
 
-  if (blockedUntil) {
+  if (!attempt.id || blockedUntil) {
     // Nothing is recorded while blocked: the counts stop growing, so the block
-    // ends on schedule instead of extending with every retry.
-    await discardAttempt(attempt.id);
+    // ends on schedule instead of extending with every retry, and a blocked
+    // caller cannot add to another account's count. The database makes that
+    // call before writing; the two rules are kept identical (see the migration),
+    // and if they ever disagree the attempt is refused either way.
+    if (attempt.id) await discardAttempt(attempt.id);
     await admin.from('security_events').insert({ event_type: 'rate_limit_trip', outcome: 'denied' });
-    return settle({ error: LOCKED, retryAfterMinutes: retryAfterMinutes(blockedUntil, now) }, 429);
+    return settle({ error: LOCKED, retryAfterMinutes: retryAfterMinutes(Math.max(blockedUntil, now), now) }, 429);
   }
+  const attemptId = attempt.id;
 
   // Keyed on the hash, so an unknown email backs off exactly like a real one.
   await sleep(backoffMs(inWindow));
@@ -158,13 +178,13 @@ Deno.serve(async (req) => {
     // Only a credential rejection counts (limits.ts authFailure).
     const outcome = authFailure(error?.status);
     if (outcome !== 'rejected') {
-      await discardAttempt(attempt.id);
+      await discardAttempt(attemptId);
       if (outcome === 'rate-limited') return settle({ error: LOCKED, retryAfterMinutes: 5 }, 429);
       return settle({ error: UNAVAILABLE }, 503);
     }
 
-    // If this update fails the row stays pending, which still counts as a failure.
-    await admin.from('sign_in_attempts').update({ outcome: 'failure' }).eq('id', attempt.id);
+    // If this never lands the row stays pending, which counts as a failure too.
+    await settleAttempt(() => admin.from('sign_in_attempts').update({ outcome: 'failure' }).eq('id', attemptId));
     await admin.from('security_events').insert({ event_type: 'sign_in_failure', outcome: 'failure' });
     return settle({ error: GENERIC }, 401);
   }
@@ -181,7 +201,7 @@ Deno.serve(async (req) => {
     .delete()
     .eq('email_hash', emailHash)
     .or(`outcome.eq.failure,and(outcome.eq.pending,created_at.lt."${stale}")`);
-  await admin.from('sign_in_attempts').update({ outcome: 'success' }).eq('id', attempt.id);
+  await settleAttempt(() => admin.from('sign_in_attempts').update({ outcome: 'success' }).eq('id', attemptId));
   await admin
     .from('security_events')
     .insert({ user_id: data.user!.id, event_type: 'sign_in_success', outcome: 'success' });

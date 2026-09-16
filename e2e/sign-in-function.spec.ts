@@ -1,4 +1,14 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import {
+  ACCOUNT_LOCKOUT_MS,
+  ACCOUNT_MAX_FAILURES,
+  ACCOUNT_WINDOW_MS,
+  accountLockout,
+  IP_DEFAULT_MAX_FAILURES,
+  IP_WINDOW_MS,
+  ipBlockedUntil,
+  MINUTE,
+} from '../supabase/functions/sign-in/limits.ts';
 import { adminClient } from './throwaway-user.js';
 
 /**
@@ -125,27 +135,45 @@ test('the function answers CORS only for allowlisted origins (§7.5)', async ({ 
 /** A random 64-character hash, shaped like the function's peppered SHA-256 keys. */
 const hex = () => crypto.randomUUID().replace(/-/g, '').repeat(2);
 
+type Reservation = { id: string | null; now: string; account: string[]; ip: string[] };
+
+/** begin_sign_in_attempt with the function's real limits, unless a test narrows one. */
+async function reserve(emailHash: string, ipHash: string, limits: { accountMax?: number; ipMax?: number } = {}) {
+  const { data, error } = await adminClient().rpc('begin_sign_in_attempt', {
+    p_email_hash: emailHash,
+    p_ip_hash: ipHash,
+    p_account_max: limits.accountMax ?? ACCOUNT_MAX_FAILURES,
+    p_account_window_ms: ACCOUNT_WINDOW_MS,
+    p_account_lockout_ms: ACCOUNT_LOCKOUT_MS,
+    p_ip_max: limits.ipMax ?? IP_DEFAULT_MAX_FAILURES,
+    p_ip_window_ms: IP_WINDOW_MS,
+  });
+  if (error) throw new Error(`could not reserve an attempt: ${error.message}`);
+  return data as Reservation;
+}
+
 /**
  * The database's clock, not this machine's: the Docker/WSL clock can drift from the host's
  * (after sleep especially), and `sign_in_attempts.created_at` is written by the database.
  * Read from a throwaway reservation under random hashes, which is deleted at once.
  */
 async function databaseNow(): Promise<number> {
-  const admin = adminClient();
-  const since = new Date(0).toISOString();
-  const { data, error } = await admin.rpc('begin_sign_in_attempt', {
-    p_email_hash: hex(),
-    p_ip_hash: hex(),
-    p_account_since: since,
-    p_account_limit: 1,
-    p_ip_since: since,
-    p_ip_limit: 1,
-  });
-  if (error) throw new Error(`could not reserve a probe attempt: ${error.message}`);
-  const { id } = data as { id: string };
-  const { data: row, error: readError } = await admin.from('sign_in_attempts').delete().eq('id', id).select('created_at').single();
-  if (readError) throw new Error(`could not read the probe attempt: ${readError.message}`);
-  return Date.parse(row.created_at);
+  const probe = await reserve(hex(), hex());
+  await adminClient().from('sign_in_attempts').delete().eq('id', probe.id!);
+  return Date.parse(probe.now);
+}
+
+/** Failure rows `minutesAgo` before `base`, for one account or one address. */
+async function plantFailures(key: { email_hash: string } | { ip_hash: string }, base: number, minutesAgo: number[]) {
+  const rows = minutesAgo.map((m) => ({
+    email_hash: hex(),
+    ip_hash: hex(),
+    ...key,
+    outcome: 'failure',
+    created_at: new Date(base - m * MINUTE).toISOString(),
+  }));
+  const { error } = await adminClient().from('sign_in_attempts').insert(rows);
+  if (error) throw new Error(`could not plant failures: ${error.message}`);
 }
 
 // When this file's run began, by the database's clock. Rows from before it — left pending by
@@ -159,28 +187,80 @@ test('attempts arriving together each count the ones before them (§7.1)', async
   // The local edge runtime answers one sign-in at a time, so parallel requests to the
   // function cannot race here the way they do hosted. The guarantee lives in the database
   // (begin_sign_in_attempt), so it is tested there, with genuinely concurrent calls.
-  const admin = adminClient();
   const emailHash = hex();
-  const since = new Date(Date.now() - 60 * 60_000).toISOString();
-  const reserve = async (): Promise<number> => {
-    const { data, error } = await admin.rpc('begin_sign_in_attempt', {
-      p_email_hash: emailHash,
-      p_ip_hash: hex(),
-      p_account_since: since,
-      p_account_limit: 20,
-      p_ip_since: since,
-      p_ip_limit: 20,
-    });
-    expect(error).toBeNull();
-    return (data as { account: string[] }).account.length;
-  };
+  // A limit of 20 here, so ten attempts stay below it and every one is recorded.
+  const seenBefore = async () => (await reserve(emailHash, hex(), { accountMax: 20 })).account.length;
 
   try {
     // Unlocked, all ten would read the same count. Locked, each sees every one before it.
-    const seen = (await Promise.all(Array.from({ length: 10 }, reserve))).sort((a, b) => a - b);
+    const seen = (await Promise.all(Array.from({ length: 10 }, seenBefore))).sort((a, b) => a - b);
     expect(seen).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   } finally {
-    await admin.from('sign_in_attempts').delete().eq('email_hash', emailHash);
+    await adminClient().from('sign_in_attempts').delete().eq('email_hash', emailHash);
+  }
+});
+
+test('a blocked address writes nothing, so it cannot add to an account’s count (§7.1)', async () => {
+  // The attack this stops: an address already blocked floods one account. If each refused
+  // attempt were recorded and deleted afterwards, five would sit pending there at any instant
+  // and lock the owner out, without one guess reaching Auth.
+  const admin = adminClient();
+  const blockedIp = hex();
+  const otherIp = hex();
+  const victim = hex();
+  try {
+    await plantFailures({ ip_hash: blockedIp }, await databaseNow(), [1, 2, 3]);
+
+    const flood = await Promise.all(Array.from({ length: 10 }, () => reserve(victim, blockedIp, { ipMax: 3 })));
+    expect(flood.map((r) => r.id)).toEqual(Array(10).fill(null));
+
+    const { count } = await admin.from('sign_in_attempts').select('id', { count: 'exact', head: true }).eq('email_hash', victim);
+    expect(count).toBe(0);
+
+    // The owner, from their own address, finds nothing counted against the account.
+    const owner = await reserve(victim, otherIp, { ipMax: 3 });
+    expect(owner.id).not.toBeNull();
+    expect(owner.account).toEqual([]);
+  } finally {
+    await admin.from('sign_in_attempts').delete().in('ip_hash', [blockedIp, otherIp]);
+  }
+});
+
+test('the database blocks exactly when limits.ts does (§7.1)', async () => {
+  // The block rule is written twice — SQL decides before writing, limits.ts computes the
+  // wait — so they are checked against each other at the edges of each rule.
+  const cases: { name: string; account?: number[]; ip?: number[]; blocked: boolean }[] = [
+    { name: 'four account failures', account: [1, 2, 3, 4], blocked: false },
+    { name: 'five inside 15 minutes', account: [1, 2, 3, 4, 5], blocked: true },
+    { name: 'five spanning exactly 15 minutes', account: [1, 2, 3, 4, 16], blocked: true },
+    { name: 'five spanning just over 15 minutes', account: [1, 2, 3, 4, 16.05], blocked: false },
+    { name: 'lock from the newest with a minute left', account: [14, 15, 16, 17, 18], blocked: true },
+    { name: 'lock from the newest a minute over', account: [16, 17, 18, 19, 20], blocked: false },
+    { name: 'address at its limit', ip: [1, 2, 3], blocked: true },
+    { name: 'address with one failure past the hour', ip: [1, 2, 61], blocked: false },
+    { name: 'address with all three just inside the hour', ip: [59.9, 59.95, 59.98], blocked: true },
+  ];
+
+  const admin = adminClient();
+  for (const c of cases) {
+    const emailHash = hex();
+    const ipHash = hex();
+    try {
+      const base = await databaseNow();
+      if (c.account) await plantFailures({ email_hash: emailHash }, base, c.account);
+      if (c.ip) await plantFailures({ ip_hash: ipHash }, base, c.ip);
+
+      const r = await reserve(emailHash, ipHash, { ipMax: 3 });
+      const now = Date.parse(r.now);
+      const times = (ts: string[]) => ts.map((t) => Date.parse(t));
+      const inTypeScript =
+        accountLockout(times(r.account), now).lockedUntil > 0 || ipBlockedUntil(times(r.ip), now, 3) > 0;
+
+      expect({ case: c.name, sql: r.id === null }).toEqual({ case: c.name, sql: c.blocked });
+      expect({ case: c.name, typescript: inTypeScript }).toEqual({ case: c.name, typescript: c.blocked });
+    } finally {
+      await admin.from('sign_in_attempts').delete().or(`email_hash.eq.${emailHash},ip_hash.eq.${ipHash}`);
+    }
   }
 });
 
