@@ -454,13 +454,28 @@ These requirements apply to them:
 
 **Sessions**
 
-| setting | value |
-|---|---|
-| Access token (JWT) lifetime | 1 hour |
-| Refresh token | 30 days, sliding |
-| Absolute session cap | 90 days, then full re-auth |
-| Idle timeout | 14 days without activity |
-| On sign-out | refresh token revoked server-side, not just the cookie cleared |
+| setting | value | enforced by |
+|---|---|---|
+| Access token (JWT) lifetime | 1 hour | `config.toml` `jwt_expiry` |
+| Absolute session cap | 90 days from sign-in, then full re-auth | `expire-sessions` pg_cron job |
+| Idle timeout | 14 days without a token refresh | `expire-sessions` pg_cron job |
+| On sign-out | this device's session deleted server-side, revoking its refresh tokens | Auth |
+
+A refresh token has no lifetime of its own. It is rotated on every use and lasts exactly as
+long as its session, so the two session limits above are the limits.
+
+Supabase's own settings for them (`config.toml` `[auth.sessions]` `timebox` and
+`inactivity_timeout`) are **Pro-plan only**. On the Free plan they are ignored and a session
+never ends by itself. So migration `20260916175247_expire_sessions.sql` schedules an hourly
+pg_cron job, run as `postgres`, that deletes every `auth.sessions` row past either limit.
+Deleting the row deletes its refresh tokens with it, so the next refresh is refused and the
+app returns to sign-in. Idle is measured from `refreshed_at` (falling back to `updated_at`,
+then `created_at`). supabase-js refreshes about hourly while a tab is open, so "idle" means
+no open tab for 14 days. A session can outlive its limit by up to an hour, because the job
+runs hourly. After that, its last access token still works against the database for up to
+another hour, because PostgREST checks the token's signature, not whether the session still
+exists. `config.toml` keeps `[auth.sessions]` so the local stack, and a Pro plan if one ever
+applies, behave the same way.
 
 **Rate limits** — set these explicitly; do not accept provider defaults.
 
@@ -617,8 +632,15 @@ SVG is not an accepted type anywhere. It is a script execution vector.
   hold them in an `HttpOnly` cookie: the browser calls Supabase directly and has to attach the
   token itself, so only a server in front of every Supabase call could keep it out of reach.
   What that trade costs: script injected into the page (XSS, a compromised dependency) could
-  copy the refresh token and use it elsewhere until it expires or is revoked, instead of only
-  acting while the tab is open. Accepted for two users, on three conditions:
+  copy the refresh token and use it elsewhere, instead of only acting while the tab is open.
+  A copied token works until its session ends (§7.1): the user signs out on that device,
+  changes their password, or deletes the account; or the session reaches 90 days from
+  sign-in or 14 days without a refresh. The thief's own refreshes count as activity, so a
+  thief who keeps refreshing is stopped only by the **90-day cap** or one of the user's
+  actions. The user carrying on with the app does not evict them either: Auth still accepts a
+  refresh token one rotation behind (measured locally). Nothing bounds it at all on the Free
+  plan without the `expire-sessions` job. After the session ends, the last access token the
+  thief received still works for up to an hour. Accepted for two users, on three conditions:
   1. **The CSP ships enforced before any real user data exists.** Release blocker, not a
      follow-up — it stops injected script from running at all, which is the actual defence.
   2. The dependency tree stays small (§7.6) and no user content is rendered as HTML (§7.3).
@@ -1131,6 +1153,16 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-16
+- **Session limits are now enforced by a pg_cron job (§7.1, §7.5).** Found in the same review.
+  `config.toml`'s `[auth.sessions]` 90-day cap and 14-day idle timeout are Pro-plan settings,
+  and on the Free plan Supabase refresh tokens never expire. That made both limits unmet
+  hosted, and made §7.5's "until it expires" wrong: a copied refresh token would have worked
+  indefinitely. An hourly job now deletes sessions past either limit, which revokes their
+  refresh tokens (verified locally against a throwaway user, for each limit and just inside
+  both). The "refresh token 30 days, sliding" row is gone: a refresh token lasts as long as its
+  session, so the idle cutoff was always the real limit. §7.5 now says what actually bounds a
+  stolen token. A second daily job keeps `cron.job_run_details` to 30 days, which the hourly
+  job would otherwise grow without end.
 - **The 90-day log purge now actually runs (§7.7).** Found in a whole-repo security review.
   `purge_old_logs()` existed from the start, but only a comment said to schedule it, so once
   hosted every `app_errors` and `security_events` row would have been kept forever, user ids

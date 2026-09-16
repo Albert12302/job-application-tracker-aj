@@ -145,9 +145,32 @@ emails, and user ids that are published in this repo for anyone to read. Plain
 `db push` applies migrations only and is the only form you need. Your own account goes
 in by hand in the dashboard, with a password from a password manager.
 
-`config.toml` settings do not all sync on push; confirm the §7.1 auth values (JWT expiry,
-password minimum, `enable_signup`, rate limits) in the dashboard after linking, and change
-them in the file rather than the UI from then on.
+`config.toml` settings do not all sync on push. After linking, confirm these §7.1 auth values
+in the dashboard, and from then on change them in the file rather than the UI:
+
+- JWT expiry 3600 s. Refresh-token rotation on, reuse interval 10 s.
+- Password minimum 12. `enable_signup` off.
+- Email confirmations on. Secure password change on. Email OTP / link expiry 3600 s.
+- Rate limits (`[auth.rate_limit]`).
+- **Sessions:** the dashboard's time-box and inactivity timeout are Pro-only. Leave them
+  unset. On the Free plan, the `expire-sessions` pg_cron job enforces §7.1's 90-day cap and
+  14-day idle limit instead. It arrives with `db push`.
+
+**Then check that the session job can actually delete, hosted.** It depends on `postgres`
+keeping its DELETE grant on `auth.sessions`, a Supabase-managed table. An hour after
+`db push`, run this in the SQL editor:
+
+```sql
+select d.status, d.return_message, d.start_time
+  from cron.job_run_details d join cron.job j using (jobid)
+ where j.jobname = 'expire-sessions'
+ order by d.start_time desc limit 3;
+```
+
+Expect `succeeded` with `DELETE 0` (or a count). A `failed` row saying `permission denied`
+means sessions never expire hosted, and §7.1 is unmet. Fix that before any real data goes in.
+`select jobname, schedule from cron.job;` should list `expire-sessions`,
+`purge-cron-run-details` and `purge-old-logs`.
 
 `enable_signup` is `false`. The deployed app therefore has no way to create your account —
 add it in the dashboard (Auth → Users → Add user, with "auto confirm"), or flip the flag,

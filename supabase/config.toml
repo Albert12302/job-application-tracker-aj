@@ -74,6 +74,10 @@ token_verifications = 30              # per 5 min per IP
 anonymous_users = 0
 
 [auth.sessions]
+# Takes effect only locally or on a Pro plan. The hosted Free plan ignores both
+# settings and never expires a session. There the limits are enforced by the
+# expire-sessions pg_cron job (migration 20260916175247_expire_sessions.sql).
+# Keep the values here in step with that job.
 timebox = "2160h"                     # 90-day absolute cap, then full re-auth (§7.1)
 inactivity_timeout = "336h"           # 14 days idle (§7.1)
 
