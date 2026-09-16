@@ -1,0 +1,35 @@
+version: 2
+
+# SPEC §7.6: "Keep dependencies patched; run an automated vulnerability scan in
+# CI and on a schedule." The scan lives in ci.yml; this is the other half —
+# something that actually proposes the patch rather than only reporting the
+# hole.
+#
+# Grouped into one pull request per ecosystem per week. Ungrouped, a tree this
+# size opens a handful of separate PRs every Monday, and the project has two
+# people to review them; a pile nobody reads patches nothing.
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Patch and minor bumps are the ones that should be boring to merge, and
+      # CI has to pass before they can be.
+      routine:
+        update-types: [minor, patch]
+    # Majors still arrive as their own PRs: React, Vite, Zod and Supabase have
+    # all had majors that changed behaviour this project depends on (CLAUDE.md
+    # records several), so they deserve reading one at a time.
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']

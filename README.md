@@ -87,6 +87,28 @@ SPEC §4.1d. Create accounts via seed or Studio.
 schema is applied and the app exists — that is correct. Get them passing as part of the
 features they cover, never by weakening an assertion.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push to `master` and every pull request: typecheck,
+lint, the unit suite **in two timezones**, and the build. `.github/dependabot.yml` proposes
+dependency updates weekly, grouped so they stay reviewable.
+
+The second timezone is the point, not thoroughness for its own sake. `date_applied` is stored
+at UTC midnight and formatted in UTC everywhere (SPEC §5.4); rendered in local time it shows
+the previous day west of Greenwich, and nowhere east of it — so a UTC-only runner proves
+nothing. The job asserts the zone actually applied before running the suite, because a `TZ`
+that silently falls back leaves the suite green having tested nothing. (That is not
+hypothetical: on Windows `TZ=America/Los_Angeles` is ignored — use `TZ=PST8PDT` locally.)
+
+The vulnerability scan (§7.6) is blocking for runtime dependencies, which ship to the browser,
+and report-only for dev dependencies, which do not — an unfixable advisory in a test tool
+should not stop all work.
+
+**The Playwright suite is not in CI yet.** It needs the whole Supabase stack on the runner,
+and the §7.1 sign-in timing check fails about half of full local runs for reasons of load
+rather than correctness. A pipeline that is red half the time teaches people to ignore it.
+Fix that test, then add the job.
+
 ## Deploy
 
 **Vercel (Hobby) + Supabase (Free).** Both free, neither requires a card, and Hobby's terms
@@ -104,7 +126,8 @@ Vercel's `vercel.json` handles all of it; Cloudflare Pages and Netlify do the sa
 npx supabase link --project-ref <ref>
 npx supabase db push                       # applies migrations/ to the hosted project
 npx supabase functions deploy sign-in
-npx supabase functions deploy upload       # the only way files reach Storage (§7.3)
+npx supabase functions deploy upload          # the only way files reach Storage (§7.3)
+npx supabase functions deploy delete-account  # the only thing that can remove an auth.users row (§9.7)
 npx supabase secrets set SIGN_IN_HASH_PEPPER="$(openssl rand -hex 32)"
 npx supabase secrets set ALLOWED_ORIGINS="https://<your-app>.vercel.app"   # without it, browser sign-in fails CORS
 # Never set SIGN_IN_IP_MAX_FAILURES here — it is local-only; unset means the §7.1 limit of 20.
@@ -130,7 +153,43 @@ them in the file rather than the UI from then on.
 add it in the dashboard (Auth → Users → Add user, with "auto confirm"), or flip the flag,
 deploy, sign up, and flip it back.
 
+### Backups
+
+SPEC §7.6 wants point-in-time recovery before real user data exists. PITR and daily backups
+are **paid** Supabase features, and no payment card goes on either service — that rule is what
+guarantees this project cannot generate a bill. So the requirement is met the other way:
+`.github/workflows/backup.yml` dumps the hosted database every night and keeps the dump as a
+build artifact for 90 days.
+
+**The dump is encrypted, and that is not optional.** This repository is public, and workflow
+artifacts on a public repository can be downloaded by anyone who can read the repo. An
+unencrypted dump would publish every application, note and email address in the database. It
+is encrypted on the runner with an `age` **public** key, so CI can write a backup it cannot
+itself read and the private key never exists in GitHub.
+
+Set up once:
+
+```bash
+age-keygen -o backup-key.txt     # keep this file in a password manager, never in the repo
+```
+
+- Repository **variable** `BACKUP_AGE_RECIPIENT` — the `age1…` public key. Not a secret.
+- Repository **secret** `SUPABASE_DB_URL` — the hosted Postgres connection string.
+
+Until both exist the job skips with a notice instead of failing nightly. Restore with:
+
+```bash
+age -d -i backup-key.txt -o backup.tar.gz backup-YYYY-MM-DD.tar.gz.age
+tar xzf backup.tar.gz            # schema.sql, then data.sql
+```
+
+§7.6 also says to **test a restore at least once**. Do it against a scratch local database
+before trusting it — an untested backup is a hope, not a backup.
+
 ### Vercel
+
+The app lives at the repository root, so Vercel's defaults apply and no "Root Directory"
+needs setting.
 
 `vercel.json` is committed with the SPA rewrite and the §7.5 headers. Two edits before it
 means anything:
