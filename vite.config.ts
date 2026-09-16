@@ -41,6 +41,15 @@ export default defineConfig(({ mode }) => {
     // Preview only: the dev server's hot reload injects inline scripts the policy blocks.
     preview: csp ? { headers: { 'Content-Security-Policy': csp } } : {},
     test: {
+      // Fixed stand-ins, so no unit test depends on a gitignored .env.local.
+      // data/client.ts throws at import time without these, so a test that
+      // imports something under data/ for real — rather than mocking it — passes
+      // on a machine that has run the app and fails in CI. Never a real
+      // project: nothing in the unit suite makes a request.
+      env: {
+        VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+        VITE_SUPABASE_ANON_KEY: 'unit-test-anon-key',
+      },
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       // e2e/ belongs to Playwright; Vitest owns only co-located unit and
