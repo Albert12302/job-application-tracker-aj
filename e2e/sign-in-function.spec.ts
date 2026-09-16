@@ -238,7 +238,9 @@ test('the database blocks exactly when limits.ts does (§7.1)', async () => {
     { name: 'lock from the newest a minute over', account: [16, 17, 18, 19, 20], blocked: false },
     { name: 'address at its limit', ip: [1, 2, 3], blocked: true },
     { name: 'address with one failure past the hour', ip: [1, 2, 61], blocked: false },
-    { name: 'address with all three just inside the hour', ip: [59.9, 59.95, 59.98], blocked: true },
+    // Six seconds inside, not one: planting and reserving take a few calls, and a busy
+    // machine must not push the oldest failure past the hour before the check runs.
+    { name: 'address with all three just inside the hour', ip: [59.8, 59.85, 59.9], blocked: true },
   ];
 
   const admin = adminClient();
