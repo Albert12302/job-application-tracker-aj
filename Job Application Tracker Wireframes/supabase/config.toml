@@ -86,3 +86,6 @@ verify_jwt = false                    # it is the pre-auth endpoint
 
 [functions.upload]
 verify_jwt = true                     # signed-in users only; the function then asks Auth who
+
+[functions.delete-account]
+verify_jwt = true                     # same: the token names whose account goes, never the body

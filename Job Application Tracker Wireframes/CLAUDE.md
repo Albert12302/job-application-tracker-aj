@@ -271,7 +271,9 @@ src/
   services/                   multi-table operations that must not live in a component
     change-status.ts          the ONE status-change path: update + status_history (§9.1)
     delete-application.ts     cascade + Storage cleanup (§9.2)
-    delete-account.ts         Storage first, then auth.users + cascade (§9.7)
+    delete-account.ts         Storage first, then auth.users + cascade (§9.7). The order is
+                              the rule: Storage does not cascade, so a failed file delete has
+                              to stop before the account is gone
     export-data.ts            client-side zip of the user's own data (§9.8)
     report-error.ts           the ONE error-reporting path (§7.7)
 
@@ -359,6 +361,11 @@ src/
     ErrorState.tsx
 
   hooks/                      generic: useMediaQuery, prefersReducedMotion
+  lib/
+    utils.ts                  the shadcn `cn` helper — stays exactly as generated
+    save-file.ts              hands the browser a blob to save; used by the cover-letter
+                              download (§4.4) and the export (§9.8), so it sits above both
+                              rather than inside either feature
   styles/globals.css          Tailwind layers + the audited palette (§3) as CSS variables
                               wired into the shadcn theme tokens
   test/                       setup, factories, a11y helpers
@@ -463,10 +470,14 @@ supabase/
   `new Function`, which the enforced CSP reports as a violation on every load. Any new
   dependency that needs `eval` or `new Function` is a CSP problem — check it with
   `npm run build && npm run preview` before adopting it.
+- **A library that spawns a worker is the same CSP problem.** The §7.5 policy has no
+  `worker-src`, so a worker falls back to `default-src 'self'` and a `blob:` worker is refused.
+  `fflate` (the export's zip, `services/export-data.ts`) is imported as `zipSync` **only** —
+  its async API builds exactly such a worker. Check a new dependency for both before adopting it.
 - **Private-bucket images render as `data:` URLs** downloaded through the authenticated client
   (`data/storage.ts`), not signed URLs: no fetchable link sits in the page, and nothing needs
   revoking. Downloads the user clicks (cover letters) are fetched through a 60-second signed URL
-  made on the click (§7.3) and saved from a blob (`features/applications/save-file.ts`) — never
+  made on the click (§7.3) and saved from a blob (`lib/save-file.ts`) — never
   handed to the browser as a link: Storage percent-encodes the name in `Content-Disposition`'s
   plain `filename`, which WebKit uses, and storage-js's own `download` option encodes it twice.
   Preview (PDF only) is the one exception: a blank tab opened during the click, `opener` cut,
@@ -517,6 +528,15 @@ supabase/
   Postgres function; the creation row comes from `create_application`. Never write `status` in
   a plain update, and never insert into `status_history` from the client.
 - Deleting an application deletes its notes, history, and Storage objects. No orphaned files.
+- **Deleting an account deletes its Storage objects first, then the `auth.users` row** (§9.7),
+  through `supabase/functions/delete-account`. The function takes no id — the token says whose
+  account goes — and writes the `account_deletion` `security_events` row itself, with the
+  service role, after the delete succeeds. `security_events.user_id` has no foreign key for
+  that reason (migration `20260915192815`); `app_errors.user_id` still nulls on delete.
+- **Deletion tests use a throwaway user, never a seed one** (`e2e/throwaway-user.ts`): the test
+  destroys the account it runs as, so `dev-a` … `dev-g` cannot serve, and a seeded eighth user
+  would only work until the first run consumed it. The helper reads the local service-role key
+  from `supabase status`, so it cannot be aimed at a hosted project.
 - Debug mode and verbose errors off in production builds.
 - **Every error is reported through `reportError()`** — never a direct insert or SDK call from
   a component. Stack traces yes; form values, note bodies, and emails never.
@@ -574,7 +594,11 @@ limit, and do not add a new limit without deciding where it lives:
   **as the user**. It is Storage's only writer and stores with the service role, whose
   `auth.uid()` is null, so a trigger on `storage.objects` would count nothing.
 
-The two functions are the only places the service role key exists.
+- `supabase/functions/delete-account` — no limit of its own; it is the only place that can
+  remove an `auth.users` row (SPEC §9.7). Deletion is not rate-limited: a user deleting their
+  own account once is the end of the story, and a second call has no account to act on.
+
+The three functions are the only places the service role key exists.
 
 `public.rate_limits` has RLS on and no policies at all. That is not an oversight; the definer
 functions and the service role are the only intended readers.

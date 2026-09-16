@@ -20,7 +20,7 @@ import { CoverLetterSize } from './CoverLetterSize';
 import { SECTION_HEADING } from './panel';
 import { RemoveCoverLetterDialog } from './RemoveCoverLetterDialog';
 import { openPreviewTab } from './preview-tab';
-import { saveFile } from './save-file';
+import { saveFile } from '@/lib/save-file';
 
 const ACTION = 'h-9 max-[760px]:h-11';
 

@@ -7,6 +7,8 @@ import { useProfile } from '@/queries/use-profile';
 import { useSignedInUser } from '@/queries/use-session';
 import { ApplicationCount } from './ApplicationCount';
 import { AvatarUpload } from './AvatarUpload';
+import { DeleteAccountButton } from './DeleteAccountButton';
+import { ExportDataButton } from './ExportDataButton';
 import { SignOutButton } from './SignOutButton';
 
 const CARD = 'mx-auto flex w-full max-w-[320px] flex-col gap-5 rounded-xl border bg-card p-5 shadow-xs';
@@ -60,7 +62,9 @@ export function ProfileScreen() {
         </h1>
         <ApplicationCount />
       </div>
+      <ExportDataButton />
       <SignOutButton />
+      <DeleteAccountButton />
     </section>
   );
 }

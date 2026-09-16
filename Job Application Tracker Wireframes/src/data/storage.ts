@@ -49,13 +49,25 @@ export async function uploadFile(kind: UploadKind, file: Blob): Promise<string> 
 }
 
 /**
- * The avatar as a data: URL. Downloaded through the authenticated client rather
- * than a signed URL, so no fetchable link to the file ever sits in the page;
- * a data: URL also needs no revoking, unlike a blob: URL.
+ * The avatar's bytes, through the authenticated client — not a signed URL.
+ *
+ * The rule for private-bucket images (CLAUDE.md): nothing fetchable ever sits
+ * in the page. §9.8 describes the export as fetching every file through the
+ * detail screen's signed URLs, but the detail screen has never fetched the
+ * avatar that way, and an export is not a reason to start.
  */
-export async function downloadAvatarDataUrl(path: string): Promise<string> {
+export async function downloadAvatar(path: string): Promise<Blob> {
   const { data, error } = await supabase.storage.from(AVATARS).download(path);
   if (error) throw error;
+  return data;
+}
+
+/**
+ * The avatar as a data: URL. A data: URL also needs no revoking, unlike a
+ * blob: URL.
+ */
+export async function downloadAvatarDataUrl(path: string): Promise<string> {
+  const data = await downloadAvatar(path);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
@@ -135,4 +147,41 @@ export function removeAvatarObject(path: string): Promise<void> {
 
 export function removeCoverLetterObject(path: string): Promise<void> {
   return removeObject(COVER_LETTERS, path);
+}
+
+/** Storage's list is paged; this is its per-request maximum here, not a total. */
+const LIST_PAGE = 100;
+
+/** Every object in the user's own folder of `bucket`, however many. */
+async function listOwnObjects(bucket: string, userId: string): Promise<string[]> {
+  const paths: string[] = [];
+  for (let offset = 0; ; offset += LIST_PAGE) {
+    const { data, error } = await supabase.storage.from(bucket).list(userId, { limit: LIST_PAGE, offset });
+    if (error) throw error;
+    // An id of null is a folder placeholder, not a stored object.
+    paths.push(...(data ?? []).filter((object) => object.id !== null).map((object) => `${userId}/${object.name}`));
+    if (!data || data.length < LIST_PAGE) return paths;
+  }
+}
+
+/**
+ * Everything this user has stored, in both buckets — the first half of an
+ * account deletion (SPEC §9.7).
+ *
+ * The folder is listed rather than derived from `cover_letter_path` and
+ * `avatar_path`, so a file whose row was already lost goes too. After this the
+ * account is deleted and there is no owner left to find an orphan by.
+ *
+ * Unlike removeObject, a path that is already gone is not an error: this is
+ * destroying files, not tracking them, and a retry after a half-finished
+ * deletion has to be able to finish (§9.7).
+ */
+export async function removeAllOwnObjects(userId: string): Promise<void> {
+  for (const bucket of [COVER_LETTERS, AVATARS]) {
+    const paths = await listOwnObjects(bucket, userId);
+    for (let start = 0; start < paths.length; start += LIST_PAGE) {
+      const { error } = await supabase.storage.from(bucket).remove(paths.slice(start, start + LIST_PAGE));
+      if (error) throw error;
+    }
+  }
 }

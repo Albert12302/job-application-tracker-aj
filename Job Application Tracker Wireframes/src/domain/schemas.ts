@@ -174,6 +174,8 @@ export type SignInValues = z.infer<typeof signInSchema>;
 export const signInSearchSchema = z.object({
   redirect: z.string().max(2000).optional().catch(undefined),
   expired: z.boolean().optional().catch(undefined),
+  /** Arrived here because the account was just deleted (§9.7). */
+  deleted: z.boolean().optional().catch(undefined),
 });
 
 /** The sign-in edge function's 200 body. Only the two tokens setSession needs
