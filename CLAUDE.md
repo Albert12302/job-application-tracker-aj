@@ -176,8 +176,9 @@ Three layers, each with a job:
   `VITE_SUPABASE_ANON_KEY` are missing, so a test that imports something under `data/` for
   real — rather than mocking it, which is what an `instanceof` check on an error class needs —
   passes on any machine that has run the app and fails on a CI runner, which has no
-  `.env.local`. That is how 14 tests sat in the repo without ever running in CI. Never point
-  those values at a real project; nothing in the unit suite makes a request.
+  `.env.local`. That is how 14 tests sat in the repo without ever running in CI. The URL is a
+  `.invalid` host on purpose: a stray request must fail, not reach the local stack when it
+  happens to be running. Never point those values at a real project.
 - **Testing Library** for components with logic worth asserting: the form's validation
   messages, the three states of a list (§8), keyboard operation of the filter builder.
   Query by role and label, never by test id — a test that cannot find the button by its
