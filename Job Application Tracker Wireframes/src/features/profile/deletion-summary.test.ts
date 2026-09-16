@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { ReportedError } from '@/queries/errors';
+import { AccountDeletionError } from '@/services/delete-account';
 import {
   deletionFailureMessage,
   deletionProgressLabel,
   deletionSummarySentence,
   emailMatches,
+  failedDeletionStage,
 } from './deletion-summary';
 
 /** The exact words shown before an irreversible act (SPEC §9.7). */
@@ -73,5 +76,32 @@ describe('emailMatches', () => {
   it('an account with no address can never be confirmed, rather than confirmed by an empty box', () => {
     expect(emailMatches('', null)).toBe(false);
     expect(emailMatches('   ', null)).toBe(false);
+  });
+});
+
+describe('failedDeletionStage', () => {
+  it('reads the stage through the ReportedError that reporting() wraps it in', () => {
+    // The service's error never arrives bare: queries/errors.ts wraps every
+    // failure, so testing the outer error for AccountDeletionError finds nothing.
+    const reported = new ReportedError('abcd1234', new AccountDeletionError('account'));
+
+    expect(failedDeletionStage(reported, null)).toBe('account');
+    expect(failedDeletionStage(reported, 'files')).toBe('account');
+  });
+
+  it('reads a bare one too, for a caller that does not report', () => {
+    expect(failedDeletionStage(new AccountDeletionError('files'), null)).toBe('files');
+  });
+
+  it('falls back when the failure is not the deletion service"s own', () => {
+    expect(failedDeletionStage(new Error('network'), 'files')).toBe('files');
+    expect(failedDeletionStage(new ReportedError('abcd1234', new Error('network')), null)).toBeNull();
+    expect(failedDeletionStage(null, null)).toBeNull();
+  });
+
+  it('a stage read this way picks the copy that matches what actually happened', () => {
+    const reported = new ReportedError('abcd1234', new AccountDeletionError('account'));
+
+    expect(deletionFailureMessage(failedDeletionStage(reported, null))).toContain('Your files have been removed');
   });
 });

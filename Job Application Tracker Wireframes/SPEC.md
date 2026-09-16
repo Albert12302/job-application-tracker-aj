@@ -829,7 +829,7 @@ Nothing ships with an unhandled failure.
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
 | Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
-| Delete account (dialog) | "Counting what goes…" in place of the sentence, confirm disabled until counted; then "Removing your files…" and "Deleting your account…" in the confirm button, with the dialog's other controls disabled and the same words in a live region (§10.4) | n/a | Stops where it failed, dialog open, confirming again carries on (§9.7). On Storage: "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again." On the account: "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish." Both with an error reference. A count that will not load does not block the delete: the sentence loses its numbers instead |
+| Delete account (dialog) | "Counting what goes…" in place of the sentence, confirm disabled until counted **and while an export started in the dialog is still running** (§9.8); then "Removing your files…" and "Deleting your account…" in the confirm button, with the dialog's other controls disabled and the same words in a live region (§10.4) | n/a | Stops where it failed, dialog open, confirming again carries on (§9.7). On Storage: "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again." On the account: "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish." Both with an error reference. A count that will not load does not block the delete: the sentence loses its numbers instead |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
 | Offline | n/a | n/a | Persistent banner: "You're offline. Changes won't save." Disable mutations |
 
@@ -946,6 +946,11 @@ rules are specific:
   `security_events.user_id` therefore has **no** foreign key to `auth.users`; it keeps an
   opaque UUID for the table's 90-day retention. `app_errors.user_id` is still
   `on delete set null`, so stack traces keep their traces and lose the person.
+- **The export offered here is not overtakeable.** While an export started in the dialog is
+  running, the confirm is disabled: destroying the account mid-export would strand its files in
+  `export-errors.txt` and then discard the zip on the way out, which is the exact opposite of
+  offering a way out. Closing the dialog does not cancel or lose a running export — the file is
+  saved by the export itself, not by the button that started it.
 - **A retry has to be able to finish.** Failing on Storage leaves the account and all its data
   intact; failing on the account leaves the files gone and the account present — the §9.4
   broken-record shape, and unavoidable given the order. The dialog says which of the two
@@ -1115,6 +1120,14 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-15
+- **The deletion dialog now waits for what it is holding (§8.2, §9.7, §9.8).** Found in review.
+  Three async things run in that dialog — the counts, the export, the deletion — and the confirm
+  only knew about the last. It could destroy the account while the counts still read "Counting
+  what goes…" (which §8.2 had already forbidden in writing), and while the export that is the
+  user's only way out was still fetching. Saving the zip also moved out of the button's
+  `mutate()` callback and into the export itself, because closing the dialog unmounts the button
+  and React Query drops call-level callbacks — a finished export was being discarded with no
+  download, no error, and nothing said.
 - **§6 step 7 finished: account deletion (§9.7), built after export.**
 - **Deletion runs through a third edge function (§7.4, §9.7).** Removing an `auth.users` row
   needs the service role, and the browser must never hold it, so `supabase/functions/delete-account`

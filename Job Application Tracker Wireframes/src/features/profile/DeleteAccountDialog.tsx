@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useIsMutating } from '@tanstack/react-query';
 import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,14 +15,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ErrorState } from '@/components/ErrorState';
 import { errorReference } from '@/queries/errors';
+import { keys } from '@/queries/keys';
 import { useDeletionSummary } from '@/queries/use-delete-account';
 import { useSignedInUser } from '@/queries/use-session';
-import { AccountDeletionError, type DeletionStage } from '@/services/delete-account';
+import type { DeletionStage } from '@/services/delete-account';
 import {
   deletionFailureMessage,
   deletionProgressLabel,
   deletionSummarySentence,
   emailMatches,
+  failedDeletionStage,
 } from './deletion-summary';
 import { ExportDataButton } from './ExportDataButton';
 
@@ -62,8 +65,19 @@ export function DeleteAccountDialog({
   // irreversible act should be the number that is true now.
   const summary = useDeletionSummary(open);
 
+  // An export the user started from in here is the thing standing between them
+  // and losing everything, so nothing may destroy the account while it runs
+  // (§9.8). Read from the mutation key rather than passed down, because the
+  // export button owns its own state.
+  const exporting = useIsMutating({ mutationKey: keys.dataExport(user.id) }) > 0;
+
   const confirmed = emailMatches(typed, user.email);
-  const failedStage = error instanceof AccountDeletionError ? error.stage : stage;
+  const failedStage = failedDeletionStage(error, stage);
+
+  // Nothing irreversible before the numbers land: §8.2 promises the confirm is
+  // disabled until counted. `isPending` only — a count that failed shows the
+  // sentence without its numbers and must still not block the delete (§9.2).
+  const ready = !summary.isPending && !exporting;
 
   return (
     <Dialog
@@ -119,7 +133,7 @@ export function DeleteAccountDialog({
           <DialogClose disabled={pending} render={<Button variant="outline" />}>
             Keep my account
           </DialogClose>
-          <Button variant="destructive" disabled={pending || !confirmed} onClick={onConfirm}>
+          <Button variant="destructive" disabled={pending || !confirmed || !ready} onClick={onConfirm}>
             {pending ? (
               <>
                 <Loader2Icon aria-hidden="true" className="animate-spin" />

@@ -1,5 +1,6 @@
+import { ReportedError } from '@/queries/errors';
 import type { DeletionSummary } from '@/queries/use-delete-account';
-import type { DeletionStage } from '@/services/delete-account';
+import { AccountDeletionError, type DeletionStage } from '@/services/delete-account';
 
 /**
  * The words the account-deletion dialog uses (SPEC §9.7). Kept out of the
@@ -44,6 +45,23 @@ export function deletionFailureMessage(stage: DeletionStage | null): string {
   return stage === 'account'
     ? "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish."
     : "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again.";
+}
+
+/**
+ * Which half of the deletion failed, read from the error itself.
+ *
+ * `reporting()` wraps every failure in a ReportedError, so the AccountDeletionError
+ * the service threw is one `cause` down — testing the outer error for it never
+ * matches. Unwrapped explicitly rather than leaning on the last stage the
+ * progress callback happened to report: this decides what someone is told about
+ * a half-deleted account, and it should not be right by accident.
+ *
+ * `fallback` covers a failure that is not the service's own — nothing has been
+ * deleted then, which is what the files-stage copy says.
+ */
+export function failedDeletionStage(error: unknown, fallback: DeletionStage | null): DeletionStage | null {
+  const cause = error instanceof ReportedError ? error.cause : error;
+  return cause instanceof AccountDeletionError ? cause.stage : fallback;
 }
 
 /**

@@ -127,6 +127,24 @@ describe('Export my data', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('still saves the zip when the button unmounts mid-export (§9.8)', async () => {
+    // The export button lives inside the deletion dialog, which unmounts on
+    // close. A finished export must not be thrown away for that: no download,
+    // no error, and nothing said would be the worst moment to lose a file.
+    const letter = deferred<Blob>();
+    downloadCoverLetter.mockReturnValue(letter.promise);
+    const { user, unmount } = renderButton();
+
+    await user.click(screen.getByRole('button', { name: 'Export my data' }));
+    await screen.findByRole('button', { name: 'Adding files (0 of 1)…' });
+
+    unmount();
+    letter.settle(new Blob(['%PDF-1.4']));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(1));
+    expect(saveFile.mock.calls[0]![1]).toMatch(/\.zip$/);
+  });
+
   it('is clean to axe, at rest and in its error state', async () => {
     listApplications.mockRejectedValueOnce(new Error('network'));
     const { container, user } = renderButton();

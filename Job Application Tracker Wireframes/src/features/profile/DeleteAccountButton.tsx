@@ -31,7 +31,13 @@ export function DeleteAccountButton() {
 
       <DeleteAccountDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          // A failure belongs to the attempt that caused it. Without this, the
+          // dialog reopens already showing the last one's alert and reference,
+          // before the user has done anything.
+          if (!next) deleteAccount.reset();
+          setOpen(next);
+        }}
         pending={deleteAccount.isPending}
         stage={deleteAccount.stage}
         error={deleteAccount.error}

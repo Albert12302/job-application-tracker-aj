@@ -19,6 +19,7 @@ const signOut = vi.fn();
 const countApplications = vi.fn();
 const countAllNotes = vi.fn();
 const countCoverLetters = vi.fn();
+const listApplications = vi.fn();
 const navigate = vi.fn();
 
 vi.mock('@/data/client', () => ({
@@ -41,7 +42,7 @@ vi.mock('@/data/auth', () => ({ signOut: (...a: unknown[]) => signOut(...a) }));
 vi.mock('@/data/applications', () => ({
   countApplications: (...a: unknown[]) => countApplications(...a),
   countCoverLetters: (...a: unknown[]) => countCoverLetters(...a),
-  listApplications: async () => [],
+  listApplications: (...a: unknown[]) => listApplications(...a),
 }));
 vi.mock('@/data/notes', () => ({ countAllNotes: (...a: unknown[]) => countAllNotes(...a), listAllNotes: async () => [] }));
 vi.mock('@/data/status-history', () => ({ listStatusHistory: async () => [] }));
@@ -77,8 +78,18 @@ beforeEach(() => {
   countApplications.mockReset().mockResolvedValue(7);
   countAllNotes.mockReset().mockResolvedValue(12);
   countCoverLetters.mockReset().mockResolvedValue(2);
+  listApplications.mockReset().mockResolvedValue([]);
   navigate.mockReset();
 });
+
+/** A promise this test settles, to hold an async step open. */
+function deferred<T>() {
+  let settle!: (value: T) => void;
+  const promise = new Promise<T>((resolve) => {
+    settle = resolve;
+  });
+  return { promise, settle };
+}
 
 describe('Delete my account', () => {
   it('names exactly what goes, counted when the dialog opens (§9.7)', async () => {
@@ -161,6 +172,60 @@ describe('Delete my account', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete my account' }));
+  });
+
+  it('will not delete while an export started in here is still running (§9.8)', async () => {
+    // The export is the thing standing between the user and losing everything.
+    const reading = deferred<never[]>();
+    listApplications.mockReturnValue(reading.promise);
+    const { dialog, user } = await openDialog();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Export my data' }));
+    await user.type(within(dialog).getByLabelText('Type your email address to confirm'), TEST_USER.email);
+
+    // The address is typed and the counts are in, so only the export is holding it.
+    const confirm = within(dialog).getByRole('button', { name: 'Delete my account' });
+    await waitFor(() => expect(confirm).toHaveProperty('disabled', true));
+
+    reading.settle([]);
+    await waitFor(() => expect(confirm).toHaveProperty('disabled', false));
+    expect(removeAllOwnObjects).not.toHaveBeenCalled();
+  });
+
+  it('will not delete before the counts land, so nothing goes on "Counting what goes…" (§8.2)', async () => {
+    const counting = deferred<number>();
+    countApplications.mockReturnValue(counting.promise);
+    const { user } = renderProfile();
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('Counting what goes…');
+
+    await user.type(within(dialog).getByLabelText('Type your email address to confirm'), TEST_USER.email);
+    const confirm = within(dialog).getByRole('button', { name: 'Delete my account' });
+    expect(confirm).toHaveProperty('disabled', true);
+
+    counting.settle(7);
+    await within(dialog).findByText(/Deletes 7 applications/);
+    await waitFor(() => expect(confirm).toHaveProperty('disabled', false));
+  });
+
+  it('reopening after a failure starts clean, not on the last attempt"s error', async () => {
+    deleteAccountRow.mockRejectedValueOnce(new Error('function down'));
+    const { dialog, user } = await openDialog();
+
+    await user.type(within(dialog).getByLabelText('Type your email address to confirm'), TEST_USER.email);
+    await user.click(within(dialog).getByRole('button', { name: 'Delete my account' }));
+    await within(dialog).findByRole('alert');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Keep my account' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    const reopened = await screen.findByRole('dialog');
+    await within(reopened).findByText(/Deletes 7 applications/);
+
+    expect(within(reopened).queryByRole('alert')).toBeNull();
   });
 
   it('is clean to axe with the dialog open', async () => {

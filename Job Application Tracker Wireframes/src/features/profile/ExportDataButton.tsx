@@ -1,10 +1,8 @@
 import { DownloadIcon, Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ErrorState';
-import { saveFile } from '@/lib/save-file';
 import { errorReference } from '@/queries/errors';
 import { useExportData } from '@/queries/use-export';
-import { exportFilename } from '@/services/export-data';
 import { exportProgressLabel } from './export-progress';
 
 /**
@@ -17,7 +15,11 @@ import { exportProgressLabel } from './export-progress';
 export function ExportDataButton() {
   const exportData = useExportData();
   const label = exportProgressLabel(exportData.stage);
-  const run = () => exportData.mutate(undefined, { onSuccess: (zip) => saveFile(zip, exportFilename()) });
+  // No call-level callback: the zip is saved inside the mutation, so closing
+  // the deletion dialog mid-export cannot throw the finished file away.
+  // No call-level callback: the zip is saved inside the mutation, so closing
+  // the deletion dialog mid-export cannot throw the finished file away.
+  const run = () => exportData.mutate();
 
   return (
     <div className="flex flex-col gap-3">
