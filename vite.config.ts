@@ -41,6 +41,17 @@ export default defineConfig(({ mode }) => {
     // Preview only: the dev server's hot reload injects inline scripts the policy blocks.
     preview: csp ? { headers: { 'Content-Security-Policy': csp } } : {},
     test: {
+      // Fixed stand-ins, so no unit test depends on a gitignored .env.local.
+      // data/client.ts throws at import time without these, so a test that
+      // imports something under data/ for real — rather than mocking it — passes
+      // on a machine that has run the app and fails in CI. Nothing in the unit
+      // suite should make a request, and if one ever does it must fail rather
+      // than reach a database: .invalid is reserved (RFC 2606) and never resolves,
+      // where the local stack's address would quietly answer while it is running.
+      env: {
+        VITE_SUPABASE_URL: 'http://unit-tests.invalid',
+        VITE_SUPABASE_ANON_KEY: 'unit-test-anon-key',
+      },
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       // e2e/ belongs to Playwright; Vitest owns only co-located unit and
