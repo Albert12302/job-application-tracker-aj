@@ -32,14 +32,19 @@ concurrency:
 permissions:
   contents: read
 
+# Actions are pinned to full commit SHAs, not version tags. A tag is a mutable
+# pointer: whoever can move `v4` can run their code in this workflow. The
+# trailing comment is the release the SHA was, so a human can read it; Dependabot
+# updates both together, so pinning does not mean going stale.
+#   Resolve a new one with:  git ls-remote --tags https://github.com/actions/<name>
 jobs:
   check:
     name: Typecheck, lint, tests, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
@@ -89,9 +94,9 @@ jobs:
     name: Dependency vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm

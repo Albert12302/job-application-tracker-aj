@@ -126,6 +126,10 @@ build, and the §7.6 vulnerability scan. `.github/dependabot.yml` groups weekly 
 - **Playwright is deliberately not in CI yet.** It needs the Supabase stack on the runner, and
   the sign-in timing test fails about half of full runs under load. Make that test reliable
   first — a pipeline that is red half the time gets ignored, and then so do real failures.
+- **Actions are pinned to commit SHAs, never version tags.** A tag is a mutable pointer, so
+  `@v4` means "whatever that account publishes next"; a SHA is the code that was reviewed. Keep
+  the `# v4.4.0` comment beside each one so it stays readable, and let Dependabot bump the pair.
+  New SHA: `git ls-remote --tags https://github.com/actions/<name>`.
 - `.github/workflows/backup.yml` is the answer to §7.6's PITR requirement on a free plan. Its
   one non-negotiable: **the dump is encrypted before it becomes an artifact**, because this
   repo is public and artifacts on a public repo are world-readable. It encrypts to an `age`
