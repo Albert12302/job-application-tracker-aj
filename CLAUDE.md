@@ -99,7 +99,9 @@ Four more bootstrap settlements, for the same reason:
   Local Kong answers CORS with `*` on its own, so a missing allowlist only shows up hosted.
 - **`SIGN_IN_IP_MAX_FAILURES=200` in the local function env, never hosted.** Every local
   request reaches the function from one Docker address, so the §7.1 value of 20 would block
-  the next e2e run for an hour. Unset (hosted) means 20.
+  the next e2e run for an hour. Unset (hosted) means 20. A full e2e run spends about 16 of
+  those 200, so roughly a dozen runs inside an hour block every form sign-in and fail suites
+  that have nothing to do with it. Locally, `delete from public.sign_in_attempts;` resets it.
 - **`functions serve` replaces the edge container `supabase start` made.** If it dies
   mid-reload on a container-name conflict, `docker rm -f
   supabase_edge_runtime_job-application-tracker` and serve again.
@@ -127,9 +129,10 @@ build, and the §7.6 vulnerability scan. `.github/dependabot.yml` groups weekly 
   tested nothing, which is the exact failure the second run exists to catch.
 - **The audit blocks on runtime dependencies only** (`--omit=dev`). Those ship in the bundle;
   a dev-only advisory with no fix should not stop all work.
-- **Playwright is deliberately not in CI yet.** It needs the Supabase stack on the runner, and
-  the sign-in timing test fails about half of full runs under load. Make that test reliable
-  first — a pipeline that is red half the time gets ignored, and then so do real failures.
+- **Playwright is not in CI yet.** It needs the Supabase stack, edge functions included, on the
+  runner. The sign-in timing test that used to fail about half of full runs under load is fixed
+  (see Testing), so that is the remaining work. Keep the bar: a pipeline that is red half the
+  time gets ignored, and then so do real failures.
 - **Actions are pinned to commit SHAs, never version tags.** A tag is a mutable pointer, so
   `@v4` means "whatever that account publishes next"; a SHA is the code that was reviewed. Keep
   the `# v4.4.0` comment beside each one so it stays readable, and let Dependabot bump the pair.
@@ -239,7 +242,16 @@ Three layers, each with a job:
 
   **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
   about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
-  random.
+  random. Every `expectAxeClean` helper waits for that first — a button fading out of its pending
+  state failed WebKit's sign-in scan the same way.
+
+  **A timing assertion compares the fastest samples, never a median or a single one.** In a full
+  run, other suites' requests to the same local edge runtime overlap a sample and add about a
+  second to it — only ever adding. A real leak is a cost every sample on one side pays, so it
+  survives in the fastest; interference does not. Checked both ways: the sign-in test passed in
+  every full run it reached (10 of 10), and caught a planted 150 ms leak 3 times out of 3. Take the real side's
+  samples from accounts nobody else signs in as (fresh ones, deleted after), or another suite's
+  in-flight sign-in adds backoff to that side only (§7.1).
 
   **A test that is not about signing in starts signed in** — `e2e/session.ts` takes a session
   straight from Auth and puts it in storage. Every sign-in through the form reaches Auth from

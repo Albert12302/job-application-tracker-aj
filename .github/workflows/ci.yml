@@ -8,11 +8,11 @@ name: CI
 #   - SPEC §10.5: automated accessibility checks — axe runs inside the
 #     component tests, so `npm test` carries them.
 #
-# The Playwright suite is deliberately NOT here yet. It needs the whole Supabase
-# stack on the runner, and one test in it (the §7.1 sign-in timing check) fails
-# about half of full local runs for reasons of load, not correctness. A pipeline
-# that is red half the time teaches people to ignore it, which is worse than not
-# having one. Add the e2e job once that test is made reliable.
+# The Playwright suite is not here yet: it needs the whole Supabase stack (and
+# the edge functions, with their env) on the runner. The flaky §7.1 sign-in
+# timing check that also kept it out has been made reliable — it compares the
+# fastest samples, which parallel load cannot slow. Adding the job is now only
+# the work of standing the stack up in CI.
 
 on:
   push:
