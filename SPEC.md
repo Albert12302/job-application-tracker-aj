@@ -529,6 +529,33 @@ to lock everyone out. The address is the gateway's `x-real-ip` (a client cannot 
 it is stored only as a peppered hash. A successful sign-in clears the account's failures but
 not the address's — one valid account must not reset an address that is spraying others.
 Blocked responses carry the wait in minutes, and the body never says which limit tripped.
+
+Both limits hold for attempts that arrive **at the same time**. The function reads the
+counts and records the attempt as *pending* in one locked transaction
+(`begin_sign_in_attempt`), and a pending attempt counts as a failure for every later reader.
+Ten simultaneous guesses therefore see 0, 1, 2 … 9 attempts before them, not ten copies of the
+same count. When the attempt finishes, its row becomes a failure or a success. A blocked
+attempt, or one Auth could not answer, deletes its row and counts nothing. A row left pending by
+a function that died keeps counting as a failure until it ages out, so the limit fails closed.
+
+**Accepted risk: Auth's password endpoint can be called directly.** The limits above bind only
+callers of the sign-in function. Auth's own endpoint (`/auth/v1/token?grant_type=password`)
+is public to anyone holding the anon key, which ships in the app bundle. A script calling it
+directly skips the per-account lockout and the per-IP limit, and meets only Auth's
+`sign_in_sign_ups` limit (20 per 5 minutes per address). With many addresses there is
+effectively no limit. Nothing on the Free plan closes this:
+- server-side auth leaves the endpoint public;
+- Auth's password-verification hook is a paid-plan feature;
+- the free access-token hook runs only after the password check, so it would still reveal a
+  correct guess.
+
+Only Auth's CAPTCHA would close it. Accepted for now because sign-up is closed (§4.1d), the
+accounts are few and hand-made, and their passwords come from a password manager (12+
+characters), which puts guessing out of reach even at thousands of attempts an hour.
+**Revisit before sign-up opens**, the same trigger as §7.5. The path then is Auth's
+Turnstile CAPTCHA, with the sign-in function forwarding the token. That has its own costs:
+a CSP change, Cloudflare as a third party, test keys for the e2e session helper, and an
+accessibility check.
 - Sessions expire; log out invalidates server-side, not just the cookie.
 - Rate-limit sign-in, sign-up, and password-reset endpoints — per IP and per account.
 
@@ -731,7 +758,9 @@ untrusted, capped, and write-only:**
   whole database, so the rules above matter more than they would for a 90-day log service.
   Both tables are purged after 90 days by a nightly `pg_cron` job at 03:00 UTC, an hour before
   the backup (migration `20260916170641`), so a dump holds only rows that passed 90 days since the
-  purge — about an hour's worth, more if GitHub Actions starts the backup late.
+  purge — about an hour's worth, more if GitHub Actions starts the backup late. The same job
+  deletes `sign_in_attempts` rows (peppered email and address hashes, §7.1) after 24 hours: the
+  limits read at most the last hour, and sign-in outcomes stay in `security_events`.
 - **If an in-app viewer is ever built:** render stack text as text, never with
   `dangerouslySetInnerHTML`. Stored error strings are attacker-influenced.
 
@@ -770,7 +799,8 @@ The four checks worth doing by hand, because tooling misses them:
 6. Load the deployed app with the CSP header **enforced** (not `-Report-Only`), sign in, open
    the profile, upload a photo. Expect no CSP violations in the console — the condition that
    makes localStorage tokens acceptable (§7.5).
-7. From two different networks (home Wi-Fi, a phone on cellular), fail one sign-in on each.
+7. From two different networks (home Wi-Fi, a phone on cellular), fail one sign-in on each,
+   and check the same day (rows are kept 24 hours, §7.7).
    `sign_in_attempts` should hold two distinct `ip_hash` values for them. One value means the
    function is reading a proxy's address, not the caller's, and every user shares one
    per-IP bucket again (§7.1).
@@ -1153,6 +1183,20 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-16
+- **Direct calls to Auth's password endpoint are recorded as an accepted risk (§7.1).** Found
+  in the same review. Anyone holding the anon key can call Auth's password endpoint without
+  going through the sign-in function, skipping both of its limits. Nothing on the Free plan
+  closes that except CAPTCHA, which was deferred for its costs. It is accepted while sign-up is
+  closed and the passwords come from a password manager, and revisited before sign-up opens.
+- **The sign-in limits now hold under concurrent requests (§7.1).** The function read the
+  failure count, called Auth, and only then recorded the failure, so simultaneous attempts all
+  read the same count and all got a guess. `begin_sign_in_attempt` now reads the counts and
+  records the attempt as pending in one locked transaction. Ten concurrent calls were measured
+  seeing 0 through 9 earlier attempts; the same function without its locks let three of them
+  read the same count. The local edge runtime answers sign-ins one at a time, so the race never
+  showed locally.
+- **`sign_in_attempts` is purged after 24 hours (§7.7).** Nothing deleted from it before, so
+  every attempt's email and address hashes were kept forever. It joins the nightly log purge.
 - **Session limits are now enforced by a pg_cron job (§7.1, §7.5).** Found in the same review.
   `config.toml`'s `[auth.sessions]` 90-day cap and 14-day idle timeout are Pro-plan settings,
   and on the Free plan Supabase refresh tokens never expire. That made both limits unmet

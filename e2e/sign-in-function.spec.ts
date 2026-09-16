@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import { adminClient } from './throwaway-user.js';
 
 /**
  * The three tests supabase/functions/sign-in/README.md says the function must
@@ -119,4 +120,47 @@ test('the function answers CORS only for allowlisted origins (§7.5)', async ({ 
   });
   expect(allowed.headers()['access-control-allow-origin']).toMatch(/^(http:\/\/localhost:5173|\*)$/);
   expect(denied.headers()['access-control-allow-origin'] ?? '').not.toBe('https://evil.test');
+});
+
+test('attempts arriving together each count the ones before them (§7.1)', async () => {
+  // The local edge runtime answers one sign-in at a time, so parallel requests to the
+  // function cannot race here the way they do hosted. The guarantee lives in the database
+  // (begin_sign_in_attempt), so it is tested there, with genuinely concurrent calls.
+  const admin = adminClient();
+  const hex = () => crypto.randomUUID().replace(/-/g, '').repeat(2);
+  const emailHash = hex();
+  const since = new Date(Date.now() - 60 * 60_000).toISOString();
+  const reserve = async (): Promise<number> => {
+    const { data, error } = await admin.rpc('begin_sign_in_attempt', {
+      p_email_hash: emailHash,
+      p_ip_hash: hex(),
+      p_account_since: since,
+      p_account_limit: 20,
+      p_ip_since: since,
+      p_ip_limit: 20,
+    });
+    expect(error).toBeNull();
+    return (data as { account: string[] }).account.length;
+  };
+
+  try {
+    // Unlocked, all ten would read the same count. Locked, each sees every one before it.
+    const seen = (await Promise.all(Array.from({ length: 10 }, reserve))).sort((a, b) => a - b);
+    expect(seen).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  } finally {
+    await admin.from('sign_in_attempts').delete().eq('email_hash', emailHash);
+  }
+});
+
+test('the function settles every attempt it reserves', async () => {
+  // Runs after the tests above, serially. A pending row is only ever seconds old; one
+  // older than that means an outcome was never recorded, and it would count as a
+  // failure for its whole window.
+  const { count, error } = await adminClient()
+    .from('sign_in_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('outcome', 'pending')
+    .lt('created_at', new Date(Date.now() - 30_000).toISOString());
+  expect(error).toBeNull();
+  expect(count).toBe(0);
 });

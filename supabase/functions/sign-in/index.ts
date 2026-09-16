@@ -14,7 +14,9 @@
 // caller's address, and it checks both counts before Auth is ever called, so a
 // blocked caller cannot drain that shared bucket either.
 //
-// The client calls this instead of supabase.auth.signInWithPassword.
+// The client calls this instead of supabase.auth.signInWithPassword. A script
+// can still call Auth's password endpoint directly with the anon key and skip
+// these limits; that is an accepted risk (SPEC §7.1), revisited before sign-up opens.
 // It never sees the service role key, and it never learns whether an email
 // exists (§7.1: no account enumeration on any surface).
 
@@ -69,19 +71,29 @@ const hashEmail = (email: string) => sha256(PEPPER + email.trim().toLowerCase())
 const hashIp = (ip: string) => sha256(`${PEPPER}ip:${ip}`);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const times = (rows: { created_at: string }[] | null) => (rows ?? []).map((r) => Date.parse(r.created_at));
+const times = (timestamps: string[]) => timestamps.map((t) => Date.parse(t));
 
-/** Recent failures for one key, newest first. */
-function recentFailures(column: 'email_hash' | 'ip_hash', hash: string, sinceMs: number, limit: number) {
-  return admin
-    .from('sign_in_attempts')
-    .select('created_at')
-    .eq(column, hash)
-    .eq('outcome', 'failure')
-    .gte('created_at', new Date(sinceMs).toISOString())
-    .order('created_at', { ascending: false })
-    .limit(limit);
+type Reservation = { id: string; account: string[]; ip: string[] };
+
+/**
+ * Records this attempt as pending and returns the failures before it, newest
+ * first, in one locked transaction (migration 20260916181344). Pending attempts
+ * count as failures, so requests arriving together see each other instead of
+ * all reading the same count.
+ */
+function reserveAttempt(emailHash: string, ipHash: string, now: number) {
+  return admin.rpc('begin_sign_in_attempt', {
+    p_email_hash: emailHash,
+    p_ip_hash: ipHash,
+    p_account_since: new Date(now - ACCOUNT_WINDOW_MS - ACCOUNT_LOCKOUT_MS).toISOString(),
+    p_account_limit: ACCOUNT_MAX_FAILURES,
+    p_ip_since: new Date(now - IP_WINDOW_MS).toISOString(),
+    p_ip_limit: IP_MAX_FAILURES,
+  });
 }
+
+/** Removes an attempt that must count for nothing: blocked, or Auth unavailable. */
+const discardAttempt = (id: string) => admin.from('sign_in_attempts').delete().eq('id', id);
 
 Deno.serve(async (req) => {
   const startedAt = Date.now();
@@ -116,21 +128,20 @@ Deno.serve(async (req) => {
   const [emailHash, ipHash] = await Promise.all([hashEmail(email), hashIp(clientIp(req.headers))]);
   const now = Date.now();
 
-  const [byIp, byAccount] = await Promise.all([
-    recentFailures('ip_hash', ipHash, now - IP_WINDOW_MS, IP_MAX_FAILURES),
-    recentFailures('email_hash', emailHash, now - ACCOUNT_WINDOW_MS - ACCOUNT_LOCKOUT_MS, ACCOUNT_MAX_FAILURES),
-  ]);
+  const reserved = await reserveAttempt(emailHash, ipHash, now);
 
   // Fail closed: if a counter cannot be read, its limit cannot be enforced.
-  if (byIp.error || byAccount.error) return settle({ error: UNAVAILABLE }, 503);
+  if (reserved.error || !reserved.data) return settle({ error: UNAVAILABLE }, 503);
+  const attempt = reserved.data as Reservation;
 
-  const ipUntil = ipBlockedUntil(times(byIp.data), now, IP_MAX_FAILURES);
-  const { inWindow, lockedUntil } = accountLockout(times(byAccount.data), now);
+  const ipUntil = ipBlockedUntil(times(attempt.ip), now, IP_MAX_FAILURES);
+  const { inWindow, lockedUntil } = accountLockout(times(attempt.account), now);
   const blockedUntil = Math.max(ipUntil, lockedUntil);
 
   if (blockedUntil) {
     // Nothing is recorded while blocked: the counts stop growing, so the block
     // ends on schedule instead of extending with every retry.
+    await discardAttempt(attempt.id);
     await admin.from('security_events').insert({ event_type: 'rate_limit_trip', outcome: 'denied' });
     return settle({ error: LOCKED, retryAfterMinutes: retryAfterMinutes(blockedUntil, now) }, 429);
   }
@@ -146,10 +157,12 @@ Deno.serve(async (req) => {
     // not the user's wrong password, and must neither count against them nor
     // tell them their password is wrong.
     const status = error?.status ?? 500;
+    if (status === 429 || status >= 500) await discardAttempt(attempt.id);
     if (status === 429) return settle({ error: LOCKED, retryAfterMinutes: 5 }, 429);
     if (status >= 500) return settle({ error: UNAVAILABLE }, 503);
 
-    await admin.from('sign_in_attempts').insert({ email_hash: emailHash, ip_hash: ipHash, outcome: 'failure' });
+    // If this update fails the row stays pending, which still counts as a failure.
+    await admin.from('sign_in_attempts').update({ outcome: 'failure' }).eq('id', attempt.id);
     await admin.from('security_events').insert({ event_type: 'sign_in_failure', outcome: 'failure' });
     return settle({ error: GENERIC }, 401);
   }
@@ -157,8 +170,9 @@ Deno.serve(async (req) => {
   // Clear the account's failures on success, so a legitimate user who fumbled
   // twice is not one typo away from a lockout. The IP's failures stay: one
   // valid account must not be a way to reset an address that is spraying others.
+  // Other requests' pending attempts are theirs to settle, so only failures go.
   await admin.from('sign_in_attempts').delete().eq('email_hash', emailHash).eq('outcome', 'failure');
-  await admin.from('sign_in_attempts').insert({ email_hash: emailHash, ip_hash: ipHash, outcome: 'success' });
+  await admin.from('sign_in_attempts').update({ outcome: 'success' }).eq('id', attempt.id);
   await admin
     .from('security_events')
     .insert({ user_id: data.user!.id, event_type: 'sign_in_success', outcome: 'success' });

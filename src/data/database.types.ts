@@ -316,6 +316,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      begin_sign_in_attempt: {
+        Args: {
+          p_account_limit: number
+          p_account_since: string
+          p_email_hash: string
+          p_ip_hash: string
+          p_ip_limit: number
+          p_ip_since: string
+        }
+        Returns: Json
+      }
       change_application_status: {
         Args: {
           p_application_id: string

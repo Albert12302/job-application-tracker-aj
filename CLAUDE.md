@@ -109,6 +109,10 @@ Four more bootstrap settlements, for the same reason:
   The edge runtime (1.74) never completes a response sent over an unread body — `cancel()`
   does not help — and the stuck worker stops that function starting again until the container
   is recreated. `upload/index.ts` `readCapped` drains and discards past the cap.
+- **The local edge runtime answers a function's requests one at a time** (about 1 s each for
+  sign-in), while hosted runs them side by side. A race inside a function never shows locally;
+  test concurrency where the guarantee lives, as `e2e/sign-in-function.spec.ts` does with
+  `begin_sign_in_attempt`.
 - **`src/lib/utils.ts` stays as shadcn generated it.** It is the `cn` helper every
   generated component imports, not a `utils.ts` junk drawer; moving it breaks
   `shadcn add`.
