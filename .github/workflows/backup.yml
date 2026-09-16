@@ -30,6 +30,12 @@ name: Backup database
 #
 # Until those are set the job skips rather than failing, so it does not send a
 # failure email every morning before there is anything to back up.
+#
+# Every later step carries `success() &&`, which is not decoration: a custom
+# `if:` REMOVES the implicit success() check, so without it a failed dump would
+# still run the encrypt and upload steps. The upload only ever matches
+# `backup-*.tar.gz.age`, so a plaintext tarball could not be uploaded even then
+# — but relying on a glob to be the last line of defence is not a defence.
 
 on:
   schedule:
@@ -60,10 +66,10 @@ jobs:
           fi
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
         with:
           node-version: '22'
           cache: npm
@@ -72,7 +78,7 @@ jobs:
       # backup runs the same version as everything else rather than whatever a
       # third-party action would fetch.
       - name: Install tools
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
         run: |
           npm ci
           sudo apt-get update -qq
@@ -82,7 +88,7 @@ jobs:
       # migrations in this repo can rebuild the schema, but a backup that cannot
       # stand alone is not a backup.
       - name: Dump
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -95,7 +101,7 @@ jobs:
       # step. Nothing echoes the dump: a `cat` here would put user data straight
       # into a public build log.
       - name: Encrypt
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
         env:
           RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
         run: |
@@ -113,7 +119,7 @@ jobs:
           fi
 
       - name: Keep it
-        if: steps.configured.outputs.ready == 'true'
+        if: success() && steps.configured.outputs.ready == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: db-backup-${{ github.run_id }}
