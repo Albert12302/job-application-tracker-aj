@@ -104,10 +104,10 @@ The vulnerability scan (§7.6) is blocking for runtime dependencies, which ship 
 and report-only for dev dependencies, which do not — an unfixable advisory in a test tool
 should not stop all work.
 
-**The Playwright suite is not in CI yet.** It needs the whole Supabase stack on the runner,
-and the §7.1 sign-in timing check fails about half of full local runs for reasons of load
-rather than correctness. A pipeline that is red half the time teaches people to ignore it.
-Fix that test, then add the job.
+**The Playwright suite is not in CI yet.** It needs the whole Supabase stack, edge functions
+included, on the runner. The §7.1 sign-in timing check used to fail about half of full local
+runs under load, which also kept it out — a pipeline that is red half the time teaches people to
+ignore it. That test is now reliable, so standing the stack up in CI is the remaining work.
 
 ## Deploy
 

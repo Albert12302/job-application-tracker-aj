@@ -49,6 +49,8 @@ async function openList(page: Page) {
 }
 
 async function expectAxeClean(page: Page) {
+  // A button still fading out of its pending state measures low and fails at random (CLAUDE.md).
+  await page.waitForFunction(() => document.getAnimations().length === 0);
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
 }

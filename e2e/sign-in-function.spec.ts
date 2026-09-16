@@ -16,8 +16,8 @@ import { adminClient } from './throwaway-user.js';
  * have (§7.8). They call the function over HTTP exactly as the browser does.
  *
  * Accounts: dev-c exists only to be locked out; dev-a is used for the
- * clear-on-success and timing checks, and each test that fails dev-a's password
- * ends with a correct sign-in, which clears its count again.
+ * clear-on-success check, which ends with a correct sign-in that clears its count
+ * again. The timing check makes its own accounts and deletes them.
  */
 
 const FUNCTION_URL = `${process.env.VITE_SUPABASE_URL}/functions/v1/sign-in`;
@@ -49,29 +49,46 @@ test('a successful sign-in clears the failure count', async ({ request }) => {
   expect(last.body).toHaveProperty('session.access_token');
 });
 
-test('an unknown email and a wrong password are indistinguishable', async ({ request }) => {
-  test.setTimeout(60_000);
-  // Interleaved, and each unknown address is fresh, so both sides see the same backoff.
-  const wrong = [];
-  const unknown = [];
-  for (let i = 0; i < 3; i++) {
-    unknown.push(await attempt(request, unknownEmail(), 'wrong password'));
-    wrong.push(await attempt(request, 'dev-a@example.test', 'wrong password'));
-    expect((await attempt(request, 'dev-a@example.test', PASSWORD)).status).toBe(200); // reset dev-a's count
-  }
+/**
+ * The fastest of a set of timings. Under a full parallel run, other suites' requests to the
+ * same local edge runtime overlap these and add about a second to whichever sample they hit
+ * — never subtract. A timing leak is the opposite: a cost every sample on one side pays, so
+ * it survives in the fastest sample, while interference does not. A median of three failed
+ * about half of full runs whenever two samples on one side were hit.
+ */
+const fastest = (rs: { ms: number }[]) => Math.min(...rs.map((r) => r.ms));
 
-  for (const r of [...wrong, ...unknown]) {
-    expect(r.status).toBe(401);
-    expect(r.body).toEqual({ error: 'That email and password combination is incorrect.' });
+test('an unknown email and a wrong password are indistinguishable', async ({ request }) => {
+  test.setTimeout(90_000);
+  // Each real account is new and used once, as each unknown address is, so neither side carries
+  // a failure count into its sample. Seed users would not do: other suites sign in as them at the
+  // same time, and an in-flight sign-in counts as a failure (§7.1), adding backoff to one side only.
+  const admin = adminClient();
+  const accounts: { id: string; email: string }[] = [];
+  try {
+    for (let i = 0; i < 5; i++) {
+      const email = `timing-${crypto.randomUUID()}@example.test`;
+      const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+      if (error || !data.user) throw new Error(`could not create a timing account: ${error?.message}`);
+      accounts.push({ id: data.user.id, email });
+    }
+
+    // Interleaved, so a slow stretch of the machine falls on both sides.
+    const wrong = [];
+    const unknown = [];
+    for (const { email } of accounts) {
+      unknown.push(await attempt(request, unknownEmail(), 'wrong password'));
+      wrong.push(await attempt(request, email, 'wrong password'));
+    }
+
+    for (const r of [...wrong, ...unknown]) {
+      expect(r.status).toBe(401);
+      expect(r.body).toEqual({ error: 'That email and password combination is incorrect.' });
+    }
+    expect(Math.abs(fastest(wrong) - fastest(unknown))).toBeLessThan(100);
+  } finally {
+    for (const { id } of accounts) await admin.auth.admin.deleteUser(id).catch(() => {});
   }
-  // Medians, not means: a timing leak is systematic and shows in every sample,
-  // while one request delayed by a busy machine moves a three-sample mean by
-  // more than the whole threshold.
-  const median = (rs: { ms: number }[]) => {
-    const sorted = rs.map((r) => r.ms).sort((a, b) => a - b);
-    return sorted[(sorted.length - 1) >> 1]!;
-  };
-  expect(Math.abs(median(wrong) - median(unknown))).toBeLessThan(100);
 });
 
 test('five wrong passwords lock the account; the sixth fails even when correct', async ({ request }) => {
@@ -100,9 +117,16 @@ test('a locked account and a locked unknown email answer identically (§7.8 chec
     expect([401, 429]).toContain((await attempt(request, 'dev-c@example.test', 'wrong password')).status);
   }
 
-  const realCorrect = await attempt(request, 'dev-c@example.test', PASSWORD);
+  // Three of each, interleaved, and the fastest compared (see `fastest`). Refused while locked,
+  // these reach neither Auth nor the counts, so the extra samples cost nothing.
+  const realCorrects = [];
+  const unknownLockeds = [];
+  for (let i = 0; i < 3; i++) {
+    realCorrects.push(await attempt(request, 'dev-c@example.test', PASSWORD));
+    unknownLockeds.push(await attempt(request, unknown, PASSWORD));
+  }
+  const realCorrect = realCorrects[0]!;
   const realWrong = await attempt(request, 'dev-c@example.test', 'wrong password');
-  const unknownLocked = await attempt(request, unknown, PASSWORD);
 
   // The same answer for a real and an unknown address, and — during the lock — for the
   // correct password and a wrong one. Only the wait may differ: the locks began at different times.
@@ -113,8 +137,8 @@ test('a locked account and a locked unknown email answer identically (§7.8 chec
   });
   expect(shape(realCorrect)).toEqual({ status: 429, error: 'Too many attempts.', fields: ['error', 'retryAfterMinutes'] });
   expect(shape(realWrong)).toEqual(shape(realCorrect));
-  expect(shape(unknownLocked)).toEqual(shape(realCorrect));
-  expect(Math.abs(realCorrect.ms - unknownLocked.ms)).toBeLessThan(250);
+  for (const r of [...realCorrects, ...unknownLockeds]) expect(shape(r)).toEqual(shape(realCorrect));
+  expect(Math.abs(fastest(realCorrects) - fastest(unknownLockeds))).toBeLessThan(250);
 });
 
 test('the function answers CORS only for allowlisted origins (§7.5)', async ({ request }) => {
