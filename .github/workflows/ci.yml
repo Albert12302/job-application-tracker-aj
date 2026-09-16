@@ -1,0 +1,111 @@
+name: CI
+
+# What the repo already decided has to be checked automatically:
+#   - CLAUDE.md "Testing": the unit suite runs in TWO timezones, because the
+#     §5.4 date bug is invisible at or east of Greenwich and a UTC-only runner
+#     proves nothing;
+#   - SPEC §7.6: an automated vulnerability scan, in CI and on a schedule;
+#   - SPEC §10.5: automated accessibility checks — axe runs inside the
+#     component tests, so `npm test` carries them.
+#
+# The Playwright suite is deliberately NOT here yet. It needs the whole Supabase
+# stack on the runner, and one test in it (the §7.1 sign-in timing check) fails
+# about half of full local runs for reasons of load, not correctness. A pipeline
+# that is red half the time teaches people to ignore it, which is worse than not
+# having one. Add the e2e job once that test is made reliable.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # The audit is worth running even when nobody has pushed: advisories are
+    # published against code that has not changed. Mondays, 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, lint, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # `tsc -b --noEmit`, not `tsc --noEmit`: the root tsconfig is
+      # solution-style, so the plain form compiles zero files and always passes
+      # (CLAUDE.md).
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (UTC)
+        env:
+          TZ: UTC
+        run: npm test
+
+      # The second zone is the whole point: `date_applied` is stored at UTC
+      # midnight and must format in UTC everywhere (§5.4). Rendered in local
+      # time, it shows the previous day west of Greenwich — and nowhere east of
+      # it. The guard is not ceremony: if the zone silently fails to apply, the
+      # suite goes green having tested nothing new, which is exactly the failure
+      # this job exists to prevent.
+      - name: Unit tests (America/Los_Angeles)
+        env:
+          TZ: America/Los_Angeles
+        run: |
+          node -e "
+            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (zone !== 'America/Los_Angeles') {
+              console.error('TZ did not apply — resolved to ' + zone + '. The second timezone run would prove nothing.');
+              process.exit(1);
+            }
+            console.log('timezone confirmed: ' + zone);
+          "
+          npm test
+
+      # Also proves vite.config.ts can still read the CSP out of vercel.json,
+      # which is what keeps the two from drifting (§7.5).
+      - name: Build
+        run: npm run build
+
+  audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Blocking, and only on what ships: a high or critical advisory in a
+      # runtime dependency is in the bundle the browser runs (§7.6).
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Dev dependencies are worth seeing but not worth blocking a merge on —
+      # they never reach a user, and an unfixable advisory in a test tool would
+      # otherwise stop all work.
+      - name: Audit everything (report only)
+        if: always()
+        run: npm audit || true

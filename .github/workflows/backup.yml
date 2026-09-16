@@ -1,0 +1,124 @@
+name: Backup database
+
+# SPEC §7.6 wants point-in-time recovery before real user data exists. PITR and
+# daily backups are paid Supabase features, and this project's standing rule is
+# that no payment card touches Supabase or Vercel — that rule is what guarantees
+# the project cannot generate a bill. So the requirement is met the other way:
+# a scheduled dump, taken by this workflow, kept as a build artifact.
+#
+# THE DUMP IS ENCRYPTED, AND THAT IS NOT OPTIONAL. This repository is public,
+# and workflow artifacts on a public repository can be downloaded by anyone who
+# can read the repo. An unencrypted dump here would publish every user's
+# applications, notes and email addresses. Encryption happens on the runner,
+# before the artifact is uploaded, with an age PUBLIC key: CI can write a backup
+# it cannot itself read, and the private key never exists in GitHub at all.
+#
+# Setup, once, before this does anything:
+#   1. Install age locally, then:  age-keygen -o backup-key.txt
+#   2. Keep backup-key.txt somewhere safe and OFF this repo — a password
+#      manager. Lose it and the backups are unreadable; leak it and they are
+#      readable by anyone who downloads an artifact.
+#   3. Repository variable  BACKUP_AGE_RECIPIENT  = the public key line from
+#      that file (starts `age1…`). A public key is not a secret.
+#   4. Repository secret    SUPABASE_DB_URL       = the hosted project's
+#      Postgres connection string (Supabase dashboard → Project Settings →
+#      Database → Connection string, URI).
+#
+# To restore:
+#   age -d -i backup-key.txt -o backup.tar.gz backup.tar.gz.age
+#   tar xzf backup.tar.gz     # then psql the schema, then the data
+#
+# Until those are set the job skips rather than failing, so it does not send a
+# failure email every morning before there is anything to back up.
+
+on:
+  schedule:
+    # 04:00 UTC daily. GitHub disables scheduled workflows on repositories with
+    # no activity for 60 days — worth knowing for a project with two users.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    name: Dump, encrypt, keep
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check this is configured
+        id: configured
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$RECIPIENT" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not configured yet — set the SUPABASE_DB_URL secret and the BACKUP_AGE_RECIPIENT variable. Skipping."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+
+      # The Supabase CLI is a devDependency, pinned by package-lock.json, so the
+      # backup runs the same version as everything else rather than whatever a
+      # third-party action would fetch.
+      - name: Install tools
+        if: steps.configured.outputs.ready == 'true'
+        run: |
+          npm ci
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+
+      # Schema and data separately, as Supabase's own restore path expects. The
+      # migrations in this repo can rebuild the schema, but a backup that cannot
+      # stand alone is not a backup.
+      - name: Dump
+        if: steps.configured.outputs.ready == 'true'
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backup
+          npx supabase db dump --db-url "$DB_URL" -f backup/schema.sql
+          npx supabase db dump --db-url "$DB_URL" --data-only -f backup/data.sql
+          date -u +"taken %Y-%m-%dT%H:%M:%SZ from commit ${{ github.sha }}" > backup/README.txt
+
+      # Encrypted before it can be uploaded, and the plaintext never leaves this
+      # step. Nothing echoes the dump: a `cat` here would put user data straight
+      # into a public build log.
+      - name: Encrypt
+        if: steps.configured.outputs.ready == 'true'
+        env:
+          RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          tar czf backup.tar.gz backup
+          age -r "$RECIPIENT" -o "backup-$(date -u +%Y-%m-%d).tar.gz.age" backup.tar.gz
+          rm -rf backup backup.tar.gz
+
+          # A zero-length or absurdly small artifact means the dump failed
+          # quietly; better to fail now than to discover it during a restore.
+          size=$(stat -c%s backup-*.tar.gz.age)
+          echo "encrypted backup: $size bytes"
+          if [ "$size" -lt 1024 ]; then
+            echo "::error::Backup is only $size bytes — treating that as a failed dump."
+            exit 1
+          fi
+
+      - name: Keep it
+        if: steps.configured.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup-*.tar.gz.age
+          # The maximum a free public repo allows, and it matches the 90-day
+          # retention §7.7 sets for the log tables.
+          retention-days: 90
+          if-no-files-found: error

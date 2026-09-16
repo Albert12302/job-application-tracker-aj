@@ -644,7 +644,13 @@ SVG is not an accepted type anywhere. It is a script execution vector.
 - Remove unused packages; keep the dependency tree small.
 - Keep dependencies patched; run an automated vulnerability scan in CI and on a schedule.
 - Enable point-in-time recovery / scheduled backups before real user data exists, and test a
-  restore at least once.
+  restore at least once. **PITR is a paid Supabase feature and no card goes on this project**
+  (README, Deploy), so the scheduled half is met by `.github/workflows/backup.yml`: a nightly
+  dump kept as a 90-day artifact. It is encrypted to an `age` public key on the runner before
+  it is uploaded — this repo is public, and artifacts on a public repo are readable by anyone,
+  so an unencrypted dump would publish the whole database. CI holds no key that can read its
+  own backups. Losing a window of writes between nightly dumps is the accepted cost of not
+  having PITR; revisit if the data ever justifies the plan.
 
 ### 7.7 Logging and monitoring
 The rule "never log PII" leaves a gap unless what *should* be logged is written down.

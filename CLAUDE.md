@@ -18,7 +18,10 @@ single-file prototype with in-memory state and is not the architecture.
 
 ## Repo shape
 
-One repo, no workspaces. Everything ships together: one React app, one Supabase project and
+One repo, no workspaces, and the app is **at the repository root** — `src/`, `supabase/`,
+`e2e/` and the configs sit beside `.git`. It lived in a subfolder until 2026-09-15 (a leftover
+from the design-tool export, not a decision); flattening it means Vercel's default root works
+with no project setting, and CI needs no `working-directory`. Everything ships together: one React app, one Supabase project and
 its edge functions, one test suite — and workspaces earn their overhead when two deployables share
 a library. `src/domain/` imports nothing from the rest of `src/`, so if a second consumer ever
 appears it becomes `packages/domain` by moving it. Do not pre-build that.
@@ -109,6 +112,24 @@ Four more bootstrap settlements, for the same reason:
 - **`src/lib/utils.ts` stays as shadcn generated it.** It is the `cn` helper every
   generated component imports, not a `utils.ts` junk drawer; moving it breaks
   `shadcn add`.
+
+## CI
+
+`.github/workflows/ci.yml` — typecheck, lint, unit tests in UTC **and** America/Los_Angeles,
+build, and the §7.6 vulnerability scan. `.github/dependabot.yml` groups weekly updates.
+
+- **The two-timezone run has a guard**, and it must stay. The job asserts the resolved zone
+  before running the suite: a `TZ` that silently fails to apply leaves the suite green having
+  tested nothing, which is the exact failure the second run exists to catch.
+- **The audit blocks on runtime dependencies only** (`--omit=dev`). Those ship in the bundle;
+  a dev-only advisory with no fix should not stop all work.
+- **Playwright is deliberately not in CI yet.** It needs the Supabase stack on the runner, and
+  the sign-in timing test fails about half of full runs under load. Make that test reliable
+  first — a pipeline that is red half the time gets ignored, and then so do real failures.
+- `.github/workflows/backup.yml` is the answer to §7.6's PITR requirement on a free plan. Its
+  one non-negotiable: **the dump is encrypted before it becomes an artifact**, because this
+  repo is public and artifacts on a public repo are world-readable. It encrypts to an `age`
+  public key, so CI can write backups it cannot read.
 
 ## Database workflow
 
