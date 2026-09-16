@@ -27,6 +27,7 @@ import {
   ACCOUNT_MAX_FAILURES,
   ACCOUNT_WINDOW_MS,
   accountLockout,
+  authFailure,
   backoffMs,
   clientIp,
   IP_DEFAULT_MAX_FAILURES,
@@ -153,13 +154,13 @@ Deno.serve(async (req) => {
   const { data, error } = await auth.auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    // Only a credential rejection counts. Auth being rate limited or down is
-    // not the user's wrong password, and must neither count against them nor
-    // tell them their password is wrong.
-    const status = error?.status ?? 500;
-    if (status === 429 || status >= 500) await discardAttempt(attempt.id);
-    if (status === 429) return settle({ error: LOCKED, retryAfterMinutes: 5 }, 429);
-    if (status >= 500) return settle({ error: UNAVAILABLE }, 503);
+    // Only a credential rejection counts (limits.ts authFailure).
+    const outcome = authFailure(error?.status);
+    if (outcome !== 'rejected') {
+      await discardAttempt(attempt.id);
+      if (outcome === 'rate-limited') return settle({ error: LOCKED, retryAfterMinutes: 5 }, 429);
+      return settle({ error: UNAVAILABLE }, 503);
+    }
 
     // If this update fails the row stays pending, which still counts as a failure.
     await admin.from('sign_in_attempts').update({ outcome: 'failure' }).eq('id', attempt.id);

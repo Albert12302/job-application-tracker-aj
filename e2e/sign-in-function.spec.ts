@@ -122,12 +122,44 @@ test('the function answers CORS only for allowlisted origins (§7.5)', async ({ 
   expect(denied.headers()['access-control-allow-origin'] ?? '').not.toBe('https://evil.test');
 });
 
+/** A random 64-character hash, shaped like the function's peppered SHA-256 keys. */
+const hex = () => crypto.randomUUID().replace(/-/g, '').repeat(2);
+
+/**
+ * The database's clock, not this machine's: the Docker/WSL clock can drift from the host's
+ * (after sleep especially), and `sign_in_attempts.created_at` is written by the database.
+ * Read from a throwaway reservation under random hashes, which is deleted at once.
+ */
+async function databaseNow(): Promise<number> {
+  const admin = adminClient();
+  const since = new Date(0).toISOString();
+  const { data, error } = await admin.rpc('begin_sign_in_attempt', {
+    p_email_hash: hex(),
+    p_ip_hash: hex(),
+    p_account_since: since,
+    p_account_limit: 1,
+    p_ip_since: since,
+    p_ip_limit: 1,
+  });
+  if (error) throw new Error(`could not reserve a probe attempt: ${error.message}`);
+  const { id } = data as { id: string };
+  const { data: row, error: readError } = await admin.from('sign_in_attempts').delete().eq('id', id).select('created_at').single();
+  if (readError) throw new Error(`could not read the probe attempt: ${readError.message}`);
+  return Date.parse(row.created_at);
+}
+
+// When this file's run began, by the database's clock. Rows from before it — left pending by
+// an earlier run cut short, say by a container restart — are not this run's to judge.
+let runStartedAt = 0;
+test.beforeAll(async ({ browserName }) => {
+  if (browserName === 'chromium') runStartedAt = await databaseNow();
+});
+
 test('attempts arriving together each count the ones before them (§7.1)', async () => {
   // The local edge runtime answers one sign-in at a time, so parallel requests to the
   // function cannot race here the way they do hosted. The guarantee lives in the database
   // (begin_sign_in_attempt), so it is tested there, with genuinely concurrent calls.
   const admin = adminClient();
-  const hex = () => crypto.randomUUID().replace(/-/g, '').repeat(2);
   const emailHash = hex();
   const since = new Date(Date.now() - 60 * 60_000).toISOString();
   const reserve = async (): Promise<number> => {
@@ -155,12 +187,16 @@ test('attempts arriving together each count the ones before them (§7.1)', async
 test('the function settles every attempt it reserves', async () => {
   // Runs after the tests above, serially. A pending row is only ever seconds old; one
   // older than that means an outcome was never recorded, and it would count as a
-  // failure for its whole window.
+  // failure for its whole window. Only rows from this run, and both bounds by the
+  // database's clock; the 30 s spares sign-ins other suites have in flight.
+  expect(runStartedAt).toBeGreaterThan(0);
+  const now = await databaseNow();
   const { count, error } = await adminClient()
     .from('sign_in_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('outcome', 'pending')
-    .lt('created_at', new Date(Date.now() - 30_000).toISOString());
+    .gte('created_at', new Date(runStartedAt).toISOString())
+    .lt('created_at', new Date(now - 30_000).toISOString());
   expect(error).toBeNull();
   expect(count).toBe(0);
 });

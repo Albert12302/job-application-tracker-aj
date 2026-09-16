@@ -45,6 +45,19 @@ export function ipBlockedUntil(failureTimes: number[], now: number, maxFailures:
   return oldest === undefined ? 0 : oldest + IP_WINDOW_MS;
 }
 
+/**
+ * What a failed Auth sign-in means for the counts. Only `rejected` — Auth answered and
+ * refused the credentials — counts as a failure. Auth rate-limited or unreachable is not
+ * the user's wrong password: it must neither count against them nor tell them so.
+ * `status` is supabase-js's: 0 when the request never reached Auth (network, restart),
+ * undefined when there was no error but also no session.
+ */
+export function authFailure(status: number | undefined): 'rejected' | 'rate-limited' | 'unavailable' {
+  if (status === 429) return 'rate-limited';
+  if (status !== undefined && status >= 400 && status < 500) return 'rejected';
+  return 'unavailable';
+}
+
 /** Whole minutes to wait, never zero — "try again in 0 minutes" reads as a bug. */
 export function retryAfterMinutes(until: number, now: number): number {
   return Math.max(1, Math.ceil((until - now) / MINUTE));
