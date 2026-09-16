@@ -17,7 +17,8 @@
 create extension if not exists pg_cron;
 
 -- 03:00 UTC, an hour before the nightly backup (.github/workflows/backup.yml,
--- 04:00), so a dump never carries rows already past retention.
+-- 04:00), so a dump holds only rows that passed 90 days since the purge —
+-- about an hour's worth, more if GitHub Actions starts the backup late.
 -- cron.schedule with a name replaces a job of that name, so re-applying this
 -- does not stack duplicates.
 select cron.schedule('purge-old-logs', '0 3 * * *', $$select public.purge_old_logs()$$);

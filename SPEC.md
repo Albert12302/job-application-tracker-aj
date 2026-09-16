@@ -708,7 +708,8 @@ untrusted, capped, and write-only:**
 - **These tables are in your backups.** Whatever lands there inherits the retention of the
   whole database, so the rules above matter more than they would for a 90-day log service.
   Both tables are purged after 90 days by a nightly `pg_cron` job at 03:00 UTC, an hour before
-  the backup (migration `20260916170641`), so a dump never carries rows already past retention.
+  the backup (migration `20260916170641`), so a dump holds only rows that passed 90 days since the
+  purge — about an hour's worth, more if GitHub Actions starts the backup late.
 - **If an in-app viewer is ever built:** render stack text as text, never with
   `dangerouslySetInnerHTML`. Stored error strings are attacker-influenced.
 
