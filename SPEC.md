@@ -637,7 +637,10 @@ SVG is not an accepted type anywhere. It is a script execution vector.
 - **Postgres functions and triggers:** avoid `SECURITY DEFINER`. Where it is unavoidable, pin
   `set search_path = ''` and schema-qualify every reference — an unpinned `search_path` on a
   definer function is a privilege-escalation path.
-- Install extensions into a dedicated `extensions` schema, not `public`.
+- Install extensions into a dedicated `extensions` schema, not `public`. The one exception is
+  `pg_cron`, which ignores `WITH SCHEMA` and always installs into `pg_catalog`, with its jobs in
+  its own `cron` schema. The rule's purpose still holds: neither schema is exposed through the
+  API, and `anon` and `authenticated` have no usage on `cron`.
 - Views that touch user data are `security_invoker = on`, or they silently bypass RLS.
 - If Realtime is enabled, confirm its policies separately — a subscription is a read, and it
   needs the same RLS scrutiny as a query.
@@ -704,7 +707,9 @@ untrusted, capped, and write-only:**
   in the log six months from now.
 - **These tables are in your backups.** Whatever lands there inherits the retention of the
   whole database, so the rules above matter more than they would for a 90-day log service.
-  Purge `app_errors` on the same 90-day schedule (\u00a77.7) with a scheduled job.
+  Both tables are purged after 90 days by a nightly `pg_cron` job at 03:00 UTC, an hour before
+  the backup (migration `20260916170641`), so a dump holds only rows that passed 90 days since the
+  purge — about an hour's worth, more if GitHub Actions starts the backup late.
 - **If an in-app viewer is ever built:** render stack text as text, never with
   `dangerouslySetInnerHTML`. Stored error strings are attacker-influenced.
 
@@ -1124,6 +1129,20 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-16
+- **The 90-day log purge now actually runs (§7.7).** Found in a whole-repo security review.
+  `purge_old_logs()` existed from the start, but only a comment said to schedule it, so once
+  hosted every `app_errors` and `security_events` row would have been kept forever, user ids
+  included. A `pg_cron` job (on the Free plan, and a migration rather than a dashboard setting)
+  runs it nightly at 03:00 UTC, an hour before the backup. `pg_cron` is recorded as the one
+  extension outside the `extensions` schema (§7.6): it installs only into `pg_catalog`.
+- **`anon` can no longer call `purge_old_logs()` or `consume_rate_limit()`.** Supabase grants
+  new functions to `anon` directly, so `revoke … from public` left them callable by anyone
+  holding the anon key. Neither call did harm (the purge deletes only rows already due, and
+  `consume_rate_limit` does nothing without a user), but "deny unless explicitly authorized"
+  (§7.2) is the rule. Fixed in the original migrations, which have not been applied anywhere
+  hosted.
 
 ### 2026-09-15
 - **The deletion dialog now waits for what it is holding (§8.2, §9.7, §9.8).** Found in review.

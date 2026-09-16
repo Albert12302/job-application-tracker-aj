@@ -125,9 +125,8 @@ create policy app_errors_insert_only on public.app_errors
 create policy security_events_insert_only on public.security_events
   for insert to authenticated with check (true);
 
--- 90-day retention (§7.7). Schedule with pg_cron once the extension is
--- installed into the extensions schema:
---   select cron.schedule('purge-logs', '0 4 * * *', $$select public.purge_old_logs()$$);
+-- 90-day retention (§7.7). Run nightly by pg_cron — migration
+-- 20260916170641_schedule_log_purge.sql.
 create or replace function public.purge_old_logs()
 returns void
 language sql
@@ -138,4 +137,5 @@ as $$
   delete from public.security_events where created_at < now() - interval '90 days';
 $$;
 
-revoke all on function public.purge_old_logs() from public, authenticated;
+-- anon too: Supabase grants new functions to anon directly, not through public.
+revoke all on function public.purge_old_logs() from public, anon, authenticated;

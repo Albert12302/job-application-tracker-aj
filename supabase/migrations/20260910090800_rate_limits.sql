@@ -82,7 +82,8 @@ begin
 end;
 $$;
 
-revoke all on function public.consume_rate_limit(text, integer, interval) from public;
+-- anon too: Supabase grants new functions to anon directly, not through public.
+revoke all on function public.consume_rate_limit(text, integer, interval) from public, anon;
 grant execute on function public.consume_rate_limit(text, integer, interval) to authenticated;
 
 -- 120 write mutations per user per minute (§7.1).
