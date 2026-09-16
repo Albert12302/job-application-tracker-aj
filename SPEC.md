@@ -536,7 +536,10 @@ counts and records the attempt as *pending* in one locked transaction
 Ten simultaneous guesses therefore see 0, 1, 2 … 9 attempts before them, not ten copies of the
 same count. When the attempt finishes, its row becomes a failure or a success. A blocked
 attempt, or one Auth could not answer, deletes its row and counts nothing. A row left pending by
-a function that died keeps counting as a failure until it ages out, so the limit fails closed.
+a function that died keeps counting as a failure until it ages out, so the limit fails closed —
+except that a successful sign-in clears it with the account's failures once it is older than
+any live request could be (7 minutes; hosted functions end at 150 s on Free, 400 s on paid).
+Otherwise a user who had just signed in could be locked out by attempts that never finished.
 
 **Accepted risk: Auth's password endpoint can be called directly.** The limits above bind only
 callers of the sign-in function. Auth's own endpoint (`/auth/v1/token?grant_type=password`)

@@ -14,6 +14,13 @@ export const IP_DEFAULT_MAX_FAILURES = 20;
 export const IP_WINDOW_MS = 60 * MINUTE;
 
 /**
+ * A pending attempt older than this belongs to a request that died (Auth hung, the worker
+ * was killed): hosted Supabase ends an edge function after 150 s on Free and 400 s on paid
+ * plans. A successful sign-in clears such rows along with the account's failures.
+ */
+export const STALE_PENDING_MS = 7 * MINUTE;
+
+/**
  * The account decision. `failureTimes` are the account's most recent failures,
  * newest first, at most ACCOUNT_MAX_FAILURES of them. No failure is recorded
  * while locked, so the fifth failure is the clock for the whole lockout.

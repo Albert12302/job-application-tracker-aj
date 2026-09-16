@@ -42,7 +42,9 @@ Concurrency: the counts come from `begin_sign_in_attempt` (migration `2026091618
 locks the account and address hashes, reads their recent failures, and inserts this attempt as
 `pending` in one transaction. Pending rows count as failures, so simultaneous attempts see each
 other. Every path then settles its own row: `failure` or `success`, or deleted when blocked or
-when Auth is rate-limited or down. Never go back to reading the counts with plain selects — the
+when Auth is rate-limited or down. A success also clears the account's pending rows older than
+`STALE_PENDING_MS` (7 minutes, above hosted Supabase's function time limit): those requests died
+unsettled, and would otherwise count against a user who has just signed in. Never go back to reading the counts with plain selects — the
 check and the record would separate again, and parallel guesses would all read the same count.
 
 What this does **not** cover: Auth's password endpoint is public to the anon key, and a direct

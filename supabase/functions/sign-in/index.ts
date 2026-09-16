@@ -35,6 +35,7 @@ import {
   ipBlockedUntil,
   parseLimit,
   retryAfterMinutes,
+  STALE_PENDING_MS,
 } from './limits.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -171,8 +172,15 @@ Deno.serve(async (req) => {
   // Clear the account's failures on success, so a legitimate user who fumbled
   // twice is not one typo away from a lockout. The IP's failures stay: one
   // valid account must not be a way to reset an address that is spraying others.
-  // Other requests' pending attempts are theirs to settle, so only failures go.
-  await admin.from('sign_in_attempts').delete().eq('email_hash', emailHash).eq('outcome', 'failure');
+  // Pending attempts still in flight are theirs to settle; one older than any
+  // live request (STALE_PENDING_MS) died unsettled and counts as a failure, so
+  // it goes with the failures.
+  const stale = new Date(Date.now() - STALE_PENDING_MS).toISOString();
+  await admin
+    .from('sign_in_attempts')
+    .delete()
+    .eq('email_hash', emailHash)
+    .or(`outcome.eq.failure,and(outcome.eq.pending,created_at.lt."${stale}")`);
   await admin.from('sign_in_attempts').update({ outcome: 'success' }).eq('id', attempt.id);
   await admin
     .from('security_events')
