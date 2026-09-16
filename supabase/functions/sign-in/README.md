@@ -38,12 +38,29 @@ is an hour old, whatever account it tries. A success clears the account's failur
 address's. The decisions live in `limits.ts` — pure, no Deno APIs — and `limits.test.ts`
 covers them under Vitest (`npm test`).
 
+Concurrency: the counts come from `begin_sign_in_attempt` (migration `20260916181344`), which
+locks the account and address hashes, reads their recent failures, decides the block, and — only
+when not blocked — inserts this attempt as `pending`, in one transaction. Pending rows count as
+failures, so simultaneous attempts see each other. A blocked attempt writes nothing, so a blocked
+address cannot pile pending rows onto someone else's account. That means the block rule lives in
+SQL too; change `accountLockout` or `ipBlockedUntil` and the migration together, and the e2e
+parity test tells you if they drift. Every unblocked path then settles its own row, with retries:
+`failure` or `success`, or deleted when Auth is rate-limited or down. A success also clears the account's pending rows older than
+`STALE_PENDING_MS` (7 minutes, above hosted Supabase's function time limit): those requests died
+unsettled, and would otherwise count against a user who has just signed in. Never go back to reading the counts with plain selects — the
+check and the record would separate again, and parallel guesses would all read the same count.
+
+What this does **not** cover: Auth's password endpoint is public to the anon key, and a direct
+call skips this function entirely. That is an accepted risk (SPEC §7.1), revisited before
+sign-up opens.
+
 ## Confirm the client IP after deploy
 
 The address comes from `x-real-ip`, falling back to the **last** `x-forwarded-for` entry
 (`limits.ts` `clientIp`). Locally both are written by Kong, and a client-sent value never
 survives — measured, not assumed. On the hosted project, confirm it once (SPEC §7.8 check 7):
-fail one sign-in from home Wi-Fi and one from a phone on cellular, then
+fail one sign-in from home Wi-Fi and one from a phone on cellular, then, the same day (rows are
+purged after 24 hours)
 
 ```sql
 select ip_hash, count(*) from public.sign_in_attempts where outcome = 'failure' group by 1;
@@ -89,6 +106,14 @@ failure window, which is harmless.
    during the lock the correct password gets the same answer as a wrong one (SPEC §7.8 check 5).
    The lockout copy is not a leak: it is shown for any address, real or not.
 5. CORS headers only for allowlisted origins.
+6. Ten concurrent `begin_sign_in_attempt` calls for one account each see a different number of
+   earlier attempts (0–9). Called on the database directly, because the local edge runtime
+   answers sign-ins one at a time and cannot stage the race.
+7. An address already blocked floods one account: nothing is written for that account, and its
+   owner, from another address, finds no failures counted.
+8. The database's block decision matches `accountLockout` / `ipBlockedUntil` at the edges of
+   each rule (four failures, exactly 15 minutes, the lock's last minute, the hour's edge).
+9. No attempt from this run is left `pending` once the tests above have finished.
 
 The per-IP block has no e2e test: locally every caller is the same Docker address and a
 client cannot fake another (which is the point), so "a second address still gets in" cannot

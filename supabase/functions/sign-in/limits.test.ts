@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACCOUNT_LOCKOUT_MS,
   accountLockout,
+  authFailure,
   backoffMs,
   clientIp,
   IP_DEFAULT_MAX_FAILURES,
@@ -65,6 +66,28 @@ describe('ipBlockedUntil (§7.1: 20 failures / hour, temporary block)', () => {
 
   it('honours a configured limit', () => {
     expect(ipBlockedUntil(ago(1, 2, 3), NOW, 3)).toBe(NOW - 3 * MINUTE + IP_WINDOW_MS);
+  });
+});
+
+describe('authFailure (§7.1: only Auth rejecting the credentials counts)', () => {
+  it('counts a credential rejection', () => {
+    expect(authFailure(400)).toBe('rejected');
+  });
+
+  it('reports Auth rate limiting without counting it', () => {
+    expect(authFailure(429)).toBe('rate-limited');
+  });
+
+  it('never counts a request that did not reach Auth', () => {
+    // supabase-js reports status 0 for a network failure. It used to fall through to
+    // "wrong password", so a few blips could lock out a real user.
+    expect(authFailure(0)).toBe('unavailable');
+  });
+
+  it('never counts Auth erroring, or no session with no status', () => {
+    expect(authFailure(500)).toBe('unavailable');
+    expect(authFailure(503)).toBe('unavailable');
+    expect(authFailure(undefined)).toBe('unavailable');
   });
 });
 

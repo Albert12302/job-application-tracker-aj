@@ -1,5 +1,10 @@
 // Sign-in limits (SPEC §7.1) as pure decisions. No imports and no Deno APIs,
 // so index.ts runs exactly the code the unit tests (limits.test.ts, Vitest) cover.
+//
+// The block rule in accountLockout and ipBlockedUntil is also written in SQL, in
+// begin_sign_in_attempt (migration 20260916181344), which decides it before
+// writing anything. Change one, change both: e2e/sign-in-function.spec.ts checks
+// the SQL against these.
 
 export const MINUTE = 60_000;
 
@@ -12,6 +17,13 @@ export const BASE_BACKOFF_MS = 250;
 /** Per IP: 20 failures inside an hour block the address until the oldest of them is an hour old. */
 export const IP_DEFAULT_MAX_FAILURES = 20;
 export const IP_WINDOW_MS = 60 * MINUTE;
+
+/**
+ * A pending attempt older than this belongs to a request that died (Auth hung, the worker
+ * was killed): hosted Supabase ends an edge function after 150 s on Free and 400 s on paid
+ * plans. A successful sign-in clears such rows along with the account's failures.
+ */
+export const STALE_PENDING_MS = 7 * MINUTE;
 
 /**
  * The account decision. `failureTimes` are the account's most recent failures,
@@ -43,6 +55,19 @@ export function ipBlockedUntil(failureTimes: number[], now: number, maxFailures:
   const recent = failureTimes.filter((t) => now - t < IP_WINDOW_MS);
   const oldest = recent[maxFailures - 1];
   return oldest === undefined ? 0 : oldest + IP_WINDOW_MS;
+}
+
+/**
+ * What a failed Auth sign-in means for the counts. Only `rejected` — Auth answered and
+ * refused the credentials — counts as a failure. Auth rate-limited or unreachable is not
+ * the user's wrong password: it must neither count against them nor tell them so.
+ * `status` is supabase-js's: 0 when the request never reached Auth (network, restart),
+ * undefined when there was no error but also no session.
+ */
+export function authFailure(status: number | undefined): 'rejected' | 'rate-limited' | 'unavailable' {
+  if (status === 429) return 'rate-limited';
+  if (status !== undefined && status >= 400 && status < 500) return 'rejected';
+  return 'unavailable';
 }
 
 /** Whole minutes to wait, never zero — "try again in 0 minutes" reads as a bug. */
