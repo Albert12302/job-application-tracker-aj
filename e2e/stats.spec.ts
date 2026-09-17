@@ -1,6 +1,7 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { expectAxeClean } from './a11y.js';
+import { makeApplication, unique } from './fixtures.js';
 import { apiActor, apiSession, startSignedIn } from './session.js';
 
 /**
@@ -20,13 +21,6 @@ import { apiActor, apiSession, startSignedIn } from './session.js';
 
 const DEV_A = 'dev-a@example.test';
 const DEV_D = 'dev-d@example.test';
-
-async function expectAxeClean(page: Page) {
-  // A skeleton still pulsing, or a toast mid-fade, measures low and fails at random (CLAUDE.md).
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
-}
 
 /** A stat card, found by its label. */
 function card(page: Page, label: string) {
@@ -204,17 +198,8 @@ test.describe("dev-d's status changes", () => {
    * rule's cases are domain/stats.test.ts's.
    */
   test('a status change reaches stats at once, and Interview → Rejected stays an interview', async ({ page }, testInfo) => {
-    const company = `Stats ${testInfo.project.name} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-    const { data, error } = await client.rpc('create_application', {
-      p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
-      p_company: company,
-      p_position: 'Frontend Engineer',
-      p_status: 'Interview',
-      p_referral: false,
-    });
-    expect(error).toBeNull();
-    const id = (data as { id: string }).id;
-    made.push(id);
+    const company = unique('Stats', testInfo.project.name);
+    const id = await makeApplication(client, made, company, { status: 'Interview' });
 
     await startSignedIn(page, session);
     await onlyApplication(page, id);

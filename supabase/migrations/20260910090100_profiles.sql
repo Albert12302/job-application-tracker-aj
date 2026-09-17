@@ -22,14 +22,16 @@ alter table public.profiles enable row level security;
 
 -- One policy per operation (§7.2). No delete policy: account deletion is out of
 -- scope for v1 (§9.6) and cascades from auth.users when it is added.
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy profiles_select_own on public.profiles
-  for select to authenticated using (auth.uid() = id);
+  for select to authenticated using ((select auth.uid()) = id);
 
 create policy profiles_insert_own on public.profiles
-  for insert to authenticated with check (auth.uid() = id);
+  for insert to authenticated with check ((select auth.uid()) = id);
 
 create policy profiles_update_own on public.profiles
-  for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+  for update to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 -- Create the profile row when an auth user is confirmed.
 -- SECURITY DEFINER is unavoidable: the insert happens in the auth trigger's

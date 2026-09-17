@@ -21,7 +21,7 @@ const ANON = process.env.VITE_SUPABASE_ANON_KEY!;
 export const PASSWORD = 'devpassword1234';
 
 /** src/data/client.ts AUTH_STORAGE_KEY — where supabase-js keeps the session. */
-const STORAGE_KEY = 'aj-hunt-auth';
+export const STORAGE_KEY = 'aj-hunt-auth';
 
 /**
  * One sign-in, giving both halves a spec needs: a client for the rows it sets

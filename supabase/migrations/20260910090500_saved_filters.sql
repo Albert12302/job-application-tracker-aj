@@ -27,14 +27,16 @@ create index saved_filters_user_idx on public.saved_filters (user_id, created_at
 
 alter table public.saved_filters enable row level security;
 
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy saved_filters_select_own on public.saved_filters
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 create policy saved_filters_insert_own on public.saved_filters
-  for insert to authenticated with check (auth.uid() = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 
 create policy saved_filters_update_own on public.saved_filters
-  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy saved_filters_delete_own on public.saved_filters
-  for delete to authenticated using (auth.uid() = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);

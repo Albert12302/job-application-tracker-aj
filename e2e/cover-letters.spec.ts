@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { expectAxeClean } from './a11y.js';
+import { makeApplication as insertApplication, unique } from './fixtures.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -44,10 +45,6 @@ test.beforeEach(async ({ page }) => {
   await startSignedIn(page, session);
 });
 
-function unique(prefix: string, project: string): string {
-  return `${prefix} ${project} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
 const PDF = Buffer.from('%PDF-1.4\n% a cover letter\n');
 /** The OLE2 signature: what the upload function accepts as a .doc. */
 const DOC = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(504)]);
@@ -55,30 +52,7 @@ const DOC = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a
 const NOT_A_DOCX = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(60)]);
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
 
-/**
- * Once nothing is mid-animation. A toast fading in measures 1.58:1 for its
- * first frames and passes once settled, so a scan that lands on the fade
- * reports a contrast failure no one ever reads.
- */
-async function expectAxeClean(page: Page) {
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
-}
-
-async function makeApplication(company: string): Promise<string> {
-  const { data, error } = await client.rpc('create_application', {
-    p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
-    p_company: company,
-    p_position: 'Frontend Engineer',
-    p_status: 'Applied',
-    p_referral: false,
-  });
-  expect(error).toBeNull();
-  const id = (data as { id: string }).id;
-  made.push(id);
-  return id;
-}
+const makeApplication = (company: string) => insertApplication(client, made, company);
 
 async function coverLetterOf(id: string) {
   const { data, error } = await client

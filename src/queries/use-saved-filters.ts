@@ -36,9 +36,10 @@ export function useCreateSavedFilter() {
       const names = (queryClient.getQueryData<SavedFilter[]>(key) ?? []).map((filter) => filter.name);
       return reporting('create_saved_filter', () => createSavedFilter(savedFilterInput(values, names)), isRateLimited);
     },
+    // The saved row goes on the end of the tabs, where the database orders it;
+    // no refetch, because this is the database's own answer.
     onSuccess: (filter) => {
       queryClient.setQueryData<SavedFilter[]>(key, (filters) => [...(filters ?? []), filter]);
-      void queryClient.invalidateQueries({ queryKey: key });
     },
   });
 }

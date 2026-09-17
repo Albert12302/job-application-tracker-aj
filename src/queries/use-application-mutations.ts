@@ -64,11 +64,17 @@ const deleteIfPresent = (id: string) =>
     if (!isNotFound(error)) throw error;
   });
 
-/** Take deleted rows out of the list at once, and refresh what counted them. */
+/**
+ * Take deleted rows out of the list at once, and refresh what counted them.
+ *
+ * The list itself is not invalidated: the rows are gone from its cache, and
+ * reloading every application to learn what this call already knows is the
+ * refetch the delete does not need. The count and stats are derived elsewhere,
+ * so they are asked again.
+ */
 function dropDeleted(queryClient: QueryClient, userId: string, ids: readonly string[]) {
   const gone = new Set(ids);
   queryClient.setQueryData<Application[]>(keys.applicationList(userId), (rows) => rows?.filter((row) => !gone.has(row.id)));
-  void queryClient.invalidateQueries({ queryKey: keys.applicationList(userId) });
   void queryClient.invalidateQueries({ queryKey: keys.applicationCount(userId) });
   void queryClient.invalidateQueries({ queryKey: keys.stats(userId) });
 }
@@ -137,11 +143,13 @@ export function useToggleStar() {
     mutationFn: ({ id, starred }: { id: string; starred: boolean; company: string }) =>
       reporting('star_application', () => setStarred(id, starred), isNotFound),
     onMutate: async ({ id, starred }) => ({ rollback: await patchCached(queryClient, user.id, id, { starred }) }),
-    onError: (_error, { starred, company }, context) => {
+    // Only a failure asks the database again: a star writes one column, and the
+    // optimistic patch already holds what a success would return (§8.3).
+    onError: (_error, { id, starred, company }, context) => {
       context?.rollback();
       toast.error(`Couldn't ${starred ? 'star' : 'unstar'} ${company}.`);
+      void refreshOne(queryClient, user.id, id);
     },
-    onSettled: (_data, _error, { id }) => refreshOne(queryClient, user.id, id),
   });
 }
 

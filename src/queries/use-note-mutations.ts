@@ -15,10 +15,14 @@ function put(queryClient: QueryClient, key: readonly unknown[], notes: (current:
   queryClient.setQueryData<Note[]>(key, (current) => (current ? notes(current) : current));
 }
 
-/** Order is imposed where notes render (NotesSection), so a saved note just joins the cache. */
+/**
+ * Order is imposed where notes render (NotesSection), so a saved note just
+ * joins the cache — and the cache now holds the row the database returned, so
+ * nothing is invalidated: the open screen would refetch every note to be told
+ * what it was just told.
+ */
 function append(queryClient: QueryClient, key: readonly unknown[], note: Note) {
   put(queryClient, key, (notes) => [...notes, note]);
-  void queryClient.invalidateQueries({ queryKey: key });
 }
 
 /**

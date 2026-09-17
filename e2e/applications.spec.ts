@@ -1,6 +1,7 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { expectAxeClean } from './a11y.js';
+import { makeApplication as insertApplication, unique } from './fixtures.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -39,44 +40,13 @@ test.beforeEach(async ({ page }) => {
  * A company name no other test, browser project, or rerun will use: two tests
  * that share a name fight over each other's rows.
  */
-function unique(prefix: string, project: string): string {
-  return `${prefix} ${project} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
 async function openList(page: Page) {
   await page.goto('/applications');
   await expect(page.getByRole('heading', { level: 1, name: 'My Applications' })).toBeVisible();
 }
 
-async function expectAxeClean(page: Page) {
-  // A button still fading out of its pending state measures low and fails at random (CLAUDE.md).
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
-}
-
-/**
- * A row of this run's own, made through the same function the app calls.
- *
- * dev-d starts with no applications, so a test that acts on "the first row"
- * is really acting on whatever an earlier run or e2e/security.spec.ts — which
- * also creates and deletes rows as dev-d, at the same time — happened to leave
- * behind. Each test that needs a row makes one and names it.
- */
-async function makeApplication(company: string): Promise<string> {
-  const { data, error } = await client.rpc('create_application', {
-    // Midnight UTC, which the column's check constraint requires (§5.4).
-    p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
-    p_company: company,
-    p_position: 'Frontend Engineer',
-    p_status: 'Applied',
-    p_referral: false,
-  });
-  expect(error).toBeNull();
-  const id = (data as { id: string }).id;
-  made.push(id);
-  return id;
-}
+/** A row of this run's own; see e2e/fixtures.ts for why each test makes its own. */
+const makeApplication = (company: string) => insertApplication(client, made, company);
 
 /** The history rows an application has, oldest first — what §2 says must exist. */
 async function historyFor(applicationId: string) {
