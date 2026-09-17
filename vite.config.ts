@@ -7,17 +7,48 @@ import { defineConfig } from 'vitest/config'
 
 type VercelConfig = { headers?: { headers: { key: string; value: string }[] }[] }
 
-/**
- * The CSP from vercel.json, enforced, for `npm run preview` (SPEC §7.5). Read
- * from vercel.json rather than copied, so what is checked locally is what
- * ships. The hosted Supabase origin (placeholder or real ref) becomes the
- * local one, or every request from the preview would be refused.
- */
-function previewCsp(supabaseUrl: string | undefined): string | undefined {
+/** The enforced CSP in vercel.json — never a `-Report-Only` one, which enforces nothing (SPEC §7.5). */
+function shippedCsp(): string | undefined {
   const vercel = JSON.parse(readFileSync(new URL('./vercel.json', import.meta.url), 'utf8')) as VercelConfig
-  const policy = vercel.headers
-    ?.flatMap((rule) => rule.headers)
-    .find((header) => /^Content-Security-Policy(-Report-Only)?$/.test(header.key))?.value
+  return vercel.headers?.flatMap((rule) => rule.headers).find((header) => header.key === 'Content-Security-Policy')
+    ?.value
+}
+
+/**
+ * Fails a Vercel build (`VERCEL=1`) whose CSP would not protect the deployed app
+ * (SPEC §7.5): missing or report-only, still holding the placeholder ref, or
+ * naming a different Supabase project than the one the bundle calls. An enforced
+ * CSP is the condition that makes localStorage tokens acceptable, so it is a
+ * build failure rather than a README step. Local builds are not checked.
+ */
+function assertReleaseCsp(policy: string | undefined, supabaseUrl: string | undefined): void {
+  if (!policy) refuseRelease('no enforced Content-Security-Policy header (a -Report-Only one does not count)')
+  if (policy.includes('YOUR_PROJECT_REF')) refuseRelease('still holds the YOUR_PROJECT_REF placeholder')
+  if (!supabaseUrl) refuseRelease('VITE_SUPABASE_URL is not set in the Vercel project')
+  const host = new URL(supabaseUrl).host
+  // Every Supabase origin in every directive, whole host only: one directive left
+  // naming another project would pass a check that the right host appears somewhere.
+  const named = [...policy.matchAll(/(https|wss):\/\/([\w.-]+\.supabase\.co)(?=[\s;]|$)/g)]
+  const other = named.find(([, , namedHost]) => namedHost !== host)
+  if (other) refuseRelease(`names ${other[0]}, but VITE_SUPABASE_URL points at ${host}`)
+  for (const scheme of ['https', 'wss']) {
+    if (!named.some(([, namedScheme]) => namedScheme === scheme)) {
+      refuseRelease(`does not allow ${scheme}://${host}, the Supabase project VITE_SUPABASE_URL points at`)
+    }
+  }
+}
+
+function refuseRelease(problem: string): never {
+  throw new Error(`vercel.json CSP: ${problem} — see README.md, Deploy → Vercel (SPEC §7.5).`)
+}
+
+/**
+ * The shipped CSP, enforced, for `npm run preview` (SPEC §7.5). Read from
+ * vercel.json rather than copied, so what is checked locally is what ships.
+ * The hosted Supabase origin (placeholder or real ref) becomes the local one,
+ * or every request from the preview would be refused.
+ */
+function previewCsp(policy: string | undefined, supabaseUrl: string | undefined): string | undefined {
   if (!policy || !supabaseUrl) return policy
 
   const local = new URL(supabaseUrl)
@@ -29,7 +60,10 @@ function previewCsp(supabaseUrl: string | undefined): string | undefined {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const csp = previewCsp(loadEnv(mode, process.cwd(), 'VITE_').VITE_SUPABASE_URL)
+  const supabaseUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_SUPABASE_URL
+  const policy = shippedCsp()
+  if (process.env.VERCEL) assertReleaseCsp(policy, supabaseUrl)
+  const csp = previewCsp(policy, supabaseUrl)
 
   return {
     plugins: [react(), tailwindcss()],
