@@ -658,10 +658,12 @@ SVG is not an accepted type anywhere. It is a script execution vector.
   ```
 
   The Supabase origin must be in `connect-src` (and `wss:` if Realtime is used) or every
-  request fails. Ship it in report-only mode first, then enforce — do not disable it when it
+  request fails. It ships **enforced from the first deploy** — do not disable it when it
   breaks something. Check it locally before deploying: `npm run build && npm run preview`
-  serves the build under the same policy, **enforced** (`vite.config.ts` reads it from
-  `vercel.json`, so the two cannot drift).
+  serves the build under the same policy, enforced (`vite.config.ts` reads it from
+  `vercel.json`, so the two cannot drift). A Vercel build fails if the policy is missing,
+  report-only, still holds the placeholder project ref, or allows a different Supabase
+  project than `VITE_SUPABASE_URL`.
 - **Session tokens in localStorage — accepted risk.** supabase-js keeps the access and refresh
   tokens in `localStorage`, where any script on the page can read them. A static app cannot
   hold them in an `HttpOnly` cookie: the browser calls Supabase directly and has to attach the
@@ -1191,6 +1193,13 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-16
+- **The CSP ships enforced from the first deploy, and a Vercel build checks it (§7.5).** Found in a
+  second whole-repo security review. "Report-only first, then enforce" left the release blocker
+  as a README step: deploying master as it stood would have shipped a policy that enforced
+  nothing, pointed at a placeholder project. Report-only was for learning what the policy
+  breaks, and `npm run preview` already shows that locally under the enforced policy, so the
+  stage bought nothing. The build now refuses a missing or report-only policy, the placeholder
+  ref, and a policy naming a different Supabase project than the bundle calls.
 - **Direct calls to Auth's password endpoint are recorded as an accepted risk (§7.1).** Found
   in the same review. Anyone holding the anon key can call Auth's password endpoint without
   going through the sign-in function, skipping both of its limits. Nothing on the Free plan

@@ -214,21 +214,19 @@ before trusting it — an untested backup is a hope, not a backup.
 The app lives at the repository root, so Vercel's defaults apply and no "Root Directory"
 needs setting.
 
-`vercel.json` is committed with the SPA rewrite and the §7.5 headers. Two edits before it
-means anything:
+`vercel.json` is committed with the SPA rewrite and the §7.5 headers, the CSP already
+**enforced**. One edit before the first deploy:
 
-1. Replace both `YOUR_PROJECT_REF` placeholders with the hosted project ref, or every request
-   is blocked once the CSP is enforced.
-2. The CSP ships as `Content-Security-Policy-Report-Only` (§7.5: report-only first). Rename
-   the key to `Content-Security-Policy` once the console is clean. Do not disable it when it
-   breaks something — fix the directive.
+1. Replace the three `YOUR_PROJECT_REF` placeholders with the hosted project ref.
 
-   **Enforcing it is a release blocker, not a follow-up:** session tokens live in
-   localStorage (an accepted risk, SPEC §7.5), and the enforced CSP is the condition that
-   makes that acceptable. No real user data goes in while the header still says
-   `-Report-Only`.
+   **A Vercel build fails until that is done.** `vite.config.ts` checks the policy whenever
+   `VERCEL` is set: it must be an enforced `Content-Security-Policy` (never `-Report-Only`),
+   hold no placeholder, and allow the same project as `VITE_SUPABASE_URL`. The enforced CSP is
+   the condition that makes localStorage tokens acceptable (SPEC §7.5), so it is a build
+   failure rather than a step to remember. Do not disable the policy when it breaks
+   something — fix the directive.
 
-   Check the policy locally before each deploy — it catches most breakage without a round
+2. Check the policy locally before each deploy — it catches most breakage without a round
    trip to Vercel:
 
    ```bash
