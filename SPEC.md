@@ -687,8 +687,17 @@ SVG is not an accepted type anywhere. It is a script execution vector.
   The cookie rule in the first bullet still governs any cookie the app does set.
 - Also set: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
   `Permissions-Policy` denying camera/microphone/geolocation.
-- CORS restricted to known origins. No `*` on any authenticated endpoint, and no reflecting
-  the request's `Origin` header back.
+- CORS restricted to known origins on every endpoint this project writes — the edge
+  functions answer for `ALLOWED_ORIGINS` only (`supabase/functions/_shared/cors.ts`). No `*`,
+  and no reflecting the request's `Origin` header back.
+
+  **Accepted: Supabase's own APIs answer `*`.** The Data API, Auth and Storage send
+  `Access-Control-Allow-Origin: *` (local Kong does; hosted gives no setting to narrow it).
+  `*` is dangerous where the browser attaches credentials by itself — a cookie — so that any
+  site's script can make a signed-in request. Here nothing is attached by itself: the page
+  adds the token to each request from localStorage, so another site's script can send only a
+  token it already holds, and CORS was never what stood in its way. **Revisit if the app ever
+  authenticates with a cookie** — the server-side auth path this section names for sign-up.
 
 ### 7.6 Database and dependencies
 - Postgres access through Supabase with RLS on (§7.2). No direct connection string in client
@@ -777,7 +786,10 @@ untrusted, capped, and write-only:**
 - **Log these security events:** sign-in success and failure, sign-out, password change,
   password reset request and completion, email change, rate-limit trip, permission denial
   (RLS rejection), file upload and delete, account deletion.
-- **Each entry contains:** event type, user id (opaque UUID), timestamp, source IP, outcome.
+- **Each entry contains:** event type, user id (opaque UUID), timestamp, outcome. **No source
+  IP, deliberately.** The browser writes most of these rows, and an address in them would be
+  whatever the client claimed; the real one is already in Supabase's Auth and edge-function
+  logs. Sign-in's per-IP limit keeps only a peppered hash, for 24 hours (§7.1).
 - **Never log:** email addresses, passwords or tokens, application or note content, company or
   position names, uploaded file names, full request bodies. This applies to `app_errors` too —
   a stack trace is fine, the form values that caused it are not.
@@ -1200,6 +1212,12 @@ the prototype is the reference for those.
   breaks, and `npm run preview` already shows that locally under the enforced policy, so the
   stage bought nothing. The build now refuses a missing or report-only policy, the placeholder
   ref, and a policy naming a different Supabase project than the bundle calls.
+- **Two §7 lines now match what was built (§7.5, §7.7).** From the same review. §7.5 forbade
+  `*` CORS on any authenticated endpoint, but Supabase's own APIs send it and cannot be told
+  otherwise; it is recorded as accepted, because the token is attached by the page rather than
+  sent as a cookie, with cookie auth as the trigger to revisit. §7.7 listed source IP in every
+  security event, while `security_events` has had no IP column since it was created, for a
+  reason only its migration gave: a client-written address is worthless.
 - **Direct calls to Auth's password endpoint are recorded as an accepted risk (§7.1).** Found
   in the same review. Anyone holding the anon key can call Auth's password endpoint without
   going through the sign-in function, skipping both of its limits. Nothing on the Free plan
