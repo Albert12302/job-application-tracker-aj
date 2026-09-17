@@ -1,7 +1,7 @@
 import type { FilterCriteria } from '@/domain/filters';
 import { savedFilterSchema, type SavedFilter } from '@/domain/schemas';
-import { isWriteRateLimited, WriteRateLimitedError } from './applications';
 import { supabase } from './client';
+import { writeFailure } from './write-limit';
 
 /**
  * Saved filters (SPEC §2, §9.5). RLS scopes every call to the signed-in user
@@ -23,12 +23,12 @@ export async function listSavedFilters(userId: string): Promise<SavedFilter[]> {
 
 export async function createSavedFilter(input: FilterCriteria & { name: string }): Promise<SavedFilter> {
   const { data, error } = await supabase.from('saved_filters').insert(input).select('*').single();
-  if (error) throw isWriteRateLimited(error) ? new WriteRateLimitedError({ cause: error }) : error;
+  if (error) throw writeFailure(error);
   return savedFilterSchema.parse(data);
 }
 
 /** Already gone counts as done: the user wanted it deleted, and it is. */
 export async function deleteSavedFilter(id: string): Promise<void> {
   const { error } = await supabase.from('saved_filters').delete().eq('id', id);
-  if (error) throw isWriteRateLimited(error) ? new WriteRateLimitedError({ cause: error }) : error;
+  if (error) throw writeFailure(error);
 }

@@ -1214,6 +1214,14 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-17
+- **Hitting the write limit now says to wait, wherever it happens (§7.1, §8.2).** Found by a
+  review of the data layer. Only deleting an application from the list and saving a filter
+  recognised the limit's refusal; starring, changing a status, adding or editing a note,
+  attaching a cover letter, saving the form and deleting from the detail screen all treated it
+  as a bug in the app — written to `app_errors` and shown as a generic failure with an error
+  reference to quote, when the user had simply worked faster than 120 writes a minute and
+  needed to be told to wait. Every write now reports the refusal the same way, decided once in
+  the data layer instead of per call site.
 - **A refused request can no longer take sign-in down for everybody (§7.1, §8.2).** Found by a
   review of the three edge functions. Sign-in answered any method other than POST without
   reading the request's body, and the edge runtime never completes a response sent over an

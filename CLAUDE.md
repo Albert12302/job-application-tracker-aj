@@ -530,6 +530,15 @@ supabase/
   rethrown as `ReportedError`; outcomes the user can fix (wrong password, refused file) pass
   through unreported. Components show `errorReference(error)` and never report themselves.
   `ErrorAction` is a closed union — add a member, never a free-form string.
+- **Every write in `data/` throws through `write-limit.ts` `writeFailure()`**, and every
+  mutation that writes passes `isRateLimited` to `reporting`. §7.1's 120-a-minute limit can
+  refuse any write on the four writable tables, and a refusal the user causes is not a bug:
+  unmapped, it lands in `app_errors` and the user gets generic copy instead of being told to
+  wait. The copy comes from `failureMessage(message, error)` in `queries/errors.ts` — the one
+  place that decides a refusal reads differently — and carries no error reference, because
+  nothing was reported. `data/write-limit.test.ts` asks every write what it throws when the
+  client refuses everything, so a new write that forgets is caught there rather than in
+  production.
 - **The session is a store, not a query.** `data/auth.ts` owns it (supabase-js announces
   changes); `useSession()` subscribes. Route guards read it from router context in
   `beforeLoad`; `main.tsx` re-runs them on every change and clears the query cache on every

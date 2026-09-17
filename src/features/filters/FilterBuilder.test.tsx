@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WriteRateLimitedError } from '@/data/applications';
+import { WriteRateLimitedError } from '@/data/write-limit';
 import type { SavedFilter } from '@/domain/schemas';
 import { ApplicationsScreen } from '@/features/applications/ApplicationsScreen';
 import { applicationRow, TEST_USER } from '@/test/factories';

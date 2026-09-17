@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ErrorState } from '@/components/ErrorState';
 import type { Application } from '@/domain/schemas';
-import { errorReference, WAIT_A_MINUTE } from '@/queries/errors';
-import { useDeleteApplications, WriteRateLimitedError } from '@/queries/use-application-mutations';
+import { errorReference, failureMessage } from '@/queries/errors';
+import { useDeleteApplications } from '@/queries/use-application-mutations';
 import { useNoteCount } from '@/queries/use-notes';
 import { applicationCount, bulkDeleteFailure, companyList, deleteSummary } from './delete-summary';
 
@@ -75,8 +75,6 @@ export function BulkDeleteDialog({
       },
     });
 
-  const rateLimited = failure?.error instanceof WriteRateLimitedError;
-
   return (
     <AlertDialog
       open={open}
@@ -98,11 +96,8 @@ export function BulkDeleteDialog({
         </AlertDialogHeader>
         {failure ? (
           <ErrorState
-            title={
-              bulkDeleteFailure(failure.deleted, failure.attempted, failure.company) +
-              (rateLimited ? ` ${WAIT_A_MINUTE}` : '')
-            }
-            reference={rateLimited ? null : errorReference(failure.error)}
+            title={failureMessage(bulkDeleteFailure(failure.deleted, failure.attempted, failure.company), failure.error)}
+            reference={errorReference(failure.error)}
           />
         ) : null}
         <AlertDialogFooter>
