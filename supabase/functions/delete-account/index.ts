@@ -17,6 +17,7 @@
 // gone, or the files are orphaned with no owner to find them by.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { drainBody } from '../_shared/body.ts';
 import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -51,12 +52,14 @@ Deno.serve(async (req) => {
   const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
   const reply = (body: unknown, status: number) => jsonResponse(body, status, cors);
 
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  // Drained to the end before anything is answered, even a preflight or a
+  // refusal: the edge runtime never completes a response sent over an unread
+  // body, and the stuck worker stops the function starting again
+  // (_shared/body.ts). This function reads nothing from the body — who is
+  // deleted comes from the token — so it is discarded rather than buffered.
+  await drainBody(req);
 
-  // Drained to the end before anything is answered, even a refusal: the edge
-  // runtime never completes a response sent over an unread body, and the stuck
-  // worker stops the function starting again (CLAUDE.md).
-  if (req.body) await req.arrayBuffer();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
   if (req.method !== 'POST') return reply({ error: 'Method not allowed.' }, 405);
 

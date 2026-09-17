@@ -1213,6 +1213,29 @@ Newest first. One line per substantive decision — what changed and *why*, so a
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
 
+### 2026-09-17
+- **Confirm dialogs get phone-sized controls (§11).** Found by a review of the mobile pass.
+  Every dialog that confirms something irreversible — deleting an application, deleting
+  several, discarding an edit, removing a cover letter, deleting the account and its typed
+  confirmation field — drew its buttons at 32px on a phone, well under the 44px §11 requires,
+  because they reach the button through a wrapper that the mobile pass did not touch. The
+  wrappers now carry the size, so a sixth dialog cannot be missed the same way.
+- **Hitting the write limit now says to wait, wherever it happens (§7.1, §8.2).** Found by a
+  review of the data layer. Only deleting an application from the list and saving a filter
+  recognised the limit's refusal; starring, changing a status, adding or editing a note,
+  attaching a cover letter, saving the form and deleting from the detail screen all treated it
+  as a bug in the app — written to `app_errors` and shown as a generic failure with an error
+  reference to quote, when the user had simply worked faster than 120 writes a minute and
+  needed to be told to wait. Every write now reports the refusal the same way, decided once in
+  the data layer instead of per call site.
+- **A refused request can no longer take sign-in down for everybody (§7.1, §8.2).** Found by a
+  review of the three edge functions. Sign-in answered any method other than POST without
+  reading the request's body, and the edge runtime never completes a response sent over an
+  unread body: the worker stuck on it stopped the function starting again, so every sign-in
+  after one such request failed until the container was recreated — one unauthenticated PUT,
+  and nobody could get in. Draining before answering now has one home the three functions
+  share, and it covers preflights and every refusal, not just the ones someone remembered.
+
 ### 2026-09-16
 - **Deleting an application with many notes no longer fails (§7.1, §9.2).** Found in a
   whole-repo code review. The write limit counted every note the delete's cascade removed, so

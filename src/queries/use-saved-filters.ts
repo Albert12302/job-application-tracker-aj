@@ -1,14 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { WriteRateLimitedError } from '@/data/applications';
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from '@/data/saved-filters';
 import { savedFilterInput } from '@/domain/filters';
 import type { SavedFilter, SavedFilterFormValues } from '@/domain/schemas';
-import { isRateLimited, reporting, WAIT_A_MINUTE } from './errors';
+import { failureMessage, isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { useIsSignedIn, useSignedInUser } from './use-session';
-
-export { WriteRateLimitedError };
 
 /** The user's saved filters, in tab order (§2, §4.2). */
 export function useSavedFilters() {
@@ -64,7 +61,7 @@ export function useDeleteSavedFilter() {
     },
     onError: (error, _filter, context) => {
       queryClient.setQueryData(key, context?.previous);
-      toast.error(isRateLimited(error) ? `Couldn't delete the filter. ${WAIT_A_MINUTE}` : "Couldn't delete the filter.");
+      toast.error(failureMessage("Couldn't delete the filter.", error));
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });

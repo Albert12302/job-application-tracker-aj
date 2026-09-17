@@ -110,9 +110,14 @@ Four more bootstrap settlements, for the same reason:
 - **A function must read a request body to the end before answering, even to refuse it.**
   The edge runtime (1.74) never completes a response sent over an unread body — `cancel()`
   does not help — and the stuck worker stops that function starting again until the container
-  is recreated. `upload/index.ts` `readCapped` drains and discards past the cap, and its
-  `refuse` drains before every early 401/404/405. A small body arrives whole and hides the bug;
-  test a refusal with one of about a megabyte (`upload-function.spec.ts`).
+  is recreated. The rule has one home, `_shared/body.ts` `drainBody`, and it covers *every*
+  answer a function can give: the 405, the 401, the 404, and the preflight. Only a function
+  that reads the body itself is exempt, for that one path — `upload/index.ts` `readCapped`
+  (which drains and discards past its cap) and `sign-in/index.ts` `req.json()`. Route the
+  answers through one function so a new refusal cannot forget: sign-in's `settle` drains,
+  upload's `refuse` drains, delete-account drains up front. A small body arrives whole and
+  hides the bug; test a refusal with one of about a megabyte
+  (`upload-function.spec.ts`, `sign-in-function.spec.ts`).
 - **The local edge runtime answers a function's requests one at a time** (about 1 s each for
   sign-in), while hosted runs them side by side. A race inside a function never shows locally;
   test concurrency where the guarantee lives, as `e2e/sign-in-function.spec.ts` does with
@@ -250,11 +255,13 @@ Three layers, each with a job:
   **WebKit does not focus a button on click**, as Safari on macOS does not. A test asserting where
   focus stays after pressing a button presses it from the keyboard (`focus()` then `Enter`).
 
-  **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
-  about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
-  random. That wait is why `expectAxeClean` lives in **`e2e/a11y.ts`** and is imported, never
-  copied — a button fading out of its pending state failed WebKit's sign-in scan the same way, and
-  a per-spec copy is a per-spec chance to forget it. **`e2e/fixtures.ts`** is the same bargain for
+  **Measure or scan only once nothing is animating** (`document.getAnimations()`), through
+  `settled(page)` in **`e2e/a11y.ts`**. Anything read off a moving element is read through its
+  animation: a toast fading in measures about 1.6:1 for its first frames, and a 44px button in a
+  dialog still zooming in measures 41.8 — both pass once settled, so the check fails at random.
+  That wait is why `expectAxeClean` lives there too and is imported, never copied — a button
+  fading out of its pending state failed WebKit's sign-in scan the same way, and a per-spec copy
+  is a per-spec chance to forget it. **`e2e/fixtures.ts`** is the same bargain for
   rows a spec makes for itself: `unique()`, `todayUtcMidnight()` (§5.4's midnight, which the check
   constraint requires), and `makeApplication(client, made, company, options)` through
   `create_application`. `e2e/session.ts` owns `PASSWORD` and `STORAGE_KEY`; never redeclare
@@ -525,6 +532,15 @@ supabase/
   rethrown as `ReportedError`; outcomes the user can fix (wrong password, refused file) pass
   through unreported. Components show `errorReference(error)` and never report themselves.
   `ErrorAction` is a closed union — add a member, never a free-form string.
+- **Every write in `data/` throws through `write-limit.ts` `writeFailure()`**, and every
+  mutation that writes passes `isRateLimited` to `reporting`. §7.1's 120-a-minute limit can
+  refuse any write on the four writable tables, and a refusal the user causes is not a bug:
+  unmapped, it lands in `app_errors` and the user gets generic copy instead of being told to
+  wait. The copy comes from `failureMessage(message, error)` in `queries/errors.ts` — the one
+  place that decides a refusal reads differently — and carries no error reference, because
+  nothing was reported. `data/write-limit.test.ts` asks every write what it throws when the
+  client refuses everything, so a new write that forgets is caught there rather than in
+  production.
 - **The session is a store, not a query.** `data/auth.ts` owns it (supabase-js announces
   changes); `useSession()` subscribes. Route guards read it from router context in
   `beforeLoad`; `main.tsx` re-runs them on every change and clears the query cache on every
@@ -572,6 +588,14 @@ supabase/
   whatever tailwind-merge does — so `max-[760px]:h-11` silently did nothing on every select,
   and phones got 32px instead of §11's 44. `select.tsx` now sizes with plain classes. Measure a
   new control's height at 360px (`boundingBox()`), don't read it off the class list.
+- **§11's height is the primitive's default, not the call site's promise.** The app's control
+  size is `size="lg"` on a `Button` (36px, 44px below 760px) and `h-9 max-[760px]:h-11` on an
+  `Input`. Anything that wraps a primitive carries it: `AlertDialogAction` and
+  `AlertDialogCancel` default to `lg`, and so does the footer's close in `dialog.tsx`, because
+  five confirm dialogs each remembering to pass a size were five chances to forget — and all
+  five did, shipping 32px buttons on phones. When a wrapper cannot carry it, say it at the
+  call site as every other control does, and measure it at 360px in e2e
+  (`delete-account.spec.ts`, `bulk-delete.spec.ts`).
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

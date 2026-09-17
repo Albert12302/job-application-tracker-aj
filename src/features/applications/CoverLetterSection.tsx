@@ -6,7 +6,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { OiXIcon } from '@/components/OiXIcon';
 import { canPreviewCoverLetter, coverLetterLabel } from '@/domain/cover-letter';
 import type { Application } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
+import { errorReference, failureMessage } from '@/queries/errors';
 import {
   CoverLetterRejectedError,
   useAttachCoverLetter,
@@ -220,7 +220,7 @@ export function CoverLetterSection({ application }: { application: Application }
           {rejected.userMessage}
         </p>
       ) : failed?.variables ? (
-        <ErrorState title="Upload failed." reference={errorReference(failed.error)}>
+        <ErrorState title={failureMessage('Upload failed.', failed.error)} reference={errorReference(failed.error)}>
           <Button size="lg" disabled={busy} onClick={() => start(failed.variables!.file)}>
             Retry
           </Button>

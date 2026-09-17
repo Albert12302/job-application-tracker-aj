@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ErrorState } from '@/components/ErrorState';
 import { oldestFirst } from '@/domain/notes';
 import { noteFormSchema } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
+import { errorReference, failureMessage } from '@/queries/errors';
 import { NoteLimitError, useAddNote } from '@/queries/use-note-mutations';
 import { useNotes } from '@/queries/use-notes';
 import { NoteItem } from './NoteItem';
@@ -47,7 +47,7 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
   };
 
   const limitReached = add.error instanceof NoteLimitError;
-  const failure = add.error ? (limitReached ? LIMIT_REACHED : "Couldn't save note.") : null;
+  const failure = add.error ? (limitReached ? LIMIT_REACHED : failureMessage("Couldn't save note.", add.error)) : null;
   const retryable = failure !== null && !limitReached && add.variables !== undefined;
   const reference = errorReference(add.error);
 

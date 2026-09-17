@@ -115,6 +115,8 @@ export function DeleteAccountDialog({
             autoComplete="off"
             spellCheck={false}
             disabled={pending}
+            // The app's control height, 44px below 760px (§11) — as every other input says.
+            className="h-9 max-[760px]:h-11"
             onChange={(event) => setTyped(event.target.value)}
           />
           <p id={hintId} className="text-sm text-muted-foreground">
@@ -130,10 +132,10 @@ export function DeleteAccountDialog({
         </span>
 
         <DialogFooter>
-          <DialogClose disabled={pending} render={<Button variant="outline" />}>
+          <DialogClose disabled={pending} render={<Button variant="outline" size="lg" />}>
             Keep my account
           </DialogClose>
-          <Button variant="destructive" disabled={pending || !confirmed || !ready} onClick={onConfirm}>
+          <Button variant="destructive" size="lg" disabled={pending || !confirmed || !ready} onClick={onConfirm}>
             {pending ? (
               <>
                 <Loader2Icon aria-hidden="true" className="animate-spin" />

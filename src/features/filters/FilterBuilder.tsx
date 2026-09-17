@@ -8,8 +8,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { nextCustomName } from '@/domain/filters';
 import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
-import { errorReference, WAIT_A_MINUTE } from '@/queries/errors';
-import { WriteRateLimitedError } from '@/queries/use-saved-filters';
+import { errorReference, failureMessage } from '@/queries/errors';
 import { LocationCombobox } from './LocationCombobox';
 import { StatusChips } from './StatusChips';
 import { TriStateChoice } from './TriStateChoice';
@@ -61,7 +60,6 @@ export function FilterBuilder({
   const field = useId();
   const form = useForm<SavedFilterFormValues>({ resolver: zodResolver(savedFilterFormSchema), defaultValues: BLANK });
   const { errors } = form.formState;
-  const rateLimited = error instanceof WriteRateLimitedError;
 
   const save = form.handleSubmit(onSave);
 
@@ -72,10 +70,7 @@ export function FilterBuilder({
       </h2>
       <form onSubmit={save} noValidate aria-busy={pending} className="flex flex-col gap-5">
         {error ? (
-          <ErrorState
-            title={rateLimited ? `Couldn't save the filter. ${WAIT_A_MINUTE}` : "Couldn't save the filter."}
-            reference={rateLimited ? null : errorReference(error)}
-          />
+          <ErrorState title={failureMessage("Couldn't save the filter.", error)} reference={errorReference(error)} />
         ) : null}
 
         <fieldset disabled={pending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">

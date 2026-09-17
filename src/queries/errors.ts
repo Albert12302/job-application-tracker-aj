@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { WriteRateLimitedError } from '@/data/applications';
+import { WriteRateLimitedError } from '@/data/write-limit';
 import { reportError, type ErrorAction } from '@/services/report-error';
 
 /**
@@ -36,10 +36,22 @@ export async function reporting<T>(
   }
 }
 
-/** The write limit (§7.1): the user's to wait out, shown, and not reported. */
+/**
+ * The write limit (§7.1): the user's to wait out, shown, and not reported.
+ * Every mutation that writes passes this to `reporting`, on its own or beside
+ * its other expected outcomes — a refused write is not a bug in the app.
+ */
 export const isRateLimited = (error: unknown) => error instanceof WriteRateLimitedError;
 
 export const WAIT_A_MINUTE = "You've made a lot of changes in the last minute. Wait a minute, then try again.";
+
+/**
+ * What a failed write says. The limit adds the wait to the message and carries
+ * no reference, because nothing was reported and there is nothing to quote;
+ * every other failure keeps the plain copy (§8.1).
+ */
+export const failureMessage = (message: string, error: unknown) =>
+  isRateLimited(error) ? `${message} ${WAIT_A_MINUTE}` : message;
 
 /** The short form shown to the user; the full uuid is the row id. */
 export function errorReference(error: unknown): string | null {

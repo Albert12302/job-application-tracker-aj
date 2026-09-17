@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WriteRateLimitedError } from '@/data/write-limit';
 import { applicationRow, noteRow } from '@/test/factories';
 import { renderRoutes } from '@/test/render-routes';
 import { ApplicationDetailScreen } from './ApplicationDetailScreen';
@@ -10,6 +11,15 @@ const changeApplicationStatus = vi.fn();
 const setStarred = vi.fn();
 const deleteApplicationRow = vi.fn();
 const listNotes = vi.fn();
+// What a report would actually write (services/report-error.ts → data/app-errors.ts).
+const insertAppError = vi.fn();
+const toastError = vi.fn();
+
+vi.mock('@/data/app-errors', () => ({ insertAppError: (...args: unknown[]) => insertAppError(...args) }));
+
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { error: (...args: unknown[]) => toastError(...args), success: vi.fn() }),
+}));
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -46,6 +56,8 @@ beforeEach(() => {
   setStarred.mockReset();
   deleteApplicationRow.mockReset().mockResolvedValue({ coverLetterPath: null });
   listNotes.mockReset().mockResolvedValue([]);
+  insertAppError.mockReset().mockResolvedValue(undefined);
+  toastError.mockReset();
 });
 
 describe('ApplicationDetailScreen', () => {
@@ -169,6 +181,57 @@ describe('ApplicationDetailScreen', () => {
     expect(alert.textContent).toContain("Couldn't delete this application.");
     expect(alert.textContent).toMatch(/Error reference [0-9a-f]{8}/);
     expect(screen.queryByRole('heading', { name: 'Route /applications' })).toBeNull();
+  });
+
+  /**
+   * The §7.1 write limit is the user's to wait out, not a bug: it says so in
+   * words, writes nothing to app_errors, and shows no error reference — there is
+   * nothing to quote. Every write on this screen behaves the same way.
+   */
+  describe('when the write limit refuses the change (§7.1)', () => {
+    const WAIT = "You've made a lot of changes in the last minute.";
+
+    it('says so after a status change, and reports nothing', async () => {
+      getApplication.mockResolvedValue(applicationRow({ id: ID, status: 'Applied' }));
+      changeApplicationStatus.mockRejectedValue(new WriteRateLimitedError());
+      const { user } = renderDetail();
+
+      await user.click(await screen.findByRole('combobox', { name: 'Status' }));
+      await user.click(await screen.findByRole('option', { name: 'Interview' }));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringContaining(WAIT)));
+      expect(toastError).toHaveBeenCalledWith(expect.stringContaining("Couldn't change the status."));
+      // Rolled back, as any other failure is (§8.3).
+      await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Applied'));
+      expect(insertAppError).not.toHaveBeenCalled();
+    });
+
+    it('says so after starring, and reports nothing', async () => {
+      getApplication.mockResolvedValue(applicationRow({ id: ID, company: 'Contoso', starred: false }));
+      setStarred.mockRejectedValue(new WriteRateLimitedError());
+      const { user } = renderDetail();
+
+      await user.click(await screen.findByRole('button', { name: 'Star Contoso' }));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringContaining(WAIT)));
+      expect(toastError).toHaveBeenCalledWith(expect.stringContaining("Couldn't star Contoso."));
+      expect(insertAppError).not.toHaveBeenCalled();
+    });
+
+    it('says so in the delete dialog, with no error reference, and reports nothing', async () => {
+      getApplication.mockResolvedValue(applicationRow({ id: ID, company: 'Tailspin Toys' }));
+      deleteApplicationRow.mockRejectedValue(new WriteRateLimitedError());
+      const { user } = renderDetail();
+
+      await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+      await user.click(await screen.findByRole('button', { name: 'Delete application' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert.textContent).toContain("Couldn't delete this application.");
+      expect(alert.textContent).toContain(WAIT);
+      expect(alert.textContent).not.toMatch(/Error reference/);
+      expect(insertAppError).not.toHaveBeenCalled();
+    });
   });
 
   it('stars the application from its header', async () => {

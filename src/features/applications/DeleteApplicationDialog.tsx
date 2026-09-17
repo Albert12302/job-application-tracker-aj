@@ -9,7 +9,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ErrorState } from '@/components/ErrorState';
-import { errorReference } from '@/queries/errors';
+import { errorReference, failureMessage } from '@/queries/errors';
 import { deleteSummary } from './delete-summary';
 
 /**
@@ -49,7 +49,7 @@ export function DeleteApplicationDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <ErrorState title="Couldn't delete this application." reference={errorReference(error)} />
+          <ErrorState title={failureMessage("Couldn't delete this application.", error)} reference={errorReference(error)} />
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Keep application</AlertDialogCancel>

@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatMoment } from '@/domain/date';
 import { noteDeleteNeedsConfirmation } from '@/domain/notes';
 import type { Note } from '@/domain/schemas';
+import { failureMessage } from '@/queries/errors';
 import { useDeleteNote, useUpdateNote } from '@/queries/use-note-mutations';
 
 const ICON_BUTTON = 'text-muted-foreground max-[760px]:size-11';
@@ -76,7 +77,7 @@ export function NoteItem({ note, applicationId }: { note: Note; applicationId: s
         />
         {update.isError ? (
           <p role="alert" className="text-sm text-destructive">
-            Couldn&apos;t save the note.
+            {failureMessage("Couldn't save the note.", update.error)}
           </p>
         ) : null}
         <div className="flex gap-2">
