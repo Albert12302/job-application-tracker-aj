@@ -569,7 +569,7 @@ test.describe('7.8.1 cross-user isolation — profile and photo (§6 step 1)', (
       .select();
     expect(updated ?? []).toEqual([]);
 
-    // data/profile.ts upserts; the insert half's WITH CHECK is what refuses this.
+    // A missing profile row is inserted by data/profile.ts; the insert half's WITH CHECK is what refuses this.
     const { error: upsertError } = await b.from('profiles').upsert({ id: USER_A, avatar_path: null });
     expect(upsertError).not.toBeNull();
   });

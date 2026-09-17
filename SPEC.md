@@ -999,6 +999,10 @@ remove another (`services/remove-cover-letter.ts`):
   render; nothing else about it is trusted.
 - The size shown is read from Storage's own record of the object, not stored on the row.
 
+The profile photo (§4.6) is replaced and removed by the same rules: the profile is written only
+if it still holds the photo the change started from, a new file nothing points at is deleted,
+and removal lets go of the profile before the object.
+
 ### 9.5 Saved filters
 - Deleting a saved filter (the × on its tab) is immediate, no confirmation — it destroys no
   application data. If it is the active filter, fall back to **All**.
@@ -1224,6 +1228,10 @@ the prototype is the reference for those.
 - **`security_events` inserts are limited to 60 an hour per user (§7.7).** From the same review.
   §7.7 asks it of both client-written log tables, and only `app_errors` had it, so a loop could
   fill the table and bury real events. Events the edge functions write are not counted.
+- **Replacing or removing the profile photo checks it has not changed first (§4.6, §9.4).** From
+  the same review. With two tabs open, a replace in one could leave the other's new photo in
+  Storage with nothing pointing at it, until the account was deleted. The profile now takes the
+  cover letter's guard.
 - **The CSP ships enforced from the first deploy, and a Vercel build checks it (§7.5).** Found in a
   second whole-repo security review. "Report-only first, then enforce" left the release blocker
   as a README step: deploying master as it stood would have shipped a policy that enforced
