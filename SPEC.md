@@ -1213,6 +1213,9 @@ the prototype is the reference for those.
   an application with about 120 notes cost more than a minute's limit to delete and was refused
   every time, with no way out short of deleting the account. A cascade is now part of the one
   write that started it.
+- **`security_events` inserts are limited to 60 an hour per user (§7.7).** From the same review.
+  §7.7 asks it of both client-written log tables, and only `app_errors` had it, so a loop could
+  fill the table and bury real events. Events the edge functions write are not counted.
 - **The CSP ships enforced from the first deploy, and a Vercel build checks it (§7.5).** Found in a
   second whole-repo security review. "Report-only first, then enforce" left the release blocker
   as a README step: deploying master as it stood would have shipped a policy that enforced

@@ -268,6 +268,15 @@ test.describe('§7.1 limits count what the user does', () => {
     expect(deleteError).toBeNull();
     expect(removed).toHaveLength(1);
   });
+
+  test('security events a user writes are capped at 60 an hour (§7.7)', async () => {
+    for (let i = 0; i < 60; i++) {
+      const { error } = await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success' });
+      expect(error, `event ${i + 1}`).toBeNull();
+    }
+    const { error } = await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success' });
+    expect(error?.message).toBe('rate_limited');
+  });
 });
 
 test.describe('§2 status history — written with the status, atomically', () => {

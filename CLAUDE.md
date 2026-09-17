@@ -642,7 +642,8 @@ limit, and do not add a new limit without deciding where it lives:
   migrations. Its sign-in limit is only a backstop: every sign-in reaches Auth from the
   sign-in function's address, so there it is one bucket shared by everyone.
 - Postgres triggers calling `public.consume_rate_limit(bucket, limit, window)` — anything the
-  database can see: writes, error reports.
+  database can see: writes, error reports, security events. `consume_rate_limit` skips a null
+  `auth.uid()`, so what the service role writes is never counted.
 - `supabase/functions/sign-in` — the per-account lockout **and** the per-IP sign-in limit
   (the only code that sees the caller's address). The client calls this function instead of
   `signInWithPassword`. Its limit decisions are pure functions in `limits.ts`, unit-tested;
