@@ -156,6 +156,26 @@ test('the function answers CORS only for allowlisted origins (§7.5)', async ({ 
   expect(denied.headers()['access-control-allow-origin'] ?? '').not.toBe('https://evil.test');
 });
 
+/**
+ * A refused request must not take sign-in down with it (CLAUDE.md,
+ * supabase/functions/_shared/body.ts). The edge runtime never completes a
+ * response sent over an unread body, and the stuck worker stops the function
+ * starting again until its container is recreated — so one PUT would end
+ * sign-in for everybody until someone noticed.
+ *
+ * A megabyte, because a small body arrives whole before the refusal is written
+ * and the bug never shows. Without the drain, the PUT itself times out and every
+ * sign-in after it fails too.
+ */
+test('a refused method with a large body does not wedge the function', async ({ request }) => {
+  test.setTimeout(60_000);
+  const refused = await request.fetch(FUNCTION_URL, { method: 'PUT', data: 'x'.repeat(1_000_000), timeout: 20_000 });
+  expect(refused.status()).toBe(405);
+
+  // The function still starts and still signs people in, which is the whole point.
+  expect((await attempt(request, 'dev-a@example.test', PASSWORD)).status).toBe(200);
+});
+
 /** A random 64-character hash, shaped like the function's peppered SHA-256 keys. */
 const hex = () => crypto.randomUUID().replace(/-/g, '').repeat(2);
 

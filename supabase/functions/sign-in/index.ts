@@ -21,6 +21,7 @@
 // exists (§7.1: no account enumeration on any surface).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { drainBody } from '../_shared/body.ts';
 import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 import {
   ACCOUNT_LOCKOUT_MS,
@@ -117,16 +118,24 @@ Deno.serve(async (req) => {
   const startedAt = Date.now();
   const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
 
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-
-  // Constant-ish response time, so a locked or unknown account is not
-  // distinguishable by how fast it answers.
+  // Every answer goes through here, so none is ever sent over an unread body —
+  // a 405 with a body of any size used to wedge the worker and take sign-in down
+  // for everyone until the container was recreated (_shared/body.ts). The drain
+  // comes before the clock is read, so what it costs is padding the floor
+  // absorbs rather than time added to the response.
   const settle = async (body: unknown, status: number) => {
+    await drainBody(req);
+    // Constant-ish response time, so a locked or unknown account is not
+    // distinguishable by how fast it answers.
     const elapsed = Date.now() - startedAt;
     if (elapsed < MIN_RESPONSE_MS) await sleep(MIN_RESPONSE_MS - elapsed);
     return jsonResponse(body, status, cors);
   };
 
+  if (req.method === 'OPTIONS') {
+    await drainBody(req);
+    return new Response(null, { status: 204, headers: cors });
+  }
   if (req.method !== 'POST') return settle({ error: GENERIC }, 405);
 
   let email: unknown, password: unknown;

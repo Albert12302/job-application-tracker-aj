@@ -1213,6 +1213,15 @@ Newest first. One line per substantive decision — what changed and *why*, so a
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
 
+### 2026-09-17
+- **A refused request can no longer take sign-in down for everybody (§7.1, §8.2).** Found by a
+  review of the three edge functions. Sign-in answered any method other than POST without
+  reading the request's body, and the edge runtime never completes a response sent over an
+  unread body: the worker stuck on it stopped the function starting again, so every sign-in
+  after one such request failed until the container was recreated — one unauthenticated PUT,
+  and nobody could get in. Draining before answering now has one home the three functions
+  share, and it covers preflights and every refusal, not just the ones someone remembered.
+
 ### 2026-09-16
 - **Deleting an application with many notes no longer fails (§7.1, §9.2).** Found in a
   whole-repo code review. The write limit counted every note the delete's cascade removed, so

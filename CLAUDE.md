@@ -110,9 +110,14 @@ Four more bootstrap settlements, for the same reason:
 - **A function must read a request body to the end before answering, even to refuse it.**
   The edge runtime (1.74) never completes a response sent over an unread body — `cancel()`
   does not help — and the stuck worker stops that function starting again until the container
-  is recreated. `upload/index.ts` `readCapped` drains and discards past the cap, and its
-  `refuse` drains before every early 401/404/405. A small body arrives whole and hides the bug;
-  test a refusal with one of about a megabyte (`upload-function.spec.ts`).
+  is recreated. The rule has one home, `_shared/body.ts` `drainBody`, and it covers *every*
+  answer a function can give: the 405, the 401, the 404, and the preflight. Only a function
+  that reads the body itself is exempt, for that one path — `upload/index.ts` `readCapped`
+  (which drains and discards past its cap) and `sign-in/index.ts` `req.json()`. Route the
+  answers through one function so a new refusal cannot forget: sign-in's `settle` drains,
+  upload's `refuse` drains, delete-account drains up front. A small body arrives whole and
+  hides the bug; test a refusal with one of about a megabyte
+  (`upload-function.spec.ts`, `sign-in-function.spec.ts`).
 - **The local edge runtime answers a function's requests one at a time** (about 1 s each for
   sign-in), while hosted runs them side by side. A race inside a function never shows locally;
   test concurrency where the guarantee lives, as `e2e/sign-in-function.spec.ts` does with
