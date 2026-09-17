@@ -26,8 +26,15 @@ function assertReleaseCsp(policy: string | undefined, supabaseUrl: string | unde
   if (policy.includes('YOUR_PROJECT_REF')) refuseRelease('still holds the YOUR_PROJECT_REF placeholder')
   if (!supabaseUrl) refuseRelease('VITE_SUPABASE_URL is not set in the Vercel project')
   const host = new URL(supabaseUrl).host
-  if (!policy.includes(`https://${host}`) || !policy.includes(`wss://${host}`)) {
-    refuseRelease(`does not allow ${host}, the Supabase project VITE_SUPABASE_URL points at`)
+  // Every Supabase origin in every directive, whole host only: one directive left
+  // naming another project would pass a check that the right host appears somewhere.
+  const named = [...policy.matchAll(/(https|wss):\/\/([\w.-]+\.supabase\.co)(?=[\s;]|$)/g)]
+  const other = named.find(([, , namedHost]) => namedHost !== host)
+  if (other) refuseRelease(`names ${other[0]}, but VITE_SUPABASE_URL points at ${host}`)
+  for (const scheme of ['https', 'wss']) {
+    if (!named.some(([, namedScheme]) => namedScheme === scheme)) {
+      refuseRelease(`does not allow ${scheme}://${host}, the Supabase project VITE_SUPABASE_URL points at`)
+    }
   }
 }
 
