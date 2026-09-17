@@ -510,6 +510,9 @@ Failure counts key on a **SHA-256 of a peppered, lowercased email**, never the a
 | File upload, per user | 20 / hour | reject with a clear message |
 | Write mutations, per user | 120 / min | reject |
 
+A write counts once for each row the user writes. Rows a cascade removes along with it — the
+notes of a deleted application — are part of that one action and are not counted.
+
 Lockouts are per account **and** per IP — per-IP alone is trivially bypassed, per-account
 alone allows targeted denial of service.
 
@@ -959,8 +962,8 @@ one application at a time:
   limit above all — would refuse the rest too. What was deleted leaves the list; the dialog stays
   open on what remains, saying where it stopped: "Deleted 2 of 5 applications. Couldn't delete
   *Contoso*." with an error reference. Confirming again carries on.
-- Every note deleted with an application counts against the write limit (§7.1), so a large
-  delete can be refused part-way. Then the dialog adds "You've made a lot of changes in the last
+- Each application deleted is one write against the limit (§7.1) — the notes that go with it
+  are not counted — so deleting more than the limit at once is refused part-way. Then the dialog adds "You've made a lot of changes in the last
   minute. Wait a minute, then try again." and shows no reference, because nothing is wrong.
 - On success: the dialog closes, the selection clears, focus moves to the list's heading, and a
   toast says "3 applications deleted." (or "Application deleted." for one). No Undo.
@@ -1205,6 +1208,11 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-16
+- **Deleting an application with many notes no longer fails (§7.1, §9.2).** Found in a
+  whole-repo code review. The write limit counted every note the delete's cascade removed, so
+  an application with about 120 notes cost more than a minute's limit to delete and was refused
+  every time, with no way out short of deleting the account. A cascade is now part of the one
+  write that started it.
 - **The CSP ships enforced from the first deploy, and a Vercel build checks it (§7.5).** Found in a
   second whole-repo security review. "Report-only first, then enforce" left the release blocker
   as a README step: deploying master as it stood would have shipped a policy that enforced

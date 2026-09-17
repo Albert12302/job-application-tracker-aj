@@ -198,8 +198,8 @@ export const isWriteRateLimited = (error: { message: string }) => error.message 
 /**
  * Deletes the row; its notes and status_history rows go with it (on delete
  * cascade, §9.2). Returns the cover letter path it held, because Storage does
- * not cascade and the caller has to remove the file. Every cascaded note counts
- * against the write limit too, so a large delete can be refused part-way.
+ * not cascade and the caller has to remove the file. The delete is one write
+ * against the limit; the notes the cascade removes are not counted (§7.1).
  */
 export async function deleteApplicationRow(id: string): Promise<{ coverLetterPath: string | null }> {
   const { data, error } = await supabase

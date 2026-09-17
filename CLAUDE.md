@@ -212,7 +212,8 @@ Three layers, each with a job:
 
   **`dev-d`'s writes are budgeted too.** The write limit is 120 a minute per user (§7.1), and
   every insert, update, and delete on the writable tables counts — a status change is two (the
-  status and its history row). A full run spends about 116 of `dev-d`'s, mostly inside one
+  status and its history row). Rows a cascade removes do not (`pg_trigger_depth() > 1`), so an
+  application's delete is one whatever its notes. A full run spends about 116 of `dev-d`'s, mostly inside one
   minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
   happens to write last. Count what a new test spends (`select window_start, count from
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the

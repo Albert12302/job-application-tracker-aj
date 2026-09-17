@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { apiSession, startSignedIn } from './session.js';
+import { adminClient, removeThrowawayUser } from './throwaway-user.js';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.
@@ -222,6 +223,50 @@ test.describe('7.8.1 cross-user isolation — the status functions (§6 step 2)'
       p_referral: false,
     });
     expect(createError).not.toBeNull();
+  });
+});
+
+test.describe('§7.1 limits count what the user does', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  // A fresh user each: filling a limit on a seed user would break whichever suite uses it next.
+  let user: { id: string; client: SupabaseClient };
+
+  test.beforeEach(async () => {
+    const admin = adminClient();
+    const email = `limits-${crypto.randomUUID()}@example.test`;
+    const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+    expect(error).toBeNull();
+    const client = createClient(URL, ANON, { auth: { persistSession: false } });
+    const { error: signInError } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+    expect(signInError).toBeNull();
+    user = { id: data.user!.id, client };
+  });
+
+  test.afterEach(async () => {
+    await removeThrowawayUser(user.id);
+  });
+
+  test('an application with more notes than the write limit can still be deleted', async () => {
+    const { data: created, error } = await user.client.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: 'Many notes',
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+    });
+    expect(error).toBeNull();
+    const id = (created as { id: string }).id;
+
+    // Written with the service role, which is not counted: 150 notes as the user would trip the limit itself.
+    const notes = Array.from({ length: 150 }, (_, i) => ({ application_id: id, body: `note ${i}` }));
+    const { error: notesError } = await adminClient().from('notes').insert(notes);
+    expect(notesError).toBeNull();
+
+    // One delete is one write; the 150 notes the cascade removes are not 150 more.
+    const { data: removed, error: deleteError } = await user.client.from('applications').delete().eq('id', id).select('id');
+    expect(deleteError).toBeNull();
+    expect(removed).toHaveLength(1);
   });
 });
 
