@@ -255,11 +255,13 @@ Three layers, each with a job:
   **WebKit does not focus a button on click**, as Safari on macOS does not. A test asserting where
   focus stays after pressing a button presses it from the keyboard (`focus()` then `Enter`).
 
-  **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
-  about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
-  random. That wait is why `expectAxeClean` lives in **`e2e/a11y.ts`** and is imported, never
-  copied — a button fading out of its pending state failed WebKit's sign-in scan the same way, and
-  a per-spec copy is a per-spec chance to forget it. **`e2e/fixtures.ts`** is the same bargain for
+  **Measure or scan only once nothing is animating** (`document.getAnimations()`), through
+  `settled(page)` in **`e2e/a11y.ts`**. Anything read off a moving element is read through its
+  animation: a toast fading in measures about 1.6:1 for its first frames, and a 44px button in a
+  dialog still zooming in measures 41.8 — both pass once settled, so the check fails at random.
+  That wait is why `expectAxeClean` lives there too and is imported, never copied — a button
+  fading out of its pending state failed WebKit's sign-in scan the same way, and a per-spec copy
+  is a per-spec chance to forget it. **`e2e/fixtures.ts`** is the same bargain for
   rows a spec makes for itself: `unique()`, `todayUtcMidnight()` (§5.4's midnight, which the check
   constraint requires), and `makeApplication(client, made, company, options)` through
   `create_application`. `e2e/session.ts` owns `PASSWORD` and `STORAGE_KEY`; never redeclare
@@ -586,6 +588,14 @@ supabase/
   whatever tailwind-merge does — so `max-[760px]:h-11` silently did nothing on every select,
   and phones got 32px instead of §11's 44. `select.tsx` now sizes with plain classes. Measure a
   new control's height at 360px (`boundingBox()`), don't read it off the class list.
+- **§11's height is the primitive's default, not the call site's promise.** The app's control
+  size is `size="lg"` on a `Button` (36px, 44px below 760px) and `h-9 max-[760px]:h-11` on an
+  `Input`. Anything that wraps a primitive carries it: `AlertDialogAction` and
+  `AlertDialogCancel` default to `lg`, and so does the footer's close in `dialog.tsx`, because
+  five confirm dialogs each remembering to pass a size were five chances to forget — and all
+  five did, shipping 32px buttons on phones. When a wrapper cannot carry it, say it at the
+  call site as every other control does, and measure it at 360px in e2e
+  (`delete-account.spec.ts`, `bulk-delete.spec.ts`).
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

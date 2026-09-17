@@ -1,6 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { expectAxeClean } from './a11y.js';
+import { expectAxeClean, settled } from './a11y.js';
 import { makeApplication as insertApplication, unique as uniqueName } from './fixtures.js';
 import { apiActor, startSignedIn } from './session.js';
 
@@ -150,5 +150,17 @@ test.describe('one browser', () => {
     expect((await deleteButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expectAxeClean(page);
+
+    // The dialog's own buttons, which come from components/ui/alert-dialog.tsx
+    // rather than from here — the four other confirm dialogs get their size from
+    // the same place. Cancelled, so this costs no writes.
+    await deleteButton.click();
+    const dialog = page.getByRole('alertdialog');
+    await settled(page);
+    for (const name of ['Delete 1 application', 'Keep application']) {
+      expect((await dialog.getByRole('button', { name }).boundingBox())?.height, name).toBeGreaterThanOrEqual(44);
+    }
+    await dialog.getByRole('button', { name: 'Keep application' }).click();
+    await expect(dialog).toBeHidden();
   });
 });

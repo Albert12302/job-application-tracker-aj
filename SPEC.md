@@ -1214,6 +1214,12 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-17
+- **Confirm dialogs get phone-sized controls (§11).** Found by a review of the mobile pass.
+  Every dialog that confirms something irreversible — deleting an application, deleting
+  several, discarding an edit, removing a cover letter, deleting the account and its typed
+  confirmation field — drew its buttons at 32px on a phone, well under the 44px §11 requires,
+  because they reach the button through a wrapper that the mobile pass did not touch. The
+  wrappers now carry the size, so a sixth dialog cannot be missed the same way.
 - **Hitting the write limit now says to wait, wherever it happens (§7.1, §8.2).** Found by a
   review of the data layer. Only deleting an application from the list and saving a filter
   recognised the limit's refusal; starring, changing a status, adding or editing a note,

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectAxeClean } from './a11y.js';
+import { expectAxeClean, settled } from './a11y.js';
 import { startSignedIn } from './session.js';
 import { adminClient, createThrowawayUser, removeThrowawayUser, type ThrowawayUser } from './throwaway-user.js';
 
@@ -133,7 +133,19 @@ test.describe('deleting an account', () => {
     }
 
     await page.getByRole('button', { name: 'Delete my account' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    // The controls inside count too, and they come from the primitive, not from
+    // here — measured rather than read off the class list, because a generated
+    // class with an attribute selector outranks one a caller passes (CLAUDE.md).
+    // Once it has finished zooming in: mid-animation, 44px measures 41.8.
+    await settled(page);
+    for (const name of ['Export my data', 'Keep my account', 'Delete my account']) {
+      expect((await dialog.getByRole('button', { name }).boundingBox())?.height, name).toBeGreaterThanOrEqual(44);
+    }
+    const field = dialog.getByLabel('Type your email address to confirm');
+    expect((await field.boundingBox())?.height, 'confirm field').toBeGreaterThanOrEqual(44);
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
