@@ -110,7 +110,9 @@ Four more bootstrap settlements, for the same reason:
 - **A function must read a request body to the end before answering, even to refuse it.**
   The edge runtime (1.74) never completes a response sent over an unread body — `cancel()`
   does not help — and the stuck worker stops that function starting again until the container
-  is recreated. `upload/index.ts` `readCapped` drains and discards past the cap.
+  is recreated. `upload/index.ts` `readCapped` drains and discards past the cap, and its
+  `refuse` drains before every early 401/404/405. A small body arrives whole and hides the bug;
+  test a refusal with one of about a megabyte (`upload-function.spec.ts`).
 - **The local edge runtime answers a function's requests one at a time** (about 1 s each for
   sign-in), while hosted runs them side by side. A race inside a function never shows locally;
   test concurrency where the guarantee lives, as `e2e/sign-in-function.spec.ts` does with
@@ -212,7 +214,8 @@ Three layers, each with a job:
 
   **`dev-d`'s writes are budgeted too.** The write limit is 120 a minute per user (§7.1), and
   every insert, update, and delete on the writable tables counts — a status change is two (the
-  status and its history row). A full run spends about 116 of `dev-d`'s, mostly inside one
+  status and its history row). Rows a cascade removes do not (`pg_trigger_depth() > 1`), so an
+  application's delete is one whatever its notes. A full run spends about 116 of `dev-d`'s, mostly inside one
   minute, so a new test that writes as `dev-d` trips the limit at random in whichever suite
   happens to write last. Count what a new test spends (`select window_start, count from
   public.rate_limits where bucket = 'write'` after a run), run it in one browser when the
@@ -580,7 +583,10 @@ supabase/
 - Status changes always go through one code path that writes `status_history` — detail screen
   and edit form both. That path is `services/change-status.ts` → the `change_application_status`
   Postgres function; the creation row comes from `create_application`. Never write `status` in
-  a plain update, and never insert into `status_history` from the client.
+  a plain update, and never insert into `status_history` from the client. The database refuses
+  both, and a plain insert into `applications`, unless the write runs inside one of the two
+  functions, which set the transaction-local `app.status_write` (migration `20260916200100`).
+  A new writer of status goes inside one of them, not beside them.
 - Deleting an application deletes its notes, history, and Storage objects. No orphaned files.
 - **Deleting an account deletes its Storage objects first, then the `auth.users` row** (§9.7),
   through `supabase/functions/delete-account`. The function takes no id — the token says whose
@@ -639,7 +645,8 @@ limit, and do not add a new limit without deciding where it lives:
   migrations. Its sign-in limit is only a backstop: every sign-in reaches Auth from the
   sign-in function's address, so there it is one bucket shared by everyone.
 - Postgres triggers calling `public.consume_rate_limit(bucket, limit, window)` — anything the
-  database can see: writes, error reports.
+  database can see: writes, error reports, security events. `consume_rate_limit` skips a null
+  `auth.uid()`, so what the service role writes is never counted.
 - `supabase/functions/sign-in` — the per-account lockout **and** the per-IP sign-in limit
   (the only code that sees the caller's address). The client calls this function instead of
   `signInWithPassword`. Its limit decisions are pure functions in `limits.ts`, unit-tested;

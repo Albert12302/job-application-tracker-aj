@@ -510,6 +510,9 @@ Failure counts key on a **SHA-256 of a peppered, lowercased email**, never the a
 | File upload, per user | 20 / hour | reject with a clear message |
 | Write mutations, per user | 120 / min | reject |
 
+A write counts once for each row the user writes. Rows a cascade removes along with it — the
+notes of a deleted application — are part of that one action and are not counted.
+
 Lockouts are per account **and** per IP — per-IP alone is trivially bypassed, per-account
 alone allows targeted denial of service.
 
@@ -932,7 +935,9 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 cover letter, which is attached, replaced, and removed on the detail screen itself (§4.4, §9.4).
 - Location re-normalizes on save (§5.2).
 - Changing status here writes a `status_history` row exactly as the detail-screen status
-  selector does — one code path, not two.
+  selector does — one code path, not two. The database enforces it: a signed-in user cannot
+  change a status with a plain update, add an application with a plain insert, or insert a
+  history row; only `change_application_status` and `create_application` can.
 - Cancel with unsaved changes prompts to confirm before discarding.
 - Save returns to the detail screen with the updated record.
 
@@ -959,8 +964,8 @@ one application at a time:
   limit above all — would refuse the rest too. What was deleted leaves the list; the dialog stays
   open on what remains, saying where it stopped: "Deleted 2 of 5 applications. Couldn't delete
   *Contoso*." with an error reference. Confirming again carries on.
-- Every note deleted with an application counts against the write limit (§7.1), so a large
-  delete can be refused part-way. Then the dialog adds "You've made a lot of changes in the last
+- Each application deleted is one write against the limit (§7.1) — the notes that go with it
+  are not counted — so deleting more than the limit at once is refused part-way. Then the dialog adds "You've made a lot of changes in the last
   minute. Wait a minute, then try again." and shows no reference, because nothing is wrong.
 - On success: the dialog closes, the selection clears, focus moves to the list's heading, and a
   toast says "3 applications deleted." (or "Application deleted." for one). No Undo.
@@ -993,6 +998,10 @@ remove another (`services/remove-cover-letter.ts`):
   and is shortened to the column's 255 characters keeping its extension. React escapes it on
   render; nothing else about it is trusted.
 - The size shown is read from Storage's own record of the object, not stored on the row.
+
+The profile photo (§4.6) is replaced and removed by the same rules: the profile is written only
+if it still holds the photo the change started from, a new file nothing points at is deleted,
+and removal lets go of the profile before the object.
 
 ### 9.5 Saved filters
 - Deleting a saved filter (the × on its tab) is immediate, no confirmation — it destroys no
@@ -1205,6 +1214,24 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-16
+- **Deleting an application with many notes no longer fails (§7.1, §9.2).** Found in a
+  whole-repo code review. The write limit counted every note the delete's cascade removed, so
+  an application with about 120 notes cost more than a minute's limit to delete and was refused
+  every time, with no way out short of deleting the account. A cascade is now part of the one
+  write that started it.
+- **The one status-change path is enforced by the database (§9.1).** From the same review. The
+  table permissions the two status functions need also let a signed-in client change a status
+  with a plain update, add an application with no creation row, or insert history rows with any
+  statuses and dates — skewing stats with history that cannot be corrected. Triggers now refuse
+  all three unless the write comes from inside one of the two functions. They run after
+  row-level security, so the ownership policies still answer first.
+- **`security_events` inserts are limited to 60 an hour per user (§7.7).** From the same review.
+  §7.7 asks it of both client-written log tables, and only `app_errors` had it, so a loop could
+  fill the table and bury real events. Events the edge functions write are not counted.
+- **Replacing or removing the profile photo checks it has not changed first (§4.6, §9.4).** From
+  the same review. With two tabs open, a replace in one could leave the other's new photo in
+  Storage with nothing pointing at it, until the account was deleted. The profile now takes the
+  cover letter's guard.
 - **The CSP ships enforced from the first deploy, and a Vercel build checks it (§7.5).** Found in a
   second whole-repo security review. "Report-only first, then enforce" left the release blocker
   as a README step: deploying master as it stood would have shipped a policy that enforced

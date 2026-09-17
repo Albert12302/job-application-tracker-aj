@@ -35,6 +35,9 @@ export function useSignOut() {
  * Not optimistic — §8.3 names status, star and note only. Invalidates the
  * profile, which carries the new path; the image query for that path is new
  * and fetches itself.
+ *
+ * On failure the profile is refreshed too: if another tab changed the photo
+ * first, a retry then starts from what the profile holds now.
  */
 export function useSetAvatar() {
   const user = useSignedInUser();
@@ -47,6 +50,10 @@ export function useSetAvatar() {
         (error) => error instanceof AvatarRejectedError,
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.profile(user.id) }),
+    onError: (error) => {
+      if (error instanceof AvatarRejectedError) return;
+      void queryClient.invalidateQueries({ queryKey: keys.profile(user.id) });
+    },
   });
 }
 
@@ -55,6 +62,6 @@ export function useRemoveAvatar() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (path: string) => reporting('remove_avatar', () => removeAvatar(user.id, path)),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.profile(user.id) }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.profile(user.id) }),
   });
 }

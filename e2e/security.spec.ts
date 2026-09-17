@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { apiSession, startSignedIn } from './session.js';
+import { adminClient, removeThrowawayUser } from './throwaway-user.js';
 
 /**
  * The checks SPEC §7.8 requires as tests rather than manual steps.
@@ -83,8 +84,9 @@ test.describe('7.8.1 cross-user isolation', () => {
       position: 'Forged',
       date_applied: '2026-09-10T00:00:00.000Z',
     });
-    // The insert policy's WITH CHECK is what rejects this.
-    expect(error).not.toBeNull();
+    // The insert policy's WITH CHECK is what rejects this — asserted by code, so the
+    // status-path guard (which also refuses plain inserts, but after RLS) cannot stand in for it.
+    expect(error?.code).toBe('42501');
   });
 
   test('user B cannot read user A notes through the parent', async () => {
@@ -222,6 +224,98 @@ test.describe('7.8.1 cross-user isolation — the status functions (§6 step 2)'
       p_referral: false,
     });
     expect(createError).not.toBeNull();
+  });
+});
+
+test.describe('§9.1 the status functions are the only way to write a status', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  // As dev-b, on its own application: the refusals roll back, so they spend nothing
+  // of the write limit, and dev-b's rows stay as seeded.
+  test('a plain status update, application insert, or history insert is refused', async () => {
+    const b = await signIn('dev-b@example.test');
+    const { data: mine } = await b.from('applications').select('id, status, starred').limit(1).single();
+    expect(mine, 'seeded application missing — run npm run db:reset').toBeTruthy();
+    const history = async () => (await b.from('status_history').select('id').eq('application_id', mine!.id)).data ?? [];
+    const before = await history();
+    const other = mine!.status === 'Offer' ? 'Rejected' : 'Offer';
+
+    const { error: updateError } = await b.from('applications').update({ status: other }).eq('id', mine!.id);
+    expect(updateError?.message).toBe('status_change_path');
+
+    const { error: insertError } = await b.from('applications').insert({
+      company: 'No history',
+      position: 'No history',
+      date_applied: '2026-09-10T00:00:00.000Z',
+      status: 'Offer',
+    });
+    expect(insertError?.message).toBe('status_change_path');
+
+    const { error: historyError } = await b
+      .from('status_history')
+      .insert({ application_id: mine!.id, from_status: mine!.status, to_status: other, changed_at: '2020-01-01T00:00:00Z' });
+    expect(historyError?.message).toBe('status_change_path');
+
+    const { data: still } = await b.from('applications').select('status').eq('id', mine!.id).single();
+    expect(still?.status).toBe(mine!.status);
+    expect(await history()).toHaveLength(before.length);
+
+    // Other fields still take a plain update.
+    const { error: fieldError } = await b.from('applications').update({ starred: mine!.starred }).eq('id', mine!.id);
+    expect(fieldError).toBeNull();
+  });
+});
+
+test.describe('§7.1 limits count what the user does', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  // A fresh user each: filling a limit on a seed user would break whichever suite uses it next.
+  let user: { id: string; client: SupabaseClient };
+
+  test.beforeEach(async () => {
+    const admin = adminClient();
+    const email = `limits-${crypto.randomUUID()}@example.test`;
+    const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+    expect(error).toBeNull();
+    const client = createClient(URL, ANON, { auth: { persistSession: false } });
+    const { error: signInError } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+    expect(signInError).toBeNull();
+    user = { id: data.user!.id, client };
+  });
+
+  test.afterEach(async () => {
+    await removeThrowawayUser(user.id);
+  });
+
+  test('an application with more notes than the write limit can still be deleted', async () => {
+    const { data: created, error } = await user.client.rpc('create_application', {
+      p_date_applied: '2026-09-10T00:00:00.000Z',
+      p_company: 'Many notes',
+      p_position: 'Tester',
+      p_status: 'Applied',
+      p_referral: false,
+    });
+    expect(error).toBeNull();
+    const id = (created as { id: string }).id;
+
+    // Written with the service role, which is not counted: 150 notes as the user would trip the limit itself.
+    const notes = Array.from({ length: 150 }, (_, i) => ({ application_id: id, body: `note ${i}` }));
+    const { error: notesError } = await adminClient().from('notes').insert(notes);
+    expect(notesError).toBeNull();
+
+    // One delete is one write; the 150 notes the cascade removes are not 150 more.
+    const { data: removed, error: deleteError } = await user.client.from('applications').delete().eq('id', id).select('id');
+    expect(deleteError).toBeNull();
+    expect(removed).toHaveLength(1);
+  });
+
+  test('security events a user writes are capped at 60 an hour (§7.7)', async () => {
+    for (let i = 0; i < 60; i++) {
+      const { error } = await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success' });
+      expect(error, `event ${i + 1}`).toBeNull();
+    }
+    const { error } = await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success' });
+    expect(error?.message).toBe('rate_limited');
   });
 });
 
@@ -475,7 +569,7 @@ test.describe('7.8.1 cross-user isolation — profile and photo (§6 step 1)', (
       .select();
     expect(updated ?? []).toEqual([]);
 
-    // data/profile.ts upserts; the insert half's WITH CHECK is what refuses this.
+    // A missing profile row is inserted by data/profile.ts; the insert half's WITH CHECK is what refuses this.
     const { error: upsertError } = await b.from('profiles').upsert({ id: USER_A, avatar_path: null });
     expect(upsertError).not.toBeNull();
   });

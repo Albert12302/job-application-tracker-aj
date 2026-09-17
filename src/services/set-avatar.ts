@@ -71,7 +71,8 @@ export async function setAvatar(userId: string, file: File, previousPath: string
   }
 
   try {
-    await setAvatarPath(userId, path);
+    // Only if the profile still holds `previousPath`, which is deleted below on the strength of this write.
+    await setAvatarPath(userId, path, previousPath);
   } catch (error) {
     // The profile never pointed at the new object, so it must not outlive this call.
     await removeAvatarObject(path).catch((cleanup: unknown) => reportError(cleanup, { action: 'upload_avatar' }));
