@@ -8,7 +8,10 @@ project_id = "job-application-tracker"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+# Only what the app reads through the Data API. `storage` was here from an old CLI
+# template: nothing uses it (Storage has its own API), and exposed it is one more
+# surface RLS alone has to guard — and `config push` would expose it hosted too.
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000                       # a runaway query cannot pull the whole table
 
