@@ -127,6 +127,22 @@ test('an unknown kind is refused before anything is read', async ({ request }) =
   expect((await upload(request, 'avatars', PNG, 'image/png')).status()).toBe(404);
 });
 
+test('a refusal sent before the checks still reads the body, so the function keeps answering', async ({ request }) => {
+  // Bigger than one chunk: a small body arrives whole and never showed the bug.
+  // Refused before reading it, the edge runtime never completed the response, and
+  // the stuck worker stopped the function answering anything after it (CLAUDE.md).
+  const large = Buffer.alloc(1024 * 1024);
+  const options = { timeout: 15_000 };
+
+  expect((await request.post(`${FUNCTION_URL}/avatars`, { headers: { authorization: `Bearer ${token}` }, data: large, ...options })).status()).toBe(404);
+  // The anon key passes the gateway but is nobody — what an ended session's token meets.
+  expect((await request.post(`${FUNCTION_URL}/avatar`, { headers: { authorization: `Bearer ${ANON}` }, data: large, ...options })).status()).toBe(401);
+  expect((await request.put(`${FUNCTION_URL}/avatar`, { headers: { authorization: `Bearer ${token}` }, data: large, ...options })).status()).toBe(405);
+
+  // And the function still answers the next request. A refused file, so no upload is spent.
+  expect((await request.post(`${FUNCTION_URL}/avatar`, { headers: { authorization: `Bearer ${token}` }, data: SVG, ...options })).status()).toBe(415);
+});
+
 test('the function answers CORS only for allowlisted origins (§7.5)', async ({ request }) => {
   // As in sign-in-function.spec.ts: local Kong answers preflights itself with `*`,
   // so this checks the function's own headers, which are what reach the browser hosted.

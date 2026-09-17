@@ -76,22 +76,29 @@ Deno.serve(async (req) => {
       status,
       headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
     });
+  // A refusal sent before the body is read never completes (see readCapped), and
+  // the stuck worker blocks every later upload — a signed-out user's token, whose
+  // session the hourly expiry job ended, was enough. Drain it, keeping nothing.
+  const refuse = async (body: unknown, status: number) => {
+    if (!req.bodyUsed) await readCapped(req, 0);
+    return reply(body, status);
+  };
 
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  if (req.method !== 'POST') return reply({ error: 'Method not allowed.' }, 405);
+  if (req.method !== 'POST') return refuse({ error: 'Method not allowed.' }, 405);
 
   // POST /functions/v1/upload/<kind>. The kind picks the bucket and the rules;
   // nothing else in the request has a say in where the file goes.
   const kind = new URL(req.url).pathname.split('/').pop() ?? '';
-  if (!isUploadKind(kind)) return reply({ error: 'Unknown upload kind.' }, 404);
+  if (!isUploadKind(kind)) return refuse({ error: 'Unknown upload kind.' }, 404);
 
   // Who is uploading comes from a token Auth itself vouches for — not the
   // body, not the path. The gateway's verify_jwt checks the signature; this
   // also refuses a signed-out or deleted user's still-unexpired token.
   const token = req.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
-  if (!token) return reply({ error: SIGN_IN }, 401);
+  if (!token) return refuse({ error: SIGN_IN }, 401);
   const { data: auth, error: authError } = await admin.auth.getUser(token);
-  if (authError || !auth.user) return reply({ error: SIGN_IN }, 401);
+  if (authError || !auth.user) return refuse({ error: SIGN_IN }, 401);
   const userId = auth.user.id;
 
   const { bucket, maxBytes } = UPLOAD_RULES[kind];
