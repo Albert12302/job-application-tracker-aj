@@ -316,6 +316,86 @@ test.describe('§7.1 limits count what the user does', () => {
     const { error } = await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success' });
     expect(error?.message).toBe('rate_limited');
   });
+
+  /**
+   * The error-report cap counts rows by `created_at`, so while the client could
+   * send that column a backdated row fell outside the window the cap counts and
+   * never counted: 250 rows went in against a limit of 60. `clamp_app_error`
+   * overwrites it now, the way it always overwrote `user_id`.
+   *
+   * The cap is asserted through a backdated insert rather than an honest one —
+   * an honest one passes whether or not the column is forced.
+   */
+  test('a client-chosen created_at does not get past the error-report cap (§7.7)', async () => {
+    const backdated = () =>
+      user.client.from('app_errors').insert({ message: 'x', route: '/x', created_at: '2020-01-01T00:00:00Z' });
+
+    for (let i = 0; i < 60; i++) {
+      const { error } = await backdated();
+      expect(error, `report ${i + 1}`).toBeNull();
+    }
+    const { error } = await backdated();
+    expect(error?.message).toBe('error_report_rate_limited');
+  });
+
+  /**
+   * And the stored timestamp is the server's, on both log tables — otherwise a
+   * post-dated row outlives purge_old_logs(), which deletes what is OLDER than
+   * 90 days, and keeps its user id in every backup for as long as the database
+   * exists (§7.7).
+   *
+   * Read with the service role: neither table has a select policy, which is also
+   * why the inserts cannot ask for `return=representation` — PostgREST needs the
+   * select to build it and rolls the insert back without one.
+   */
+  test('a client-chosen created_at is replaced by the server on both log tables (§7.7)', async () => {
+    const future = '2999-01-01T00:00:00Z';
+    expect((await user.client.from('app_errors').insert({ message: 'x', route: '/x', created_at: future })).error).toBeNull();
+    expect(
+      (await user.client.from('security_events').insert({ event_type: 'sign_out', outcome: 'success', created_at: future })).error,
+    ).toBeNull();
+
+    const admin = adminClient();
+    for (const table of ['app_errors', 'security_events'] as const) {
+      const { data } = await admin.from(table).select('created_at').eq('user_id', user.id);
+      expect(data, `${table} row missing`).toHaveLength(1);
+      // Not 2999, and close enough to now to be this insert's own clock.
+      expect(new Date(data![0]!.created_at as string).getUTCFullYear(), table).toBeLessThan(2100);
+    }
+  });
+
+  /**
+   * `public.rate_limits` is meant to be reachable only by the definer functions
+   * and the service role. RLS does deny the table, but `authenticated` has to
+   * keep EXECUTE on consume_rate_limit — the write and security_event triggers
+   * run with invoker rights and call it as the user — and PostgREST exposes
+   * every function in `public`. So the bucket, limit and window were the
+   * caller's to choose, and each distinct pair is another row.
+   */
+  test('consume_rate_limit refuses any limit §7.1 does not define (§7.1)', async () => {
+    const call = (p_bucket: string, p_limit: number, p_window: string) =>
+      user.client.rpc('consume_rate_limit', { p_bucket, p_limit, p_window });
+
+    // A bucket of the caller's invention, and a real bucket with a window of
+    // their own — that one mints a fresh row every second it is called.
+    for (const [bucket, limit, window] of [
+      ['invented', 999999, '1 hour'],
+      ['write', 999999, '1 second'],
+      ['upload', 999999, '1 hour'],
+    ] as const) {
+      const { error } = await call(bucket, limit, window);
+      expect(error?.message, `${bucket}/${limit}/${window}`).toBe('rate_limit_not_a_limit');
+    }
+
+    // The three the app does use still go through, or every write would fail.
+    for (const [bucket, limit, window] of [
+      ['write', 120, '1 minute'],
+      ['upload', 20, '1 hour'],
+      ['security_event', 60, '1 hour'],
+    ] as const) {
+      expect((await call(bucket, limit, window)).error, `${bucket} refused`).toBeNull();
+    }
+  });
 });
 
 test.describe('§2 status history — written with the status, atomically', () => {

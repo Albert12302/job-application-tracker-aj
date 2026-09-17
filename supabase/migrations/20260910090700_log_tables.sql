@@ -59,6 +59,14 @@ begin
   new.release    = left(new.release, 100);
   new.user_agent = left(new.user_agent, 300);
   new.user_id    = auth.uid();   -- ignore anything the client sent
+  -- created_at is forced for the same reason user_id is: the client sends it,
+  -- and two of §7.7's guarantees are computed from it. The insert limit below
+  -- counts rows whose created_at falls inside the last hour, so a backdated row
+  -- never counts and the 60-an-hour cap stops existing — measured: 250 rows
+  -- accepted against a limit of 60. And purge_old_logs() deletes rows OLDER
+  -- than 90 days, so a future-dated row is never purged and inherits the
+  -- database's whole retention, backups included. Both close here.
+  new.created_at = now();
   return new;
 end;
 $$;
@@ -67,10 +75,18 @@ create trigger app_errors_clamp
   before insert on public.app_errors
   for each row execute function public.clamp_app_error();
 
--- A client's user_id is always replaced by its own auth.uid(). The service role
--- is the exception: the sign-in edge function writes sign_in_success for a user
--- who has no session yet, and its auth.uid() is null — forcing it would erase
--- the one thing the row is for.
+-- A client's user_id and created_at are always replaced. The service role is the
+-- exception: the sign-in edge function writes sign_in_success for a user who has
+-- no session yet, and its auth.uid() is null — forcing it would erase the one
+-- thing the row is for. It never sends created_at either, so the column default
+-- is what times its rows.
+--
+-- created_at matters here for retention rather than for a limit (this table's
+-- limit goes through consume_rate_limit, which reads clock_timestamp() and so
+-- was never forgeable): purge_old_logs() deletes rows OLDER than 90 days, so a
+-- future-dated row is never purged. §7.7 says both log tables are purged after
+-- 90 days and notes that whatever lands there is in the backups too — a row the
+-- purge cannot reach keeps its user id for as long as the database exists.
 create or replace function public.force_security_event_owner()
 returns trigger
 language plpgsql
@@ -78,7 +94,8 @@ set search_path = ''
 as $$
 begin
   if auth.role() is distinct from 'service_role' then
-    new.user_id = auth.uid();
+    new.user_id    = auth.uid();
+    new.created_at = now();
   end if;
   return new;
 end;
@@ -108,7 +125,14 @@ begin
 end;
 $$;
 
-revoke all on function public.enforce_app_error_rate_limit() from public;
+-- anon and authenticated too: Supabase grants new functions to them directly
+-- rather than through public, so `from public` alone leaves a SECURITY DEFINER
+-- function callable by every client — the same trap the other migrations' revokes
+-- name. Nothing was exploitable through it (Postgres refuses a trigger function
+-- called directly: "trigger functions can only be called as triggers"), and the
+-- trigger still fires, because EXECUTE is checked when a trigger is created and
+-- not on every firing. The revoke is here so the grant matches the intent.
+revoke all on function public.enforce_app_error_rate_limit() from public, anon, authenticated;
 
 create trigger app_errors_rate_limit
   before insert on public.app_errors

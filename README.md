@@ -70,13 +70,24 @@ Add these to the generated `package.json`. CLAUDE.md and CI both assume all eigh
 
 ## Local accounts
 
-`seed.sql` creates three, all with password `devpassword1234`:
+`seed.sql` creates seven, all with password `devpassword1234`. Each after the first two
+exists because a suite needs a set nobody else is changing — the §7.1 write and upload
+limits are per user, and several specs assert exact counts (CLAUDE.md, "Testing"):
 
-- `dev-a@example.test` — applications, notes, and status history
+- `dev-a@example.test` — applications, notes, and status history. **Read-only in tests:**
+  `auth.spec.ts` asserts its exact application count, `stats.spec.ts` its exact numbers, and
+  `filters.spec.ts` its seeded tabs. Never save a filter as `dev-a`.
 - `dev-b@example.test` — owns one application, and exists so the §7.8 cross-user isolation
   tests have a second account without a manual setup step
 - `dev-c@example.test` — owns nothing; `e2e/sign-in-function.spec.ts` locks it out on purpose.
   A lockout lasts 15 minutes, so no other test may sign in as it. `db:reset` unlocks it.
+- `dev-d@example.test` — the tests that add and delete applications (`applications.spec.ts`,
+  `security.spec.ts`). A full run spends about 116 of its 120 writes a minute, so a new test
+  that writes as `dev-d` needs its budget counted.
+- `dev-e@example.test` — `bulk-delete.spec.ts` alone, which writes too much to share
+- `dev-f@example.test` — the saving-and-deleting half of `filters.spec.ts`
+- `dev-g@example.test` — `pagination.spec.ts`, read-only: 23 applications, with a date tie
+  across the end of page 1. Nothing may write as `dev-g`.
 
 Signup is disabled in `config.toml` (`enable_signup = false`), matching the launch decision in
 SPEC §4.1d. Create accounts via seed or Studio.

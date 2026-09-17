@@ -41,6 +41,20 @@ alter table public.sign_in_attempts enable row level security;
 -- Consume one unit from a per-user bucket, or raise.
 -- SECURITY DEFINER is required: the counter table is unreadable by the user
 -- whose writes it counts. search_path pinned, everything schema-qualified (§7.6).
+--
+-- Its arguments are checked, not trusted, because a client can call it: PostgREST
+-- exposes `public`, and the `authenticated` role cannot simply lose EXECUTE —
+-- the write and security_event triggers run with invoker rights (§7.6 keeps them
+-- out of SECURITY DEFINER), so they call this as the user and need it themselves.
+-- Verified over HTTP with nothing but the anon key and a signed-in user's token:
+-- `POST /rest/v1/rpc/consume_rate_limit` answered 204 and wrote a row with a
+-- bucket name of the caller's choosing. Every distinct bucket and window is
+-- another row in a table §7.1 describes as reachable only by this function and
+-- the service role, so that was unbounded row growth against a 500 MB Free-plan
+-- database — the denial-of-wallet shape §7.7 guards app_errors against.
+--
+-- What a direct call can still do is spend the caller's OWN budget, which needs
+-- no defence: they can spend it by writing.
 create or replace function public.consume_rate_limit(
   p_bucket text,
   p_limit  integer,
@@ -57,6 +71,22 @@ declare
   v_start   timestamptz;
   v_count   integer;
 begin
+  -- §7.1's limits, exactly as their call sites pass them: the write trigger
+  -- below, enforce_security_event_rate_limit (migration 20260916200200), and
+  -- supabase/functions/upload. A new limit adds its row here, or the call that
+  -- carries it is refused. coalesce, because a null argument makes every
+  -- comparison null and `if not null` would fall through to the insert.
+  if not coalesce(
+       (p_bucket = 'write'          and p_limit = 120 and p_window = interval '1 minute') or
+       (p_bucket = 'upload'         and p_limit =  20 and p_window = interval '1 hour')   or
+       (p_bucket = 'security_event' and p_limit =  60 and p_window = interval '1 hour'),
+       false
+     ) then
+    raise exception 'rate_limit_not_a_limit' using
+      errcode = 'check_violation',
+      hint    = 'SPEC 7.1: consume_rate_limit takes only the limits listed in its body';
+  end if;
+
   if v_uid is null then
     return;   -- unauthenticated writes are denied by RLS, not by this
   end if;
