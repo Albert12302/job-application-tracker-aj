@@ -583,7 +583,10 @@ supabase/
 - Status changes always go through one code path that writes `status_history` — detail screen
   and edit form both. That path is `services/change-status.ts` → the `change_application_status`
   Postgres function; the creation row comes from `create_application`. Never write `status` in
-  a plain update, and never insert into `status_history` from the client.
+  a plain update, and never insert into `status_history` from the client. The database refuses
+  both, and a plain insert into `applications`, unless the write runs inside one of the two
+  functions, which set the transaction-local `app.status_write` (migration `20260916200100`).
+  A new writer of status goes inside one of them, not beside them.
 - Deleting an application deletes its notes, history, and Storage objects. No orphaned files.
 - **Deleting an account deletes its Storage objects first, then the `auth.users` row** (§9.7),
   through `supabase/functions/delete-account`. The function takes no id — the token says whose

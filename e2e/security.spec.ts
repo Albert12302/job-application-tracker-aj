@@ -84,8 +84,9 @@ test.describe('7.8.1 cross-user isolation', () => {
       position: 'Forged',
       date_applied: '2026-09-10T00:00:00.000Z',
     });
-    // The insert policy's WITH CHECK is what rejects this.
-    expect(error).not.toBeNull();
+    // The insert policy's WITH CHECK is what rejects this — asserted by code, so the
+    // status-path guard (which also refuses plain inserts, but after RLS) cannot stand in for it.
+    expect(error?.code).toBe('42501');
   });
 
   test('user B cannot read user A notes through the parent', async () => {
@@ -223,6 +224,45 @@ test.describe('7.8.1 cross-user isolation — the status functions (§6 step 2)'
       p_referral: false,
     });
     expect(createError).not.toBeNull();
+  });
+});
+
+test.describe('§9.1 the status functions are the only way to write a status', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
+
+  // As dev-b, on its own application: the refusals roll back, so they spend nothing
+  // of the write limit, and dev-b's rows stay as seeded.
+  test('a plain status update, application insert, or history insert is refused', async () => {
+    const b = await signIn('dev-b@example.test');
+    const { data: mine } = await b.from('applications').select('id, status, starred').limit(1).single();
+    expect(mine, 'seeded application missing — run npm run db:reset').toBeTruthy();
+    const history = async () => (await b.from('status_history').select('id').eq('application_id', mine!.id)).data ?? [];
+    const before = await history();
+    const other = mine!.status === 'Offer' ? 'Rejected' : 'Offer';
+
+    const { error: updateError } = await b.from('applications').update({ status: other }).eq('id', mine!.id);
+    expect(updateError?.message).toBe('status_change_path');
+
+    const { error: insertError } = await b.from('applications').insert({
+      company: 'No history',
+      position: 'No history',
+      date_applied: '2026-09-10T00:00:00.000Z',
+      status: 'Offer',
+    });
+    expect(insertError?.message).toBe('status_change_path');
+
+    const { error: historyError } = await b
+      .from('status_history')
+      .insert({ application_id: mine!.id, from_status: mine!.status, to_status: other, changed_at: '2020-01-01T00:00:00Z' });
+    expect(historyError?.message).toBe('status_change_path');
+
+    const { data: still } = await b.from('applications').select('status').eq('id', mine!.id).single();
+    expect(still?.status).toBe(mine!.status);
+    expect(await history()).toHaveLength(before.length);
+
+    // Other fields still take a plain update.
+    const { error: fieldError } = await b.from('applications').update({ starred: mine!.starred }).eq('id', mine!.id);
+    expect(fieldError).toBeNull();
   });
 });
 

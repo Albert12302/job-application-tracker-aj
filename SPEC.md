@@ -935,7 +935,9 @@ Reached from the detail screen. Same fields and validation as Add (§4.3), pre-f
 cover letter, which is attached, replaced, and removed on the detail screen itself (§4.4, §9.4).
 - Location re-normalizes on save (§5.2).
 - Changing status here writes a `status_history` row exactly as the detail-screen status
-  selector does — one code path, not two.
+  selector does — one code path, not two. The database enforces it: a signed-in user cannot
+  change a status with a plain update, add an application with a plain insert, or insert a
+  history row; only `change_application_status` and `create_application` can.
 - Cancel with unsaved changes prompts to confirm before discarding.
 - Save returns to the detail screen with the updated record.
 
@@ -1213,6 +1215,12 @@ the prototype is the reference for those.
   an application with about 120 notes cost more than a minute's limit to delete and was refused
   every time, with no way out short of deleting the account. A cascade is now part of the one
   write that started it.
+- **The one status-change path is enforced by the database (§9.1).** From the same review. The
+  table permissions the two status functions need also let a signed-in client change a status
+  with a plain update, add an application with no creation row, or insert history rows with any
+  statuses and dates — skewing stats with history that cannot be corrected. Triggers now refuse
+  all three unless the write comes from inside one of the two functions. They run after
+  row-level security, so the ownership policies still answer first.
 - **`security_events` inserts are limited to 60 an hour per user (§7.7).** From the same review.
   §7.7 asks it of both client-written log tables, and only `app_errors` had it, so a loop could
   fill the table and bury real events. Events the edge functions write are not counted.
