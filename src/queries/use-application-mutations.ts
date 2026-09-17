@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApplicationNotFoundError, createApplication, setStarred, WriteRateLimitedError } from '@/data/applications';
+import { ApplicationNotFoundError, createApplication, setStarred } from '@/data/applications';
 import type { ApplicationInput } from '@/domain/application-input';
 import { newestFirst } from '@/domain/order';
 import type { Application } from '@/domain/schemas';
@@ -8,14 +8,18 @@ import type { Status } from '@/domain/status';
 import { changeStatus } from '@/services/change-status';
 import { deleteApplication } from '@/services/delete-application';
 import { updateApplication } from '@/services/update-application';
-import { isRateLimited, reporting } from './errors';
+import { failureMessage, isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { useSignedInUser } from './use-session';
 
-export { ApplicationNotFoundError, WriteRateLimitedError };
-
 /** Gone or not this user's: expected (another tab deleted it), shown, and not reported. */
 const isNotFound = (error: unknown) => error instanceof ApplicationNotFoundError;
+
+/**
+ * Neither of these is a bug: another tab got there first, or the user is writing
+ * faster than §7.1 allows. Both are shown and neither is reported.
+ */
+const isExpected = (error: unknown) => isNotFound(error) || isRateLimited(error);
 
 /**
  * Apply `patch` to application `id` wherever it is cached, at once (§8.3), and
@@ -94,7 +98,7 @@ export function useCreateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ input, firstNote }: { input: ApplicationInput; firstNote: string | null }) =>
-      reporting('create_application', () => createApplication(input, firstNote)),
+      reporting('create_application', () => createApplication(input, firstNote), isRateLimited),
     onSuccess: (row) => {
       storeSaved(queryClient, user.id, row);
       void queryClient.invalidateQueries({ queryKey: keys.applications(user.id) });
@@ -107,7 +111,7 @@ export function useUpdateApplication(id: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ApplicationInput) => reporting('update_application', () => updateApplication(id, input), isNotFound),
+    mutationFn: (input: ApplicationInput) => reporting('update_application', () => updateApplication(id, input), isExpected),
     onSuccess: (row) => {
       storeSaved(queryClient, user.id, row);
       void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
@@ -122,11 +126,11 @@ export function useChangeStatus(id: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (status: Status) => reporting('change_status', () => changeStatus(id, status), isNotFound),
+    mutationFn: (status: Status) => reporting('change_status', () => changeStatus(id, status), isExpected),
     onMutate: async (status) => ({ rollback: await patchCached(queryClient, user.id, id, { status }) }),
-    onError: (_error, _status, context) => {
+    onError: (error, _status, context) => {
       context?.rollback();
-      toast.error("Couldn't change the status.");
+      toast.error(failureMessage("Couldn't change the status.", error));
     },
     onSuccess: (row) => storeSaved(queryClient, user.id, row),
     // Stats follow the history row this wrote (§4.4: "recalculates … the stats screen live").
@@ -141,13 +145,13 @@ export function useToggleStar() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, starred }: { id: string; starred: boolean; company: string }) =>
-      reporting('star_application', () => setStarred(id, starred), isNotFound),
+      reporting('star_application', () => setStarred(id, starred), isExpected),
     onMutate: async ({ id, starred }) => ({ rollback: await patchCached(queryClient, user.id, id, { starred }) }),
     // Only a failure asks the database again: a star writes one column, and the
     // optimistic patch already holds what a success would return (§8.3).
-    onError: (_error, { id, starred, company }, context) => {
+    onError: (error, { id, starred, company }, context) => {
       context?.rollback();
-      toast.error(`Couldn't ${starred ? 'star' : 'unstar'} ${company}.`);
+      toast.error(failureMessage(`Couldn't ${starred ? 'star' : 'unstar'} ${company}.`, error));
       void refreshOne(queryClient, user.id, id);
     },
   });
@@ -162,7 +166,7 @@ export function useDeleteApplication(id: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => reporting('delete_application', () => deleteIfPresent(id)),
+    mutationFn: () => reporting('delete_application', () => deleteIfPresent(id), isRateLimited),
     onSuccess: () => dropDeleted(queryClient, user.id, [id]),
   });
 }

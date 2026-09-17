@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ErrorState } from '@/components/ErrorState';
-import { errorReference } from '@/queries/errors';
+import { errorReference, failureMessage } from '@/queries/errors';
 
 /**
  * Confirm before a cover letter is deleted (SPEC §9.4), naming the file. A
@@ -44,7 +44,9 @@ export function RemoveCoverLetterDialog({
             this application. This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? <ErrorState title="Couldn't remove the cover letter." reference={errorReference(error)} /> : null}
+        {error ? (
+          <ErrorState title={failureMessage("Couldn't remove the cover letter.", error)} reference={errorReference(error)} />
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Keep cover letter</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={pending} onClick={onConfirm}>

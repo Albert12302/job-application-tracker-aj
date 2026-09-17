@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WriteRateLimitedError } from '@/data/applications';
+import { WriteRateLimitedError } from '@/data/write-limit';
 import type { Application } from '@/domain/schemas';
 import { applicationRow } from '@/test/factories';
 import { renderRoutes } from '@/test/render-routes';

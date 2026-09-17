@@ -2,14 +2,18 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { toast } from 'sonner';
 import { addNote, deleteNote, NoteLimitError, NoteNotFoundError, restoreNote, updateNote } from '@/data/notes';
 import type { Note } from '@/domain/schemas';
-import { reporting } from './errors';
+import { failureMessage, isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { useSignedInUser } from './use-session';
 
 export { NoteLimitError };
 
-/** The cap and a note already gone are both the user's world, not bugs: shown, never reported. */
-const isExpected = (error: unknown) => error instanceof NoteLimitError || error instanceof NoteNotFoundError;
+/**
+ * The cap, a note already gone, and the write limit are all the user's world,
+ * not bugs: shown, never reported (§7.1, §9.3).
+ */
+const isExpected = (error: unknown) =>
+  error instanceof NoteLimitError || error instanceof NoteNotFoundError || isRateLimited(error);
 
 function put(queryClient: QueryClient, key: readonly unknown[], notes: (current: Note[]) => Note[]) {
   queryClient.setQueryData<Note[]>(key, (current) => (current ? notes(current) : current));
@@ -75,9 +79,9 @@ export function useDeleteNote(applicationId: string) {
       put(queryClient, key, (notes) => notes.filter((existing) => existing.id !== note.id));
       return { previous };
     },
-    onError: (_error, _note, context) => {
+    onError: (error, _note, context) => {
       queryClient.setQueryData(key, context?.previous);
-      toast.error("Couldn't delete the note.");
+      toast.error(failureMessage("Couldn't delete the note.", error));
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });
@@ -94,6 +98,6 @@ export function useRestoreNote(applicationId: string) {
   return useMutation({
     mutationFn: (note: Note) => reporting('restore_note', () => restoreNote(note), isExpected),
     onSuccess: (note) => append(queryClient, key, note),
-    onError: () => toast.error("Couldn't bring the note back."),
+    onError: (error) => toast.error(failureMessage("Couldn't bring the note back.", error)),
   });
 }

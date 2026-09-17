@@ -1,6 +1,7 @@
 import { noteSchema, type Note } from '@/domain/schemas';
 import { allPages } from './all-pages';
 import { supabase } from './client';
+import { writeFailure } from './write-limit';
 
 /**
  * Notes (SPEC §2, §9.3). Ownership comes from the parent application: the RLS
@@ -89,13 +90,13 @@ export async function addNote(applicationId: string, body: string): Promise<Note
     .insert({ application_id: applicationId, body })
     .select('*')
     .single();
-  if (error) throw isNoteLimit(error) ? new NoteLimitError({ cause: error }) : error;
+  if (error) throw isNoteLimit(error) ? new NoteLimitError({ cause: error }) : writeFailure(error);
   return noteSchema.parse(data);
 }
 
 export async function updateNote(id: string, body: string): Promise<Note> {
   const { data, error } = await supabase.from('notes').update({ body }).eq('id', id).select('*').maybeSingle();
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   if (!data) throw new NoteNotFoundError();
   return noteSchema.parse(data);
 }
@@ -103,7 +104,7 @@ export async function updateNote(id: string, body: string): Promise<Note> {
 /** Already gone counts as done: the user wanted it deleted, and it is. */
 export async function deleteNote(id: string): Promise<void> {
   const { error } = await supabase.from('notes').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw writeFailure(error);
 }
 
 /**
@@ -116,6 +117,6 @@ export async function restoreNote(note: Pick<Note, 'application_id' | 'body' | '
     .insert({ application_id: note.application_id, body: note.body, created_at: note.created_at })
     .select('*')
     .single();
-  if (error) throw isNoteLimit(error) ? new NoteLimitError({ cause: error }) : error;
+  if (error) throw isNoteLimit(error) ? new NoteLimitError({ cause: error }) : writeFailure(error);
   return noteSchema.parse(data);
 }

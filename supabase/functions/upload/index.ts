@@ -11,6 +11,7 @@
 // and a fresh UUID, so no original filename is ever stored (§7.3).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { drainBody } from '../_shared/body.ts';
 import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 import { checkUpload, type FileProblem, isUploadKind, UPLOAD_RULES } from './files.ts';
 
@@ -39,12 +40,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: 
  * The body, or null once it passes `max` bytes. Nothing past `max` is kept, so
  * an oversized upload costs at most `max` bytes of memory, whatever it declared.
  *
- * An oversized body is still read to the end — discarded, not cancelled. The
- * edge runtime streams the body in from its main worker, and a response sent
- * before the body is drained never completes, cancel or no cancel: the request
- * hangs, and the stuck worker stops the function from starting another
- * (measured locally, supabase-edge-runtime 1.74). The platform's wall-clock
- * limit bounds how long a huge body can take.
+ * An oversized body is still read to the end — discarded, not cancelled, for the
+ * reason _shared/body.ts gives. The platform's wall-clock limit bounds how long
+ * a huge body can take.
  */
 async function readCapped(req: Request, max: number): Promise<Uint8Array | null> {
   if (!req.body) return new Uint8Array();
@@ -72,15 +70,18 @@ async function readCapped(req: Request, max: number): Promise<Uint8Array | null>
 Deno.serve(async (req) => {
   const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
   const reply = (body: unknown, status: number) => jsonResponse(body, status, cors);
-  // A refusal sent before the body is read never completes (see readCapped), and
-  // the stuck worker blocks every later upload — a signed-out user's token, whose
-  // session the hourly expiry job ended, was enough. Drain it, keeping nothing.
+  // A refusal sent before the body is read never completes (_shared/body.ts),
+  // and the stuck worker blocks every later upload — a signed-out user's token,
+  // whose session the hourly expiry job ended, was enough.
   const refuse = async (body: unknown, status: number) => {
-    if (!req.bodyUsed) await readCapped(req, 0);
+    await drainBody(req);
     return reply(body, status);
   };
 
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method === 'OPTIONS') {
+    await drainBody(req);
+    return new Response(null, { status: 204, headers: cors });
+  }
   if (req.method !== 'POST') return refuse({ error: 'Method not allowed.' }, 405);
 
   // POST /functions/v1/upload/<kind>. The kind picks the bucket and the rules;

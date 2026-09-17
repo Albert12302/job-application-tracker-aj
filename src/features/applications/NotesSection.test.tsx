@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WriteRateLimitedError } from '@/data/write-limit';
 import { noteRow } from '@/test/factories';
 import { NotesSection } from './NotesSection';
 
@@ -10,6 +11,10 @@ const listNotes = vi.fn();
 const addNote = vi.fn();
 const updateNote = vi.fn();
 const deleteNote = vi.fn();
+// What a report would actually write (services/report-error.ts → data/app-errors.ts).
+const insertAppError = vi.fn();
+
+vi.mock('@/data/app-errors', () => ({ insertAppError: (...args: unknown[]) => insertAppError(...args) }));
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -50,6 +55,7 @@ beforeEach(() => {
   updateNote.mockReset();
   deleteNote.mockReset();
   listNotes.mockResolvedValue([]);
+  insertAppError.mockReset().mockResolvedValue(undefined);
 });
 
 describe('NotesSection', () => {
@@ -131,6 +137,30 @@ describe('NotesSection', () => {
     expect(await screen.findByText("Couldn't save note.")).toBeTruthy();
     expect(screen.getByLabelText('Add a note')).toHaveProperty('value', 'Panel booked.');
 
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(addNote).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * The §7.1 write limit is the user's to wait out, not a bug: the text stays in
+   * the box, the message says to wait, nothing reaches app_errors, and no error
+   * reference is offered — there is nothing to quote.
+   */
+  it('asks the user to wait out the write limit, and reports nothing (§7.1)', async () => {
+    addNote.mockRejectedValueOnce(new WriteRateLimitedError()).mockResolvedValueOnce(noteRow({ body: 'Panel booked.' }));
+    const { user } = renderNotes();
+
+    await user.type(await screen.findByLabelText('Add a note'), 'Panel booked.');
+    await user.click(screen.getByRole('button', { name: 'Add note' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain("Couldn't save note.");
+    expect(alert.textContent).toContain("You've made a lot of changes in the last minute.");
+    expect(alert.textContent).not.toMatch(/Error reference/);
+    expect(insertAppError).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Add a note')).toHaveProperty('value', 'Panel booked.');
+
+    // A minute later, the same Retry saves it.
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(addNote).toHaveBeenCalledTimes(2));
   });

@@ -3,7 +3,7 @@ import { coverLetterPreviewUrl, coverLetterSize, downloadCoverLetter } from '@/d
 import type { Application } from '@/domain/schemas';
 import { attachCoverLetter, coverLetterFileProblem, CoverLetterRejectedError } from '@/services/attach-cover-letter';
 import { removeCoverLetter } from '@/services/remove-cover-letter';
-import { reporting } from './errors';
+import { isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { storeSaved } from './use-application-mutations';
 import { useIsSignedIn, useSignedInUser } from './use-session';
@@ -20,6 +20,12 @@ export { coverLetterFileProblem, CoverLetterRejectedError };
 export type AttachVariables = { applicationId: string; file: File; currentPath: string | null };
 
 const isRejected = (error: unknown) => error instanceof CoverLetterRejectedError;
+
+/**
+ * Pointing the row at a file — or at none — is a write like any other, so the
+ * §7.1 limit can refuse it. The user's to wait out, shown, and not reported.
+ */
+const isExpected = (error: unknown) => isRejected(error) || isRateLimited(error);
 
 /** The stored file's size in bytes. An object at a path never changes, so it never goes stale. */
 export function useCoverLetterSize(path: string | null) {
@@ -47,7 +53,7 @@ export function useAttachCoverLetter() {
   return useMutation({
     mutationKey: keys.coverLetterUpload(user.id),
     mutationFn: ({ applicationId, file, currentPath }: AttachVariables) =>
-      reporting('attach_cover_letter', () => attachCoverLetter(applicationId, file, currentPath), isRejected),
+      reporting('attach_cover_letter', () => attachCoverLetter(applicationId, file, currentPath), isExpected),
     onSuccess: (row, { file }) => {
       storeSaved(queryClient, user.id, row);
       // The browser already knows the size of the file it just sent.
@@ -78,7 +84,7 @@ export function useRemoveCoverLetter(applicationId: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (path: string) => reporting('remove_cover_letter', () => removeCoverLetter(applicationId, path)),
+    mutationFn: (path: string) => reporting('remove_cover_letter', () => removeCoverLetter(applicationId, path), isRateLimited),
     onSuccess: (row) => storeSaved(queryClient, user.id, row),
     onError: () => queryClient.invalidateQueries({ queryKey: keys.application(user.id, applicationId) }),
   });

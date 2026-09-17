@@ -61,9 +61,10 @@ function DialogContent({
           <DialogPrimitive.Close
             data-slot="dialog-close"
             render={
+              // 44px below 760px (SPEC §11); unchanged above it, in the corner.
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 max-[760px]:size-11"
                 size="icon-sm"
               />
             }
@@ -107,7 +108,7 @@ function DialogFooter({
     >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close render={<Button variant="outline" />}>
+        <DialogPrimitive.Close render={<Button variant="outline" size="lg" />}>
           Close
         </DialogPrimitive.Close>
       )}

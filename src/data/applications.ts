@@ -10,6 +10,7 @@ import {
 import type { Status } from '@/domain/status';
 import { allPages } from './all-pages';
 import { supabase } from './client';
+import { writeFailure } from './write-limit';
 
 /**
  * Applications (SPEC §2). RLS scopes every call to the signed-in user (§7.2):
@@ -105,7 +106,7 @@ export async function createApplication(input: ApplicationInput, firstNote: stri
     ...(input.description === null ? {} : { p_description: input.description }),
     ...(firstNote === null ? {} : { p_first_note: firstNote }),
   });
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   return applicationSchema.parse(data);
 }
 
@@ -119,14 +120,14 @@ export async function updateApplicationFields(
   fields: Omit<ApplicationInput, 'status'>,
 ): Promise<Application> {
   const { data, error } = await supabase.from('applications').update(fields).eq('id', id).select('*').maybeSingle();
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   if (!data) throw new ApplicationNotFoundError();
   return applicationSchema.parse(data);
 }
 
 export async function setStarred(id: string, starred: boolean): Promise<void> {
   const { data, error } = await supabase.from('applications').update({ starred }).eq('id', id).select('id');
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   // RLS answers an update it refuses with zero rows, not an error.
   if (!data.length) throw new ApplicationNotFoundError();
 }
@@ -140,7 +141,7 @@ export async function changeApplicationStatus(id: string, status: Status): Promi
   if (error) {
     // P0002 is the function's own "no such application"; the message is its code, not user data.
     if (error.code === 'P0002') throw new ApplicationNotFoundError({ cause: error });
-    throw error;
+    throw writeFailure(error);
   }
   return applicationSchema.parse(data);
 }
@@ -176,24 +177,10 @@ export async function setCoverLetter(
     .eq('id', id);
   const guarded = current === null ? update.is('cover_letter_path', null) : update.eq('cover_letter_path', current);
   const { data, error } = await guarded.select('*').maybeSingle();
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   if (!data) throw new CoverLetterChangedError();
   return applicationSchema.parse(data);
 }
-
-/**
- * The per-user write limit refused the change (§7.1). The user's to wait out, so
- * not reported. The trigger raises a bare code, never the row's content.
- */
-export class WriteRateLimitedError extends Error {
-  constructor(options?: { cause?: unknown }) {
-    super('write_rate_limited', options);
-    this.name = 'WriteRateLimitedError';
-  }
-}
-
-/** The write-limit trigger's bare code, on any of the four writable tables (§7.1). */
-export const isWriteRateLimited = (error: { message: string }) => error.message === 'rate_limited';
 
 /**
  * Deletes the row; its notes and status_history rows go with it (on delete
@@ -208,7 +195,7 @@ export async function deleteApplicationRow(id: string): Promise<{ coverLetterPat
     .eq('id', id)
     .select('cover_letter_path')
     .maybeSingle();
-  if (error) throw isWriteRateLimited(error) ? new WriteRateLimitedError({ cause: error }) : error;
+  if (error) throw writeFailure(error);
   if (!data) throw new ApplicationNotFoundError();
   return { coverLetterPath: data.cover_letter_path };
 }

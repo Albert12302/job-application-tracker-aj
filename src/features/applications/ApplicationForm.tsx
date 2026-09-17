@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { applicationFormSchema, type ApplicationFormValues } from '@/domain/schemas';
 import { STATUSES, type Status } from '@/domain/status';
-import { errorReference } from '@/queries/errors';
+import { errorReference, failureMessage } from '@/queries/errors';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 
 const CONTROL = 'h-9 max-[760px]:h-11';
@@ -64,7 +64,7 @@ export function ApplicationForm({
   // The shared message goes above the form and each empty field points at it;
   // everything else is a field-level message under its own field (§8.2).
   const missingRequired = errors.company?.message === REQUIRED || errors.position?.message === REQUIRED;
-  const summary = missingRequired ? REQUIRED : error ? "Couldn't save this application." : null;
+  const summary = missingRequired ? REQUIRED : error ? failureMessage("Couldn't save this application.", error) : null;
   const reference = missingRequired ? null : errorReference(error);
 
   const describedBy = (fieldError: FieldErrorType | undefined, name: string) => {
