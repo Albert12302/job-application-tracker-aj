@@ -65,22 +65,33 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        if: success() && steps.configured.outputs.ready == 'true'
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        if: success() && steps.configured.outputs.ready == 'true'
-        with:
-          node-version: '22'
-          cache: npm
-
-      # The Supabase CLI is a devDependency, pinned by package-lock.json, so the
-      # backup runs the same version as everything else rather than whatever a
-      # third-party action would fetch.
+      # This job holds the database owner's connection string, so it runs as
+      # little third-party code as it can. No checkout, no Node, no `npm ci`: that
+      # would install the whole dev tree (600-odd packages, install scripts
+      # included) to get one CLI, and any one of them could rewrite what the Dump
+      # step runs with the secret in its environment. Instead, the Supabase CLI
+      # release binary, pinned by version AND by SHA-256, so a changed file fails
+      # here rather than running.
+      #
+      # Keep the version in step with the `supabase` devDependency in
+      # package.json. Dependabot does not see this pin, so bump it by hand: the
+      # new hash is the tarball's line in the release's checksums.txt
+      # (https://github.com/supabase/cli/releases/download/v<version>/checksums.txt).
       - name: Install tools
         if: success() && steps.configured.outputs.ready == 'true'
+        env:
+          CLI_VERSION: '2.117.0'
+          CLI_SHA256: '69c05f85b9e47ee706d30f1a6ca8a526b4e337bfd12c7ef1ef522d24e7280d24'
         run: |
-          npm ci
+          tarball="supabase_${CLI_VERSION}_linux_amd64.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$tarball" \
+            "https://github.com/supabase/cli/releases/download/v${CLI_VERSION}/${tarball}"
+          echo "${CLI_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/supabase-cli"
+          tar xzf "$tarball" -C "$RUNNER_TEMP/supabase-cli"
+          rm "$tarball"
+          echo "$RUNNER_TEMP/supabase-cli" >> "$GITHUB_PATH"
+
           sudo apt-get update -qq
           sudo apt-get install -y -qq age
 
@@ -93,8 +104,8 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           mkdir -p backup
-          npx supabase db dump --db-url "$DB_URL" -f backup/schema.sql
-          npx supabase db dump --db-url "$DB_URL" --data-only -f backup/data.sql
+          supabase db dump --db-url "$DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$DB_URL" --data-only -f backup/data.sql
           date -u +"taken %Y-%m-%dT%H:%M:%SZ from commit ${{ github.sha }}" > backup/README.txt
 
       # Encrypted before it can be uploaded, and the plaintext never leaves this
