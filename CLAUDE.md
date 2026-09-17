@@ -710,6 +710,21 @@ The three functions are the only places the service role key exists.
 `public.rate_limits` has RLS on and no policies at all. That is not an oversight; the definer
 functions and the service role are the only intended readers.
 
+**`consume_rate_limit` takes only the limits listed in its own body**, and a new limit adds a
+row to that list. It has to: `authenticated` keeps EXECUTE on it because the write and
+security_event triggers run with invoker rights and call it as the user, and PostgREST exposes
+every function in `public` — so a signed-in user can call it directly with the anon key and
+their own token. Left unchecked, the bucket and window were theirs to choose, and each distinct
+pair is another row in a table nothing is supposed to reach. Spending one's own budget through
+it is fine and not defended against.
+
+**A client-written column is forced in a trigger, not merely defaulted.** `app_errors` and
+`security_events` take `user_id` *and* `created_at` from the server (migration
+`20260910090700`), because §7.7's guarantees are computed from them: the error-report cap
+counts rows by `created_at`, so a backdated row bypassed it entirely, and `purge_old_logs`
+deletes rows *older* than 90 days, so a future-dated row was never purged and outlived its
+retention in the backups too. A default only fills a column the client left out.
+
 ## Build order
 
 Follow SPEC.md §6. Ship auth → CRUD → persistence before touching stats, filters, or

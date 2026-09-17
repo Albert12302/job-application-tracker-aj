@@ -760,8 +760,15 @@ user typed*.
 **Because `app_errors` and `security_events` are written by the client, treat them as
 untrusted, capped, and write-only:**
 
-- **`user_id` is never sent by the client.** Default it to `auth.uid()` in the column
-  definition. A client-supplied id is a forgery waiting to happen.
+- **`user_id` and `created_at` are never taken from the client.** A `default` is not enough:
+  it fills a column the client left out, and says nothing about one the client sends. Both are
+  **overwritten in a `before insert` trigger**, so what the client sent is discarded whatever
+  it was. A client-supplied id is a forgery waiting to happen, and a client-supplied timestamp
+  is worse than it looks — every guarantee below is computed from `created_at`. Backdate a row
+  and the 60-an-hour cap never counts it; post-date one and the 90-day purge never reaches it.
+  The service role is the only exception, and only for `security_events`: the sign-in function
+  writes `sign_in_success` for a user who has no session yet, so forcing `user_id` there would
+  erase the one thing the row is for.
 - **Insert-only policy, and no select policy at all** for the user role. Read these tables in
   the dashboard or with a service-role script. A user reading the error table reads other
   people's stack traces.
@@ -1214,6 +1221,24 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-17
+- **The log tables take `created_at` from the server, not the client (§7.7).** Found by the
+  pre-deploy audit. Both tables defaulted the column and left it writable, and both of §7.7's
+  protections are computed from it, so one extra field in a request body defeated them. The
+  error-report cap counts rows whose `created_at` falls inside the last hour: a backdated row
+  never counted, and 250 of them were accepted against a limit of 60 — the render-loop
+  denial-of-wallet the cap exists to stop. And `purge_old_logs` deletes rows *older* than 90
+  days, so a post-dated row was never purged and kept its user id for as long as the database
+  lived, in every nightly backup with it. `user_id` was already overwritten in a trigger;
+  `created_at` now is too, which is why §7.7 no longer says a `default` is enough for either.
+- **`consume_rate_limit` accepts only the limits §7.1 actually defines (§7.1).** Found by the
+  same audit. `public.rate_limits` is described as reachable only by the definer functions and
+  the service role, and RLS does deny the table — but the function itself has to stay callable
+  by `authenticated`, because the write and security_event triggers run with invoker rights and
+  call it as the user. PostgREST exposes it like any other, so a signed-in user could pick the
+  bucket, the limit and the window; verified with nothing but the anon key and a token. Each
+  distinct bucket and window is another row, so that was unbounded growth in a table on a
+  500 MB database. The arguments are now checked against §7.1's three limits. Spending one's
+  own budget through it is still possible and still fine.
 - **Confirm dialogs get phone-sized controls (§11).** Found by a review of the mobile pass.
   Every dialog that confirms something irreversible — deleting an application, deleting
   several, discarding an edit, removing a cover letter, deleting the account and its typed

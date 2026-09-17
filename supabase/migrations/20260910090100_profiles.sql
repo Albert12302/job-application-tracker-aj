@@ -51,6 +51,14 @@ begin
 end;
 $$;
 
+-- Not callable by a client. Supabase grants new functions to anon and
+-- authenticated directly rather than through public, so a definer function with
+-- no revoke is one every holder of the anon key may call. Nothing was reachable
+-- through this one (Postgres refuses a trigger function called directly), and
+-- the trigger below still fires — EXECUTE is checked when a trigger is created,
+-- not on every firing — but the grant should say what is intended.
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
