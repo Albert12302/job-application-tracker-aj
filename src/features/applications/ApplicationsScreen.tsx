@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
@@ -59,6 +59,8 @@ export function ApplicationsScreen() {
   /** The page a link was just followed to, until the list reaches it. */
   const pageLinkTarget = useRef<number | null>(null);
   const ready = applications.isSuccess && !view.waiting;
+  const loading = applications.isPending || view.waiting;
+  const locations = useMemo(() => uniqueLocations(view.all), [view.all]);
 
   // A change of filter, search, order, page, or page size clears the selection (§4.2),
   // whatever made it — a tab, typing, Clear filters, the active saved filter being deleted,
@@ -119,7 +121,7 @@ export function ApplicationsScreen() {
   };
 
   let content;
-  if (applications.isPending || view.waiting) {
+  if (loading) {
     content = (
       <div className={SHELL} aria-busy="true">
         <p role="status" className="sr-only">
@@ -133,7 +135,7 @@ export function ApplicationsScreen() {
       <div className={`${SHELL} p-5`}>
         <ErrorState title="Couldn't load your applications." reference={errorReference(applications.error)}>
           <Button
-            className="h-9 max-[760px]:h-11"
+            size="lg"
             disabled={applications.isFetching}
             onClick={() => void applications.refetch()}
           >
@@ -159,7 +161,7 @@ export function ApplicationsScreen() {
           action={
             <Button
               variant="outline"
-              className="h-9 max-[760px]:h-11"
+              size="lg"
               onClick={() => {
                 url.clear();
                 // The button goes with the state it belongs to.
@@ -225,7 +227,6 @@ export function ApplicationsScreen() {
   }
 
   // Sort and pagination show while loading, disabled (§8.2), and with rows; not in a state with none.
-  const loading = applications.isPending || view.waiting;
   const listed = loading || (applications.isSuccess && matched.length > 0);
 
   let summary = '';
@@ -270,7 +271,7 @@ export function ApplicationsScreen() {
       {building && view.saved.status === 'success' ? (
         <FilterBuilder
           id={builderId}
-          locations={uniqueLocations(view.all)}
+          locations={locations}
           existingNames={view.saved.filters.map((filter) => filter.name)}
           pending={createFilter.isPending}
           error={createFilter.error}

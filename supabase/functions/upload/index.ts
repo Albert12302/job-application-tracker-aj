@@ -11,7 +11,7 @@
 // and a fresh UUID, so no original filename is ever stored (§7.3).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders, parseOrigins } from '../_shared/cors.ts';
+import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 import { checkUpload, type FileProblem, isUploadKind, UPLOAD_RULES } from './files.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -71,11 +71,7 @@ async function readCapped(req: Request, max: number): Promise<Uint8Array | null>
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
-  const reply = (body: unknown, status: number) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
-    });
+  const reply = (body: unknown, status: number) => jsonResponse(body, status, cors);
   // A refusal sent before the body is read never completes (see readCapped), and
   // the stuck worker blocks every later upload — a signed-out user's token, whose
   // session the hourly expiry job ended, was enough. Drain it, keeping nothing.

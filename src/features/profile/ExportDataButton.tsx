@@ -17,8 +17,6 @@ export function ExportDataButton() {
   const label = exportProgressLabel(exportData.stage);
   // No call-level callback: the zip is saved inside the mutation, so closing
   // the deletion dialog mid-export cannot throw the finished file away.
-  // No call-level callback: the zip is saved inside the mutation, so closing
-  // the deletion dialog mid-export cannot throw the finished file away.
   const run = () => exportData.mutate();
 
   return (
@@ -50,7 +48,7 @@ export function ExportDataButton() {
 
       {exportData.isError ? (
         <ErrorState title="Couldn't export your data." reference={errorReference(exportData.error)}>
-          <Button variant="outline" className="h-9 max-[760px]:h-11" onClick={run}>
+          <Button variant="outline" size="lg" onClick={run}>
             Retry
           </Button>
         </ErrorState>

@@ -225,7 +225,7 @@ export function ApplicationForm({
           </FieldGroup>
 
           <div className="flex gap-2.5">
-            <Button type="submit" disabled={pending} className={`flex-1 ${CONTROL}`}>
+            <Button type="submit" size="lg" disabled={pending} className="flex-1">
               {pending ? (
                 <>
                   <Loader2Icon aria-hidden="true" className="animate-spin" />
@@ -238,7 +238,8 @@ export function ApplicationForm({
             <Button
               type="button"
               variant="outline"
-              className={`flex-1 ${CONTROL}`}
+              size="lg"
+              className="flex-1"
               onClick={() => (isDirty || coverLetterChosen ? setConfirmDiscard(true) : onCancel())}
             >
               Cancel

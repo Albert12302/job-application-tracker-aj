@@ -28,12 +28,19 @@ export function toDateInputValue(iso: string): string {
 /** The list's compact date, "9/2/26" in en-US (§4.2). */
 export const NUMERIC_DATE: Intl.DateTimeFormatOptions = { month: 'numeric', day: 'numeric', year: '2-digit' };
 
+const LONG_DATE: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+
+// Building a formatter costs far more than using one, and a list formats a date per row.
+const utcFormatters = new WeakMap<Intl.DateTimeFormatOptions, Intl.DateTimeFormat>();
+
 /** Display a stored date_applied. Always UTC — never the viewer's zone (§5.4). */
-export function formatUtcDate(
-  iso: string,
-  options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' },
-): string {
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: 'UTC' }).format(new Date(iso));
+export function formatUtcDate(iso: string, options: Intl.DateTimeFormatOptions = LONG_DATE): string {
+  let formatter = utcFormatters.get(options);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(undefined, { ...options, timeZone: 'UTC' });
+    utcFormatters.set(options, formatter);
+  }
+  return formatter.format(new Date(iso));
 }
 
 /**
@@ -41,10 +48,11 @@ export function formatUtcDate(
  * viewer's own zone. The opposite rule from formatUtcDate, deliberately.
  */
 export function formatMoment(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(iso),
-  );
+  momentFormatter ??= new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return momentFormatter.format(new Date(iso));
 }
+
+let momentFormatter: Intl.DateTimeFormat | undefined;
 
 /**
  * Today as an <input type="date"> value — the Add form's default (§4.3).

@@ -20,46 +20,48 @@ on conflict (id) do update
 
 -- Object paths are {user_id}/{uuid}.ext, so the first path segment is the
 -- ownership check. Policies are per operation, per bucket.
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy cover_letters_select_own on storage.objects
   for select to authenticated using (
-    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy cover_letters_insert_own on storage.objects
   for insert to authenticated with check (
-    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy cover_letters_update_own on storage.objects
   for update to authenticated using (
-    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = (select auth.uid())::text
   ) with check (
-    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy cover_letters_delete_own on storage.objects
   for delete to authenticated using (
-    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'cover-letters' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy avatars_select_own on storage.objects
   for select to authenticated using (
-    bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy avatars_insert_own on storage.objects
   for insert to authenticated with check (
-    bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy avatars_update_own on storage.objects
   for update to authenticated using (
-    bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text
   ) with check (
-    bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
 create policy avatars_delete_own on storage.objects
   for delete to authenticated using (
-    bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+    bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text
   );

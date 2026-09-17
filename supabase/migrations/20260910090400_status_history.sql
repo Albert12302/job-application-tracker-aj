@@ -19,16 +19,18 @@ create index status_history_application_idx on public.status_history (applicatio
 
 alter table public.status_history enable row level security;
 
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy status_history_select_own on public.status_history
   for select to authenticated using (
     exists (select 1 from public.applications a
-            where a.id = status_history.application_id and a.user_id = auth.uid())
+            where a.id = status_history.application_id and a.user_id = (select auth.uid()))
   );
 
 create policy status_history_insert_own on public.status_history
   for insert to authenticated with check (
     exists (select 1 from public.applications a
-            where a.id = status_history.application_id and a.user_id = auth.uid())
+            where a.id = status_history.application_id and a.user_id = (select auth.uid()))
   );
 
 -- No update policy. No delete policy. Intentional (§2) — with RLS enabled and

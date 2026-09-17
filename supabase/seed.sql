@@ -237,8 +237,11 @@ values
   ('a0000000-0000-0000-0000-000000000004', 'Interview', 'Rejected',  now() - interval '5 days')
 on conflict do nothing;
 
-insert into public.saved_filters (user_id, name, statuses, referral, starred, location)
+-- created_at is spelled out: tab order is creation order (§2), and one insert
+-- statement gives every row the same now(), leaving the order to the random ids
+-- that break the tie — a different tab order after each db reset.
+insert into public.saved_filters (user_id, name, statuses, referral, starred, location, created_at)
 values
-  ('11111111-1111-1111-1111-111111111111', 'Live', array['Interview','Callback','Offer']::public.application_status[], 'any', 'any', null),
-  ('11111111-1111-1111-1111-111111111111', 'Austin referrals', '{}', 'yes', 'any', 'Austin, TX')
+  ('11111111-1111-1111-1111-111111111111', 'Live', array['Interview','Callback','Offer']::public.application_status[], 'any', 'any', null, now() - interval '2 days'),
+  ('11111111-1111-1111-1111-111111111111', 'Austin referrals', '{}', 'yes', 'any', 'Austin, TX', now() - interval '1 day')
 on conflict do nothing;

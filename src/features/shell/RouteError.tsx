@@ -11,10 +11,10 @@ export function RouteError({ error }: ErrorComponentProps) {
   return (
     <main id="main" className="mx-auto max-w-md px-4 py-10">
       <ErrorState title="Something went wrong on this screen." reference={reference}>
-        <Button className="h-9 max-[760px]:h-11" onClick={() => void router.invalidate()}>
+        <Button size="lg" onClick={() => void router.invalidate()}>
           Retry
         </Button>
-        <Link to="/applications" className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}>
+        <Link to="/applications" className={buttonVariants({ variant: 'outline', size: 'lg' })}>
           Back to applications
         </Link>
       </ErrorState>

@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { PASSWORD } from './session.js';
 
 /**
  * The tests supabase/functions/upload/README.md says the function must have
@@ -15,7 +16,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const URL = process.env.VITE_SUPABASE_URL!;
 const ANON = process.env.VITE_SUPABASE_ANON_KEY!;
 const FUNCTION_URL = `${URL}/functions/v1/upload`;
-const PASSWORD = 'devpassword1234';
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'API-only; runs once');
 test.describe.configure({ mode: 'serial' });

@@ -1,6 +1,7 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { expectAxeClean } from './a11y.js';
+import { makeApplication as insertApplication, unique as uniqueName } from './fixtures.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -27,24 +28,10 @@ test.afterAll(async () => {
   if (made.length > 0) await client.from('applications').delete().in('id', made);
 });
 
-function unique(prefix: string, testInfo: TestInfo): string {
-  return `${prefix} ${testInfo.project.name} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
+const unique = (prefix: string, testInfo: TestInfo) => uniqueName(prefix, testInfo.project.name);
 
-async function makeApplication(company: string, firstNote?: string): Promise<string> {
-  const { data, error } = await client.rpc('create_application', {
-    p_date_applied: `${new Date().toISOString().slice(0, 10)}T00:00:00+00:00`,
-    p_company: company,
-    p_position: 'Frontend Engineer',
-    p_status: 'Applied',
-    p_referral: false,
-    ...(firstNote ? { p_first_note: firstNote } : {}),
-  });
-  expect(error).toBeNull();
-  const id = (data as { id: string }).id;
-  made.push(id);
-  return id;
-}
+const makeApplication = (company: string, firstNote?: string) =>
+  insertApplication(client, made, company, { firstNote });
 
 /** Only these applications reach the page's reads; writes pass untouched. */
 async function onlyApplications(page: Page, ids: readonly string[]) {
@@ -55,12 +42,6 @@ async function onlyApplications(page: Page, ids: readonly string[]) {
     const rows = Array.isArray(body) ? body.filter((row: { id?: string }) => ids.includes(row.id ?? '')) : body;
     await route.fulfill({ response, json: rows });
   });
-}
-
-async function expectAxeClean(page: Page) {
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
 }
 
 test.beforeEach(async ({ page }) => {

@@ -1,7 +1,5 @@
 import { deleteApplicationRow } from '@/data/applications';
-import { logSecurityEvent } from '@/data/security-events';
-import { removeCoverLetterObject } from '@/data/storage';
-import { reportError } from './report-error';
+import { discardObject } from './discard-object';
 
 /**
  * Delete an application (SPEC §9.2) — the one path, used by the detail screen
@@ -16,9 +14,5 @@ import { reportError } from './report-error';
  */
 export async function deleteApplication(id: string): Promise<void> {
   const { coverLetterPath } = await deleteApplicationRow(id);
-  if (!coverLetterPath) return;
-
-  await removeCoverLetterObject(coverLetterPath)
-    .then(() => logSecurityEvent('file_delete', 'success'))
-    .catch((error: unknown) => reportError(error, { action: 'remove_cover_letter' }));
+  if (coverLetterPath) await discardObject('cover-letter', coverLetterPath);
 }

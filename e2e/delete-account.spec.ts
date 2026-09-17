@@ -1,5 +1,5 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { expectAxeClean } from './a11y.js';
 import { startSignedIn } from './session.js';
 import { adminClient, createThrowawayUser, removeThrowawayUser, type ThrowawayUser } from './throwaway-user.js';
 
@@ -115,10 +115,7 @@ test.describe('deleting an account', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/Deletes 1 application/)).toBeVisible();
 
-    // Nothing is animating, or a fading dialog measures its own contrast wrong.
-    await page.waitForFunction(() => document.getAnimations().length === 0);
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect(violations).toEqual([]);
+    await expectAxeClean(page);
 
     // Typing the address and confirming, without ever reaching for a mouse.
     const field = dialog.getByLabel('Type your email address to confirm');

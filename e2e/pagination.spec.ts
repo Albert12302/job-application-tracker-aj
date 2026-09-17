@@ -1,5 +1,5 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { expectAxeClean } from './a11y.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -37,12 +37,6 @@ test.beforeAll(async () => {
 test.beforeEach(async ({ page }) => {
   await startSignedIn(page, session);
 });
-
-async function expectAxeClean(page: Page) {
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
-}
 
 const companies = (rows: Seeded[]) => rows.map((row) => row.company);
 /** The companies on screen, in order. */

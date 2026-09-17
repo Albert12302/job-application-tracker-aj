@@ -58,15 +58,17 @@ create trigger applications_set_updated_at
 
 alter table public.applications enable row level security;
 
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy applications_select_own on public.applications
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 -- with check is what stops a user writing rows owned by someone else (§7.2).
 create policy applications_insert_own on public.applications
-  for insert to authenticated with check (auth.uid() = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 
 create policy applications_update_own on public.applications
-  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy applications_delete_own on public.applications
-  for delete to authenticated using (auth.uid() = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);

@@ -25,14 +25,14 @@ export function SelectionBar({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border bg-card px-3 py-2">
       <p className="text-sm font-medium">{count} selected</p>
       {narrow && count < total ? (
-        <Button variant="ghost" className="h-9 max-[760px]:h-11" onClick={onSelectAll}>
+        <Button variant="ghost" size="lg" onClick={onSelectAll}>
           Select all {total}
         </Button>
       ) : null}
-      <Button variant="ghost" className="h-9 max-[760px]:h-11" onClick={onClear}>
+      <Button variant="ghost" size="lg" onClick={onClear}>
         Clear
       </Button>
-      <Button variant="destructive" className="ml-auto h-9 max-[760px]:h-11 max-[760px]:w-full" onClick={onDelete}>
+      <Button variant="destructive" size="lg" className="ml-auto max-[760px]:w-full" onClick={onDelete}>
         Delete {applicationCount(count)}
       </Button>
     </div>

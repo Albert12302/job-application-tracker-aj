@@ -1,5 +1,6 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { expectAxeClean } from './a11y.js';
+import { PASSWORD, STORAGE_KEY } from './session.js';
 
 /**
  * SPEC §6 step 1 end to end: sign in, session, profile, photo, sign out.
@@ -10,9 +11,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const ANON = process.env.VITE_SUPABASE_ANON_KEY!;
-const PASSWORD = 'devpassword1234';
-// src/data/client.ts AUTH_STORAGE_KEY — where the app keeps its session.
-const STORAGE_KEY = 'aj-hunt-auth';
 
 const ACCOUNTS = {
   chromium: { email: 'dev-a@example.test', name: 'Dev A', count: '7 applications tracked' },
@@ -29,13 +27,6 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-}
-
-async function expectAxeClean(page: Page) {
-  // A button still fading out of its pending state measures low and fails at random (CLAUDE.md).
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
 }
 
 // 1×1 PNG, and an SVG wearing a .png name — the extension must not be trusted (§7.3).

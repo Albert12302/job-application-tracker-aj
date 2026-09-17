@@ -41,29 +41,31 @@ create trigger notes_enforce_limit
 
 alter table public.notes enable row level security;
 
+-- auth.uid() is wrapped in a select so Postgres evaluates it once per statement
+-- rather than once per row (Supabase's auth_rls_initplan lint). Same result.
 create policy notes_select_own on public.notes
   for select to authenticated using (
     exists (select 1 from public.applications a
-            where a.id = notes.application_id and a.user_id = auth.uid())
+            where a.id = notes.application_id and a.user_id = (select auth.uid()))
   );
 
 create policy notes_insert_own on public.notes
   for insert to authenticated with check (
     exists (select 1 from public.applications a
-            where a.id = notes.application_id and a.user_id = auth.uid())
+            where a.id = notes.application_id and a.user_id = (select auth.uid()))
   );
 
 create policy notes_update_own on public.notes
   for update to authenticated using (
     exists (select 1 from public.applications a
-            where a.id = notes.application_id and a.user_id = auth.uid())
+            where a.id = notes.application_id and a.user_id = (select auth.uid()))
   ) with check (
     exists (select 1 from public.applications a
-            where a.id = notes.application_id and a.user_id = auth.uid())
+            where a.id = notes.application_id and a.user_id = (select auth.uid()))
   );
 
 create policy notes_delete_own on public.notes
   for delete to authenticated using (
     exists (select 1 from public.applications a
-            where a.id = notes.application_id and a.user_id = auth.uid())
+            where a.id = notes.application_id and a.user_id = (select auth.uid()))
   );

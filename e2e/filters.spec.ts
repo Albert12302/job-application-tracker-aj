@@ -1,6 +1,6 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { expectAxeClean } from './a11y.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -12,12 +12,6 @@ import { apiActor, startSignedIn } from './session.js';
  * which no other suite uses, in one browser and one test at a time, so no two
  * tests change its saved filters at once.
  */
-
-async function expectAxeClean(page: Page) {
-  await page.waitForFunction(() => document.getAnimations().length === 0);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
-}
 
 const tabs = (page: Page) => page.getByRole('group', { name: 'Filter applications' });
 const tab = (page: Page, name: string) => tabs(page).getByRole('button', { name, exact: true });

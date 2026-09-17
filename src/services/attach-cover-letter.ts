@@ -1,5 +1,4 @@
 import { setCoverLetter } from '@/data/applications';
-import { logSecurityEvent } from '@/data/security-events';
 import { removeCoverLetterObject, type UploadRefusal, UploadRefusedError, uploadFile } from '@/data/storage';
 import {
   COVER_LETTER_ERRORS,
@@ -9,6 +8,7 @@ import {
   sniffCoverLetterType,
 } from '@/domain/cover-letter';
 import type { Application } from '@/domain/schemas';
+import { discardObject } from './discard-object';
 import { reportError } from './report-error';
 
 /** The file was refused for a reason the user can fix. Not a bug; not reported. */
@@ -79,11 +79,7 @@ export async function attachCoverLetter(
     throw error;
   }
 
-  if (currentPath) {
-    await removeCoverLetterObject(currentPath)
-      .then(() => logSecurityEvent('file_delete', 'success'))
-      .catch((error: unknown) => reportError(error, { action: 'remove_cover_letter' }));
-  }
+  if (currentPath) await discardObject('cover-letter', currentPath);
 
   return saved;
 }

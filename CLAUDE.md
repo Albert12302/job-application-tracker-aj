@@ -228,7 +228,9 @@ Three layers, each with a job:
   only and serially, because its tests change one user's saved filters and "Custom N"; the
   reading half asserts `dev-a`'s seeded tabs exactly (`All (7)`, `Live (3)`, …), so a change to
   `dev-a`'s seeded applications or saved filters changes those too. **Never save a filter as
-  `dev-a`.**
+  `dev-a`.** Seeded rows whose order anything asserts spell out `created_at`: one insert statement
+  gives every row the same `now()`, and the order then falls to the random ids that break the tie —
+  dev-a's two saved filters swapped places between `db reset`s until the seed set theirs.
 
   **The builder's chips and any/yes/no choices are visually hidden native inputs inside a
   `<label>`.** Playwright's `check()` refuses them (the label intercepts the click); click the
@@ -250,8 +252,13 @@ Three layers, each with a job:
 
   **Run axe once nothing is animating** (`document.getAnimations()`). A toast fading in measures
   about 1.6:1 for its first frames and passes once settled, so a scan that lands mid-fade fails at
-  random. Every `expectAxeClean` helper waits for that first — a button fading out of its pending
-  state failed WebKit's sign-in scan the same way.
+  random. That wait is why `expectAxeClean` lives in **`e2e/a11y.ts`** and is imported, never
+  copied — a button fading out of its pending state failed WebKit's sign-in scan the same way, and
+  a per-spec copy is a per-spec chance to forget it. **`e2e/fixtures.ts`** is the same bargain for
+  rows a spec makes for itself: `unique()`, `todayUtcMidnight()` (§5.4's midnight, which the check
+  constraint requires), and `makeApplication(client, made, company, options)` through
+  `create_application`. `e2e/session.ts` owns `PASSWORD` and `STORAGE_KEY`; never redeclare
+  either in a spec.
 
   **A timing assertion compares the fastest samples, never a median or a single one.** In a full
   run, other suites' requests to the same local edge runtime overlap a sample and add about a
@@ -332,6 +339,8 @@ src/
                               the rule: Storage does not cascade, so a failed file delete has
                               to stop before the account is gone
     export-data.ts            client-side zip of the user's own data (§9.8)
+    discard-object.ts         deletes a file nothing points at any more; a failure is an
+                              orphan, reported, never thrown (§9.2)
     report-error.ts           the ONE error-reporting path (§7.7)
 
   queries/                    TanStack Query hooks: keys, fetchers, invalidation
@@ -371,6 +380,8 @@ src/
       ApplicationForm.tsx         shared by add + edit (§9.1)
       DiscardChangesDialog.tsx
       ApplicationDetailScreen.tsx
+      ApplicationLoadError.tsx    the load failure, shared by detail and edit (§8.2)
+      ApplicationNotFound.tsx     missing and not-yours read the same, detail and edit (§8.2)
       StatusSelect.tsx            the one status-change control (§4.4)
       FunnelIndicator.tsx
       NotesSection.tsx
@@ -482,6 +493,11 @@ supabase/
 - Server state through TanStack Query only. Rules that keep it sane:
   - **every key comes from `queries/keys.ts`** — no inline key arrays at call sites, or
     invalidation silently misses;
+  - **a mutation that puts the database's own answer in a cache does not then invalidate that
+    same key** — the screen is open, so it refetches the rows it was just given. Add a note,
+    save a filter, delete an application: the row goes in (or out of) the cache and that is
+    the end of it. Keys whose value is *derived* elsewhere — the count, stats — are still
+    invalidated, and a failure still refetches (`useToggleStar`'s `onError`);
   - components call a hook from `queries/`, never `useQuery` with an inline fetcher;
   - mutations declare their invalidations explicitly; after a status change invalidate the
     list, the detail, and stats;
@@ -564,6 +580,10 @@ supabase/
 
 - **RLS on every table**, policies for select/insert/update/delete separately. A new table
   without a policy is a bug, not a TODO.
+- **A policy writes `(select auth.uid())`, never a bare `auth.uid()`.** Bare, Postgres
+  evaluates it once per row; wrapped, once per statement (Supabase's `auth_rls_initplan`
+  lint). The result is identical, and the reads that cover a whole set — the list, stats, the
+  export — pay it once. Column *defaults* keep the bare call: a default cannot hold a subquery.
 - The `service_role` key never appears in client code, in a client env var, or in git.
 - **`seed.sql` never runs against a hosted project.** It creates `dev-a` / `dev-b` / `dev-c` with a
   password and user ids that are public in this repo. Plain `npx supabase db push` does

@@ -20,3 +20,11 @@ export function corsHeaders(origin: string | null, allowed: Set<string>): Record
     vary: 'Origin',
   };
 }
+
+/** Every function's JSON answer: its CORS headers, and never sniffed as anything else. */
+export function jsonResponse(body: unknown, status: number, cors: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
+  });
+}

@@ -72,6 +72,9 @@ export function ApplicationPagination({
   );
   // No href, so not focusable; still read as a link that is unavailable.
   const unavailable = { role: 'link', 'aria-disabled': true } as const;
+  const goTo = (target: number, available: boolean) => (available ? { render: link(target) } : unavailable);
+  const hasPrevious = page > 1;
+  const hasNext = paging !== null && page < pageCount;
   // On a phone Previous and Next are chevrons, like First and Last, to leave room for
   // "Page 12 of 25" on one line at 320px; screen readers still hear "Previous" and "Next".
   const step = narrow ? { className: `${ICON} ${FILLED}`, iconOnly: true } : { className: `${CONTROL} ${FILLED}` };
@@ -116,18 +119,10 @@ export function ApplicationPagination({
       <Pagination aria-label="Pages" className="max-[760px]:w-full">
         <PaginationContent className="flex-wrap gap-1 max-[760px]:w-full max-[760px]:justify-between">
           <PaginationItem>
-            {page > 1 ? (
-              <PaginationFirst className={end} render={link(1)} />
-            ) : (
-              <PaginationFirst className={end} {...unavailable} />
-            )}
+            <PaginationFirst className={end} {...goTo(1, hasPrevious)} />
           </PaginationItem>
           <PaginationItem>
-            {page > 1 ? (
-              <PaginationPrevious {...step} render={link(page - 1)} />
-            ) : (
-              <PaginationPrevious {...step} {...unavailable} />
-            )}
+            <PaginationPrevious {...step} {...goTo(page - 1, hasPrevious)} />
           </PaginationItem>
           {paging && narrow ? (
             // No numbers on a phone, so say which page this is (§11).
@@ -162,18 +157,10 @@ export function ApplicationPagination({
               )
             : null}
           <PaginationItem>
-            {paging && page < pageCount ? (
-              <PaginationNext {...step} render={link(page + 1)} />
-            ) : (
-              <PaginationNext {...step} {...unavailable} />
-            )}
+            <PaginationNext {...step} {...goTo(page + 1, hasNext)} />
           </PaginationItem>
           <PaginationItem>
-            {paging && page < pageCount ? (
-              <PaginationLast className={end} render={link(pageCount)} />
-            ) : (
-              <PaginationLast className={end} {...unavailable} />
-            )}
+            <PaginationLast className={end} {...goTo(pageCount, hasNext)} />
           </PaginationItem>
         </PaginationContent>
       </Pagination>

@@ -21,7 +21,7 @@
 // exists (§7.1: no account enumeration on any surface).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders, parseOrigins } from '../_shared/cors.ts';
+import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 import {
   ACCOUNT_LOCKOUT_MS,
   ACCOUNT_MAX_FAILURES,
@@ -124,10 +124,7 @@ Deno.serve(async (req) => {
   const settle = async (body: unknown, status: number) => {
     const elapsed = Date.now() - startedAt;
     if (elapsed < MIN_RESPONSE_MS) await sleep(MIN_RESPONSE_MS - elapsed);
-    return new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
-    });
+    return jsonResponse(body, status, cors);
   };
 
   if (req.method !== 'POST') return settle({ error: GENERIC }, 405);

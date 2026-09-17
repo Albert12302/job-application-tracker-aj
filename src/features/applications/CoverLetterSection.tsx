@@ -22,7 +22,6 @@ import { RemoveCoverLetterDialog } from './RemoveCoverLetterDialog';
 import { openPreviewTab } from './preview-tab';
 import { saveFile } from '@/lib/save-file';
 
-const ACTION = 'h-9 max-[760px]:h-11';
 
 /**
  * The detail screen's cover letter (SPEC §4.4, §9.4): its name and size, and
@@ -160,7 +159,7 @@ export function CoverLetterSection({ application }: { application: Application }
           {file && canPreviewCoverLetter(file.path) ? (
             <Button
               variant="outline"
-              className={ACTION}
+              size="lg"
               aria-label={preview.isPending ? 'Opening the preview' : 'Preview cover letter'}
               disabled={fetching}
               onClick={openPreview}
@@ -178,7 +177,7 @@ export function CoverLetterSection({ application }: { application: Application }
           {file ? (
             <Button
               variant="outline"
-              className={ACTION}
+              size="lg"
               // The visible word, plus what it acts on (§10.3, label in name).
               aria-label={download.isPending ? 'Preparing the download' : 'Download cover letter'}
               disabled={fetching}
@@ -222,7 +221,7 @@ export function CoverLetterSection({ application }: { application: Application }
         </p>
       ) : failed?.variables ? (
         <ErrorState title="Upload failed." reference={errorReference(failed.error)}>
-          <Button className={ACTION} disabled={busy} onClick={() => start(failed.variables!.file)}>
+          <Button size="lg" disabled={busy} onClick={() => start(failed.variables!.file)}>
             Retry
           </Button>
         </ErrorState>
@@ -230,7 +229,7 @@ export function CoverLetterSection({ application }: { application: Application }
 
       {download.isError ? (
         <ErrorState title="Couldn't download the cover letter." reference={errorReference(download.error)}>
-          <Button className={ACTION} onClick={fetchDownload} disabled={!file}>
+          <Button size="lg" onClick={fetchDownload} disabled={!file}>
             Retry
           </Button>
         </ErrorState>
@@ -238,7 +237,7 @@ export function CoverLetterSection({ application }: { application: Application }
 
       {preview.isError ? (
         <ErrorState title="Couldn't open the preview." reference={errorReference(preview.error)}>
-          <Button className={ACTION} onClick={openPreview} disabled={!file}>
+          <Button size="lg" onClick={openPreview} disabled={!file}>
             Retry
           </Button>
         </ErrorState>

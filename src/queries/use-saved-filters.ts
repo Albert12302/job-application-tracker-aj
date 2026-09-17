@@ -4,16 +4,11 @@ import { WriteRateLimitedError } from '@/data/applications';
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from '@/data/saved-filters';
 import { savedFilterInput } from '@/domain/filters';
 import type { SavedFilter, SavedFilterFormValues } from '@/domain/schemas';
-import { reporting } from './errors';
+import { isRateLimited, reporting, WAIT_A_MINUTE } from './errors';
 import { keys } from './keys';
 import { useIsSignedIn, useSignedInUser } from './use-session';
 
 export { WriteRateLimitedError };
-
-/** The write limit (§7.1): the user's to wait out, shown, and not reported. */
-const isRateLimited = (error: unknown) => error instanceof WriteRateLimitedError;
-
-export const WAIT_A_MINUTE = "You've made a lot of changes in the last minute. Wait a minute, then try again.";
 
 /** The user's saved filters, in tab order (§2, §4.2). */
 export function useSavedFilters() {
@@ -41,9 +36,10 @@ export function useCreateSavedFilter() {
       const names = (queryClient.getQueryData<SavedFilter[]>(key) ?? []).map((filter) => filter.name);
       return reporting('create_saved_filter', () => createSavedFilter(savedFilterInput(values, names)), isRateLimited);
     },
+    // The saved row goes on the end of the tabs, where the database orders it;
+    // no refetch, because this is the database's own answer.
     onSuccess: (filter) => {
       queryClient.setQueryData<SavedFilter[]>(key, (filters) => [...(filters ?? []), filter]);
-      void queryClient.invalidateQueries({ queryKey: key });
     },
   });
 }

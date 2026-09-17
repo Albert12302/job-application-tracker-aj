@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { apiSession, startSignedIn } from './session.js';
+import { apiSession, PASSWORD, startSignedIn } from './session.js';
 import { adminClient, removeThrowawayUser } from './throwaway-user.js';
 
 /**
@@ -19,7 +19,6 @@ const ANON = process.env.VITE_SUPABASE_ANON_KEY!;
 
 const USER_A = '11111111-1111-1111-1111-111111111111';
 const USER_A_APPLICATION = 'a0000000-0000-0000-0000-000000000001';
-const PASSWORD = 'devpassword1234';
 
 async function signIn(email: string) {
   const client = createClient(URL, ANON, { auth: { persistSession: false } });

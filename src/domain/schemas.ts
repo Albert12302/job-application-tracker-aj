@@ -113,8 +113,6 @@ export const noteFormSchema = z.object({
     .max(CAPS.noteBody, 'Notes are limited to 2,000 characters.'),
 });
 
-export type NoteFormValues = z.infer<typeof noteFormSchema>;
-
 export const noteSchema = z.object({
   id,
   application_id: id,
