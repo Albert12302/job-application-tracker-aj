@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WriteRateLimitedError } from '@/data/applications';
 import { reportError, type ErrorAction } from '@/services/report-error';
 
 /**
@@ -34,6 +35,11 @@ export async function reporting<T>(
     throw new ReportedError(reportError(error, { action }), error);
   }
 }
+
+/** The write limit (§7.1): the user's to wait out, shown, and not reported. */
+export const isRateLimited = (error: unknown) => error instanceof WriteRateLimitedError;
+
+export const WAIT_A_MINUTE = "You've made a lot of changes in the last minute. Wait a minute, then try again.";
 
 /** The short form shown to the user; the full uuid is the row id. */
 export function errorReference(error: unknown): string | null {

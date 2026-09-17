@@ -1,7 +1,7 @@
 import { AVATAR_ERRORS, AVATAR_SNIFF_BYTES, avatarProblem, sniffAvatarType } from '@/domain/avatar';
 import { setAvatarPath } from '@/data/profile';
-import { logSecurityEvent } from '@/data/security-events';
 import { removeAvatarObject, type UploadRefusal, UploadRefusedError, uploadFile } from '@/data/storage';
+import { discardObject } from './discard-object';
 import { reportError } from './report-error';
 
 /** The file was refused for a reason the user can fix. Not a bug; not reported. */
@@ -81,9 +81,7 @@ export async function setAvatar(userId: string, file: File, previousPath: string
 
   if (previousPath) {
     // The new photo is saved; a stale object is an orphan to clean up, not a failed upload (§9.2).
-    await removeAvatarObject(previousPath)
-      .then(() => logSecurityEvent('file_delete', 'success'))
-      .catch((error: unknown) => reportError(error, { action: 'remove_avatar' }));
+    await discardObject('avatar', previousPath);
   }
 
   return path;

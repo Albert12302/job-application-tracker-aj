@@ -1,17 +1,16 @@
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ErrorState } from '@/components/ErrorState';
 import { toApplicationInput, toFormValues } from '@/domain/application-input';
 import { uniqueLocations } from '@/domain/location';
 import { applicationIdSchema } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
 import { useUpdateApplication } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { useApplications } from '@/queries/use-applications';
 import { ApplicationForm } from './ApplicationForm';
+import { ApplicationLoadError } from './ApplicationLoadError';
+import { ApplicationNotFound } from './ApplicationNotFound';
 import { useListReturn } from './list-return';
 import { PANEL } from './panel';
 
@@ -40,7 +39,6 @@ export function EditApplicationScreen() {
     [applications.data, applicationId],
   );
   const found = applicationId ? application.data : null;
-  const defaultValues = useMemo(() => (found ? toFormValues(found) : null), [found]);
 
   const backToApplication = () => {
     if (applicationId) void navigate({ to: '/applications/$id', params: { id: applicationId } });
@@ -65,38 +63,11 @@ export function EditApplicationScreen() {
 
   if (applicationId && application.isError) {
     return (
-      <div className={PANEL}>
-        <ErrorState title="Couldn't load this application." reference={errorReference(application.error)}>
-          <Button className="h-9 max-[760px]:h-11" onClick={() => void application.refetch()}>
-            Retry
-          </Button>
-          <Link
-            to="/applications"
-            search={listSearch}
-            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
-          >
-            Back to list
-          </Link>
-        </ErrorState>
-      </div>
+      <ApplicationLoadError className={PANEL} error={application.error} onRetry={() => void application.refetch()} />
     );
   }
 
-  if (!found || !defaultValues) {
-    return (
-      <div className={PANEL}>
-        <h1 className="font-heading text-lg font-semibold">Application not found</h1>
-        <p className="text-sm text-muted-foreground">It may have been deleted, or the link may be wrong.</p>
-        <Link
-          to="/applications"
-          search={listSearch}
-          className={buttonVariants({ variant: 'outline', className: 'h-9 w-fit max-[760px]:h-11' })}
-        >
-          Back to applications
-        </Link>
-      </div>
-    );
-  }
+  if (!found) return <ApplicationNotFound className={PANEL} />;
 
   return (
     <section aria-labelledby="edit-application-heading" className={PANEL}>
@@ -104,7 +75,7 @@ export function EditApplicationScreen() {
         Edit application
       </h1>
       <ApplicationForm
-        defaultValues={defaultValues}
+        defaultValues={toFormValues(found)}
         locations={locations}
         submitLabel="Save changes"
         pending={update.isPending}

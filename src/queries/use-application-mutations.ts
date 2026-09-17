@@ -8,7 +8,7 @@ import type { Status } from '@/domain/status';
 import { changeStatus } from '@/services/change-status';
 import { deleteApplication } from '@/services/delete-application';
 import { updateApplication } from '@/services/update-application';
-import { reporting } from './errors';
+import { isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { useSignedInUser } from './use-session';
 
@@ -16,9 +16,6 @@ export { ApplicationNotFoundError, WriteRateLimitedError };
 
 /** Gone or not this user's: expected (another tab deleted it), shown, and not reported. */
 const isNotFound = (error: unknown) => error instanceof ApplicationNotFoundError;
-
-/** The write limit (§7.1): the user's to wait out, shown, and not reported. */
-const isRateLimited = (error: unknown) => error instanceof WriteRateLimitedError;
 
 /**
  * Apply `patch` to application `id` wherever it is cached, at once (§8.3), and
@@ -59,6 +56,26 @@ function refreshOne(queryClient: QueryClient, userId: string, id: string) {
     queryClient.invalidateQueries({ queryKey: keys.applicationList(userId) }),
     queryClient.invalidateQueries({ queryKey: keys.application(userId, id) }),
   ]);
+}
+
+/** Delete one application; already gone counts as done (§9.2). */
+const deleteIfPresent = (id: string) =>
+  deleteApplication(id).catch((error: unknown) => {
+    if (!isNotFound(error)) throw error;
+  });
+
+/** Take deleted rows out of the list at once, and refresh what counted them. */
+function dropDeleted(queryClient: QueryClient, userId: string, ids: readonly string[]) {
+  const gone = new Set(ids);
+  queryClient.setQueryData<Application[]>(keys.applicationList(userId), (rows) => rows?.filter((row) => !gone.has(row.id)));
+  void queryClient.invalidateQueries({ queryKey: keys.applicationList(userId) });
+  void queryClient.invalidateQueries({ queryKey: keys.applicationCount(userId) });
+  void queryClient.invalidateQueries({ queryKey: keys.stats(userId) });
+}
+
+function forget(queryClient: QueryClient, userId: string, id: string) {
+  queryClient.removeQueries({ queryKey: keys.application(userId, id) });
+  queryClient.removeQueries({ queryKey: keys.notes(userId, id) });
 }
 
 /**
@@ -137,18 +154,8 @@ export function useDeleteApplication(id: string) {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      reporting('delete_application', () =>
-        deleteApplication(id).catch((error: unknown) => {
-          if (!isNotFound(error)) throw error;
-        }),
-      ),
-    onSuccess: () => {
-      queryClient.setQueryData<Application[]>(keys.applicationList(user.id), (rows) => rows?.filter((row) => row.id !== id));
-      void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
-      void queryClient.invalidateQueries({ queryKey: keys.applicationCount(user.id) });
-      void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
-    },
+    mutationFn: () => reporting('delete_application', () => deleteIfPresent(id)),
+    onSuccess: () => dropDeleted(queryClient, user.id, [id]),
   });
 }
 
@@ -172,14 +179,7 @@ export function useDeleteApplications() {
       const deleted: string[] = [];
       for (const id of ids) {
         try {
-          await reporting(
-            'delete_application',
-            () =>
-              deleteApplication(id).catch((error: unknown) => {
-                if (!isNotFound(error)) throw error; // already gone counts as done
-              }),
-            isRateLimited,
-          );
+          await reporting('delete_application', () => deleteIfPresent(id), isRateLimited);
           deleted.push(id);
         } catch (error) {
           return { deleted, failed: { id, error } };
@@ -189,15 +189,8 @@ export function useDeleteApplications() {
     },
     onSuccess: ({ deleted }) => {
       if (deleted.length === 0) return;
-      const gone = new Set(deleted);
-      queryClient.setQueryData<Application[]>(keys.applicationList(user.id), (rows) => rows?.filter((row) => !gone.has(row.id)));
-      for (const id of deleted) {
-        queryClient.removeQueries({ queryKey: keys.application(user.id, id) });
-        queryClient.removeQueries({ queryKey: keys.notes(user.id, id) });
-      }
-      void queryClient.invalidateQueries({ queryKey: keys.applicationList(user.id) });
-      void queryClient.invalidateQueries({ queryKey: keys.applicationCount(user.id) });
-      void queryClient.invalidateQueries({ queryKey: keys.stats(user.id) });
+      for (const id of deleted) forget(queryClient, user.id, id);
+      dropDeleted(queryClient, user.id, deleted);
     },
   });
 }
@@ -205,8 +198,5 @@ export function useDeleteApplications() {
 export function useForgetApplication() {
   const user = useSignedInUser();
   const queryClient = useQueryClient();
-  return (id: string) => {
-    queryClient.removeQueries({ queryKey: keys.application(user.id, id) });
-    queryClient.removeQueries({ queryKey: keys.notes(user.id, id) });
-  };
+  return (id: string) => forget(queryClient, user.id, id);
 }

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ErrorState } from '@/components/ErrorState';
 import type { Application } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
+import { errorReference, WAIT_A_MINUTE } from '@/queries/errors';
 import { useDeleteApplications, WriteRateLimitedError } from '@/queries/use-application-mutations';
 import { useNoteCount } from '@/queries/use-notes';
 import { applicationCount, bulkDeleteFailure, companyList, deleteSummary } from './delete-summary';
@@ -100,7 +100,7 @@ export function BulkDeleteDialog({
           <ErrorState
             title={
               bulkDeleteFailure(failure.deleted, failure.attempted, failure.company) +
-              (rateLimited ? " You've made a lot of changes in the last minute. Wait a minute, then try again." : '')
+              (rateLimited ? ` ${WAIT_A_MINUTE}` : '')
             }
             reference={rateLimited ? null : errorReference(failure.error)}
           />

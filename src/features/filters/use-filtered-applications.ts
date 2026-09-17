@@ -33,11 +33,18 @@ export function useFilteredApplications() {
   const savedFilters = useSavedFilters();
 
   const all = applications.data ?? NONE;
-  const active = resolveFilter(url.filter, savedFilters.data);
+  const active = useMemo(() => resolveFilter(url.filter, savedFilters.data), [url.filter, savedFilters.data]);
   const sorted = useMemo(() => sortApplications(all, url.sort), [all, url.sort]);
   /** Every row the filter and search let through, across all pages — the range's n. */
-  const matched = visibleApplications(sorted, active, url.query);
+  const matched = useMemo(() => visibleApplications(sorted, active, url.query), [sorted, active, url.query]);
   const paging = pageWindow(matched.length, url.page, url.pageSize);
+  const rows = useMemo(() => matched.slice(paging.start, paging.end), [matched, paging.start, paging.end]);
+  // Over the whole set, so a search keystroke never needs them again (§5.3).
+  const loaded = applications.isSuccess;
+  const counts = useMemo(
+    () => (loaded ? tabCounts(all, savedFilters.data ?? []) : null),
+    [loaded, all, savedFilters.data],
+  );
 
   // Once loaded, a failed background refetch keeps the filters it already has: they still
   // narrow the list and feed the counts, so their tabs must stay too. Only a first load that
@@ -59,8 +66,8 @@ export function useFilteredApplications() {
     /** The page shown — the URL's, pulled back inside the pages there are. */
     paging,
     /** The rows on the current page: all that is on screen, and all that can be selected (§4.2). */
-    rows: matched.slice(paging.start, paging.end),
-    counts: applications.isSuccess ? tabCounts(all, savedFilters.data ?? []) : null,
+    rows,
+    counts,
     saved,
     /** A link to a saved filter waits for saved filters, rather than flashing All first. */
     waiting: namesSavedFilter(url.filter) && savedFilters.isPending,

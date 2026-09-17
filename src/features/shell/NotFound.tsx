@@ -6,7 +6,7 @@ export function NotFound() {
     <main id="main" className="mx-auto flex max-w-md flex-col items-start gap-3 px-4 py-10">
       <h1 className="font-heading text-lg font-semibold">Page not found</h1>
       <p className="text-sm text-muted-foreground">That address doesn't match anything in the app.</p>
-      <Link to="/applications" className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}>
+      <Link to="/applications" className={buttonVariants({ variant: 'outline', size: 'lg' })}>
         Back to applications
       </Link>
     </main>

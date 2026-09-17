@@ -17,7 +17,7 @@
 // gone, or the files are orphaned with no owner to find them by.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders, parseOrigins } from '../_shared/cors.ts';
+import { corsHeaders, jsonResponse, parseOrigins } from '../_shared/cors.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -49,11 +49,7 @@ async function record(userId: string, outcome: 'success' | 'failure'): Promise<v
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req.headers.get('origin'), ALLOWED_ORIGINS);
-  const reply = (body: unknown, status: number) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
-    });
+  const reply = (body: unknown, status: number) => jsonResponse(body, status, cors);
 
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 

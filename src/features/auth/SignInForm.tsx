@@ -52,7 +52,6 @@ export function SignInForm() {
   const pending = signIn.isPending;
 
   const onSubmit = form.handleSubmit((values) => signIn.mutate(values));
-  const describedBy = message ? ERROR_ID : undefined;
 
   return (
     <form onSubmit={onSubmit} noValidate aria-busy={pending} className="flex flex-col gap-4">
@@ -78,7 +77,7 @@ export function SignInForm() {
               autoCapitalize="none"
               spellCheck={false}
               aria-invalid={errors.email ? true : undefined}
-              aria-describedby={errors.email ? describedBy : undefined}
+              aria-describedby={errors.email ? ERROR_ID : undefined}
               className="h-9 max-[760px]:h-11"
               {...form.register('email')}
             />
@@ -90,7 +89,7 @@ export function SignInForm() {
               type="password"
               autoComplete="current-password"
               aria-invalid={errors.password ? true : undefined}
-              aria-describedby={errors.password ? describedBy : undefined}
+              aria-describedby={errors.password ? ERROR_ID : undefined}
               className="h-9 max-[760px]:h-11"
               {...form.register('password')}
             />

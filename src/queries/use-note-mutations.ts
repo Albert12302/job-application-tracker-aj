@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { addNote, deleteNote, NoteLimitError, NoteNotFoundError, restoreNote, updateNote } from '@/data/notes';
-import { oldestFirst } from '@/domain/notes';
 import type { Note } from '@/domain/schemas';
 import { reporting } from './errors';
 import { keys } from './keys';
@@ -12,10 +11,14 @@ export { NoteLimitError };
 /** The cap and a note already gone are both the user's world, not bugs: shown, never reported. */
 const isExpected = (error: unknown) => error instanceof NoteLimitError || error instanceof NoteNotFoundError;
 
-const byCreation = oldestFirst;
-
 function put(queryClient: QueryClient, key: readonly unknown[], notes: (current: Note[]) => Note[]) {
   queryClient.setQueryData<Note[]>(key, (current) => (current ? notes(current) : current));
+}
+
+/** Order is imposed where notes render (NotesSection), so a saved note just joins the cache. */
+function append(queryClient: QueryClient, key: readonly unknown[], note: Note) {
+  put(queryClient, key, (notes) => [...notes, note]);
+  void queryClient.invalidateQueries({ queryKey: key });
 }
 
 /**
@@ -29,10 +32,7 @@ export function useAddNote(applicationId: string) {
   const key = keys.notes(user.id, applicationId);
   return useMutation({
     mutationFn: (body: string) => reporting('add_note', () => addNote(applicationId, body), isExpected),
-    onSuccess: (note) => {
-      put(queryClient, key, (notes) => [...notes, note].sort(byCreation));
-      void queryClient.invalidateQueries({ queryKey: key });
-    },
+    onSuccess: (note) => append(queryClient, key, note),
   });
 }
 
@@ -89,10 +89,7 @@ export function useRestoreNote(applicationId: string) {
   const key = keys.notes(user.id, applicationId);
   return useMutation({
     mutationFn: (note: Note) => reporting('restore_note', () => restoreNote(note), isExpected),
-    onSuccess: (note) => {
-      put(queryClient, key, (notes) => [...notes, note].sort(byCreation));
-      void queryClient.invalidateQueries({ queryKey: key });
-    },
+    onSuccess: (note) => append(queryClient, key, note),
     onError: () => toast.error("Couldn't bring the note back."),
   });
 }

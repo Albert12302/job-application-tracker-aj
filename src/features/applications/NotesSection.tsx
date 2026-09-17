@@ -46,8 +46,10 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
     save(parsed.data.body);
   };
 
-  const failure = add.error ? (add.error instanceof NoteLimitError ? LIMIT_REACHED : "Couldn't save note.") : null;
-  const retryable = failure !== null && !(add.error instanceof NoteLimitError) && add.variables !== undefined;
+  const limitReached = add.error instanceof NoteLimitError;
+  const failure = add.error ? (limitReached ? LIMIT_REACHED : "Couldn't save note.") : null;
+  const retryable = failure !== null && !limitReached && add.variables !== undefined;
+  const reference = errorReference(add.error);
 
   return (
     <div className="flex flex-col gap-2">
@@ -62,7 +64,7 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
         </div>
       ) : notes.isError ? (
         <ErrorState title="Couldn't load the notes." reference={errorReference(notes.error)}>
-          <Button className="h-9 max-[760px]:h-11" onClick={() => void notes.refetch()}>
+          <Button size="lg" onClick={() => void notes.refetch()}>
             Retry
           </Button>
         </ErrorState>
@@ -113,9 +115,9 @@ export function NotesSection({ applicationId }: { applicationId: string }) {
               failure ? (
                 <span className="flex flex-wrap items-center gap-2">
                   {failure}
-                  {errorReference(add.error) ? (
+                  {reference ? (
                     <span className="text-muted-foreground">
-                      Error reference <span className="font-mono">{errorReference(add.error)}</span>
+                      Error reference <span className="font-mono">{reference}</span>
                     </span>
                   ) : null}
                   {retryable ? (

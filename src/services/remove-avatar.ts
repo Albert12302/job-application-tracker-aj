@@ -1,7 +1,5 @@
 import { setAvatarPath } from '@/data/profile';
-import { logSecurityEvent } from '@/data/security-events';
-import { removeAvatarObject } from '@/data/storage';
-import { reportError } from './report-error';
+import { discardObject } from './discard-object';
 
 /**
  * "Remove photo" (SPEC §4.6). The profile lets go of the path first, so the
@@ -13,7 +11,5 @@ import { reportError } from './report-error';
 export async function removeAvatar(userId: string, path: string): Promise<void> {
   await setAvatarPath(userId, null, path);
 
-  await removeAvatarObject(path)
-    .then(() => logSecurityEvent('file_delete', 'success'))
-    .catch((error: unknown) => reportError(error, { action: 'remove_avatar' }));
+  await discardObject('avatar', path);
 }

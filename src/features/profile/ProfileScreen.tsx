@@ -42,7 +42,7 @@ export function ProfileScreen() {
     return (
       <div className={CARD}>
         <ErrorState title="Couldn't load your profile." reference={errorReference(profile.error)}>
-          <Button className="h-9 max-[760px]:h-11" onClick={() => void profile.refetch()}>
+          <Button size="lg" onClick={() => void profile.refetch()}>
             Retry
           </Button>
         </ErrorState>

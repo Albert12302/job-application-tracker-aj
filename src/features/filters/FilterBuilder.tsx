@@ -8,13 +8,12 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { nextCustomName } from '@/domain/filters';
 import { savedFilterFormSchema, type SavedFilterFormValues } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
-import { WAIT_A_MINUTE, WriteRateLimitedError } from '@/queries/use-saved-filters';
+import { errorReference, WAIT_A_MINUTE } from '@/queries/errors';
+import { WriteRateLimitedError } from '@/queries/use-saved-filters';
 import { LocationCombobox } from './LocationCombobox';
 import { StatusChips } from './StatusChips';
 import { TriStateChoice } from './TriStateChoice';
 
-const CONTROL = 'h-9 max-[760px]:h-11';
 const INPUT = 'h-9 bg-card max-[760px]:h-11';
 
 /**
@@ -175,7 +174,7 @@ export function FilterBuilder({
           </div>
 
           <div className="flex gap-2.5 max-[760px]:flex-col">
-            <Button type="submit" className={CONTROL}>
+            <Button type="submit" size="lg">
               {pending ? (
                 <>
                   <Loader2Icon aria-hidden="true" className="animate-spin" />
@@ -185,7 +184,7 @@ export function FilterBuilder({
                 'Save filter'
               )}
             </Button>
-            <Button type="button" variant="outline" className={CONTROL} onClick={onCancel}>
+            <Button type="button" variant="outline" size="lg" onClick={onCancel}>
               Cancel
             </Button>
           </div>

@@ -30,7 +30,7 @@ export function StatsScreen() {
   } else if (stats.isError) {
     content = (
       <ErrorState title="Couldn't load stats." reference={errorReference(stats.error)}>
-        <Button className="h-9 max-[760px]:h-11" disabled={stats.isFetching} onClick={() => void stats.refetch()}>
+        <Button size="lg" disabled={stats.isFetching} onClick={() => void stats.refetch()}>
           {stats.isFetching ? 'Retrying…' : 'Retry'}
         </Button>
       </ErrorState>

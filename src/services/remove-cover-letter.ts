@@ -1,8 +1,6 @@
 import { setCoverLetter } from '@/data/applications';
-import { logSecurityEvent } from '@/data/security-events';
-import { removeCoverLetterObject } from '@/data/storage';
 import type { Application } from '@/domain/schemas';
-import { reportError } from './report-error';
+import { discardObject } from './discard-object';
 
 /**
  * Remove an application's cover letter (SPEC §9.4), once the user has
@@ -17,9 +15,7 @@ import { reportError } from './report-error';
 export async function removeCoverLetter(applicationId: string, path: string): Promise<Application> {
   const saved = await setCoverLetter(applicationId, null, path);
 
-  await removeCoverLetterObject(path)
-    .then(() => logSecurityEvent('file_delete', 'success'))
-    .catch((error: unknown) => reportError(error, { action: 'remove_cover_letter' }));
+  await discardObject('cover-letter', path);
 
   return saved;
 }

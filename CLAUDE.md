@@ -332,6 +332,8 @@ src/
                               the rule: Storage does not cascade, so a failed file delete has
                               to stop before the account is gone
     export-data.ts            client-side zip of the user's own data (§9.8)
+    discard-object.ts         deletes a file nothing points at any more; a failure is an
+                              orphan, reported, never thrown (§9.2)
     report-error.ts           the ONE error-reporting path (§7.7)
 
   queries/                    TanStack Query hooks: keys, fetchers, invalidation
@@ -371,6 +373,8 @@ src/
       ApplicationForm.tsx         shared by add + edit (§9.1)
       DiscardChangesDialog.tsx
       ApplicationDetailScreen.tsx
+      ApplicationLoadError.tsx    the load failure, shared by detail and edit (§8.2)
+      ApplicationNotFound.tsx     missing and not-yours read the same, detail and edit (§8.2)
       StatusSelect.tsx            the one status-change control (§4.4)
       FunnelIndicator.tsx
       NotesSection.tsx

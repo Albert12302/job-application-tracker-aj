@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ErrorState } from '@/components/ErrorState';
 import { formatUtcDate } from '@/domain/date';
 import { applicationIdSchema } from '@/domain/schemas';
-import { errorReference } from '@/queries/errors';
 import {
   useDeleteApplication,
   useForgetApplication,
@@ -15,6 +13,8 @@ import {
 } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { useNotes } from '@/queries/use-notes';
+import { ApplicationLoadError } from './ApplicationLoadError';
+import { ApplicationNotFound } from './ApplicationNotFound';
 import { CoverLetterSection } from './CoverLetterSection';
 import { DeleteApplicationDialog } from './DeleteApplicationDialog';
 import { FunnelIndicator } from './FunnelIndicator';
@@ -82,41 +82,16 @@ export function ApplicationDetailScreen() {
 
   if (parsed.success && application.isError) {
     return (
-      <div className={DETAIL_PANEL}>
-        <ErrorState title="Couldn't load this application." reference={errorReference(application.error)}>
-          <Button className="h-9 max-[760px]:h-11" onClick={() => void application.refetch()}>
-            Retry
-          </Button>
-          <Link
-            to="/applications"
-            search={listSearch}
-            className={buttonVariants({ variant: 'outline', className: 'h-9 max-[760px]:h-11' })}
-          >
-            Back to list
-          </Link>
-        </ErrorState>
-      </div>
+      <ApplicationLoadError
+        className={DETAIL_PANEL}
+        error={application.error}
+        onRetry={() => void application.refetch()}
+      />
     );
   }
 
   const found = applicationId ? application.data : null;
-  if (!found) {
-    return (
-      <div className={DETAIL_PANEL}>
-        <h1 className="font-heading text-lg font-semibold">Application not found</h1>
-        <p className="text-sm text-muted-foreground">
-          It may have been deleted, or the link may be wrong.
-        </p>
-        <Link
-          to="/applications"
-          search={listSearch}
-          className={buttonVariants({ variant: 'outline', className: 'h-9 w-fit max-[760px]:h-11' })}
-        >
-          Back to applications
-        </Link>
-      </div>
-    );
-  }
+  if (!found) return <ApplicationNotFound className={DETAIL_PANEL} />;
 
   return (
     <div className={`mx-auto flex w-full ${DETAIL_WIDTH} flex-col gap-3`}>
@@ -175,11 +150,11 @@ export function ApplicationDetailScreen() {
           <Link
             to="/applications/$id/edit"
             params={{ id: found.id }}
-            className={buttonVariants({ className: 'h-9 max-[760px]:h-11' })}
+            className={buttonVariants({ size: 'lg' })}
           >
             Edit application
           </Link>
-          <Button variant="destructive" className="h-9 max-[760px]:h-11" onClick={() => setConfirmDelete(true)}>
+          <Button variant="destructive" size="lg" onClick={() => setConfirmDelete(true)}>
             Delete application
           </Button>
         </div>
