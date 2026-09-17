@@ -141,6 +141,11 @@ build, and the §7.6 vulnerability scan. `.github/dependabot.yml` groups weekly 
   one non-negotiable: **the dump is encrypted before it becomes an artifact**, because this
   repo is public and artifacts on a public repo are world-readable. It encrypts to an `age`
   public key, so CI can write backups it cannot read.
+  **It never runs `npm ci` or checks out the repo.** It holds the database owner's connection
+  string, and `npm ci` would run 600-odd dev packages' install scripts beside it. It downloads
+  the Supabase CLI release pinned by version and SHA-256 instead. Dependabot cannot see that
+  pin: when the `supabase` devDependency moves, bump `CLI_VERSION` and `CLI_SHA256` with it
+  (the hash is the tarball's line in the release's `checksums.txt`).
 
 ## Database workflow
 
