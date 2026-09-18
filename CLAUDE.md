@@ -653,9 +653,10 @@ supabase/
   the date by the browser's offset and a database constraint will reject it. Local formatting
   is equally wrong in the other direction: it renders the previous day west of Greenwich.
   Every other timestamp is a real moment and formats in the viewer's zone.
-- **Migrations are already written for the whole schema** (`supabase/migrations/`). They have
-  been applied nowhere but locally, so fixing one in place is still correct; once anything is
-  hosted, write a new one. The three that repay reading before you touch them:
+- **Migrations are already written for the whole schema** (`supabase/migrations/`). Every one
+  up to `20260916200200` is applied to the hosted project (since 2026-09-18), so **never edit an
+  existing migration** — a fix is a new migration, even for a typo. The three that repay reading
+  before you touch them:
   `20260910090400_status_history.sql` (append-only via the *absence* of update and delete
   policies), `20260911165950_status_change_functions.sql` (the only writers of that table, one
   transaction each, invoker rights), and `20260910090700_log_tables.sql` (`auth.uid()`
