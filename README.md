@@ -210,15 +210,42 @@ age-keygen -o backup-key.txt     # keep this file in a password manager, never i
 - Repository **variable** `BACKUP_AGE_RECIPIENT` — the `age1…` public key. Not a secret.
 - Repository **secret** `SUPABASE_DB_URL` — the hosted Postgres connection string.
 
-Until both exist the job skips with a notice instead of failing nightly. Restore with:
+Until both exist the job skips with a notice instead of failing nightly.
+`SUPABASE_DB_URL` must be the **Session pooler** URI (dashboard → Connect → Session pooler):
+GitHub's runners reach IPv4 only, and a Free project's direct `db.<ref>.supabase.co` address
+is IPv6.
+
+**Restore from the migrations, then the data — not from `schema.sql`.** `supabase db dump`
+leaves out what lives in Supabase's own `auth`, `storage` and `cron` areas, so `schema.sql`
+alone comes back without the four storage policies, the `auth.users` trigger that creates a
+profile, and all three pg_cron jobs: files unreadable, new users without a profile, and
+sessions and logs that silently never expire. The migrations hold all of it. `README.txt` in
+the backup names the commit it was taken at; restore with that commit's migrations:
 
 ```bash
 age -d -i backup-key.txt -o backup.tar.gz backup-YYYY-MM-DD.tar.gz.age
-tar xzf backup.tar.gz            # schema.sql, then data.sql
+tar xzf backup.tar.gz                  # backup/: schema.sql, data.sql, README.txt (the commit)
+git archive <commit> supabase/migrations | tar -x -C <empty-project-dir>
+# apply them to the empty target: `db reset` on a scratch stack, `db push` on a new project
+psql "<target db url>" --single-transaction -v ON_ERROR_STOP=1 \
+  -c "SET session_replication_role = replica" \
+  -c "delete from storage.buckets" \
+  -f backup/data.sql
 ```
 
-§7.6 also says to **test a restore at least once**. Do it against a scratch local database
-before trusting it — an untested backup is a hope, not a backup.
+`session_replication_role = replica` pauses triggers for the load, so the write limits and the
+status-write guard do not refuse restored rows. The buckets go first because a migration
+creates them and `data.sql` inserts them again.
+
+**Files are not in the backup.** The dump holds `storage.objects` rows, not the cover letters
+and photos themselves, which live in Supabase Storage. Losing the project loses them. Accepted
+at two users; the in-app export (§9.8) carries a user's cover letters and photo.
+
+Tested 2026-09-18 (run 35393688488, commit `b0b6b68`) into a throwaway local stack on
+Postgres 17: every table's row count, the newest row, RLS on all 9 tables, 19 public and 4
+storage policies, 14 functions, 15 triggers plus the `auth.users` one, and 3 cron jobs matched
+the live project. Repeat that after any change to this workflow — an untested backup is a hope,
+not a backup (§7.6).
 
 ### Vercel
 
