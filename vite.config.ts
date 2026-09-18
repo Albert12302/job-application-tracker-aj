@@ -58,15 +58,29 @@ function previewCsp(policy: string | undefined, supabaseUrl: string | undefined)
     .replace(/wss:\/\/[\w-]+\.supabase\.co/g, `${wsScheme}//${local.host}`)
 }
 
+/**
+ * The version every error report carries (`services/report-error.ts`, SPEC §7.7): the
+ * commit being built. Vercel hands each build `VERCEL_GIT_COMMIT_SHA`, but not as a
+ * `VITE_` variable, and a dashboard value of `$VERCEL_GIT_COMMIT_SHA` would arrive as
+ * that literal text — so it is read here. An explicit `VITE_RELEASE` still wins; a
+ * local build has neither and reports none.
+ */
+function releaseDefine(explicit: string | undefined): Record<string, string> {
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA
+  return !explicit && commit ? { 'import.meta.env.VITE_RELEASE': JSON.stringify(commit) } : {}
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const supabaseUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_SUPABASE_URL
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const supabaseUrl = env.VITE_SUPABASE_URL
   const policy = shippedCsp()
   if (process.env.VERCEL) assertReleaseCsp(policy, supabaseUrl)
   const csp = previewCsp(policy, supabaseUrl)
 
   return {
     plugins: [react(), tailwindcss()],
+    define: releaseDefine(env.VITE_RELEASE),
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
