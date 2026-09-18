@@ -16,6 +16,17 @@ import { DiscardChangesDialog } from './DiscardChangesDialog';
 
 const CONTROL = 'h-9 max-[760px]:h-11';
 
+/**
+ * Two columns on the wide card, one below 760px (§11). Short fields pair up, in reading
+ * order so Tab moves left to right; long ones take the whole row with `WIDE`.
+ */
+const GRID = 'grid grid-cols-2 gap-x-6 gap-y-4 max-[760px]:grid-cols-1';
+/** `col-span-full`, not `col-span-2`: in the one-column grid, a span of 2 would add a second column. */
+const WIDE = 'col-span-full';
+
+/** Natural width beside the fields, full-width halves on a phone (§11's 44px targets come from `size="lg"`). */
+const ACTION = 'min-w-32 max-[760px]:flex-1';
+
 /** Company and position share this one message (SPEC §4.3), so it is shown once. */
 const REQUIRED = 'Company and position are required.';
 
@@ -93,20 +104,7 @@ export function ApplicationForm({
         ) : null}
 
         <fieldset disabled={pending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <FieldGroup className="gap-4">
-            <Field data-invalid={!!errors.date}>
-              <FieldLabel htmlFor={field('date')}>Date applied</FieldLabel>
-              <Input
-                id={field('date')}
-                type="date"
-                className={CONTROL}
-                aria-invalid={errors.date ? true : undefined}
-                aria-describedby={describedBy(errors.date, 'date')}
-                {...form.register('date')}
-              />
-              <FieldError id={field('date-error')}>{fieldMessage(errors.date)}</FieldError>
-            </Field>
-
+          <FieldGroup className={GRID}>
             <Field data-invalid={!!errors.company}>
               <FieldLabel htmlFor={field('company')}>Company</FieldLabel>
               <Input
@@ -130,6 +128,19 @@ export function ApplicationForm({
                 {...form.register('position')}
               />
               <FieldError id={field('position-error')}>{fieldMessage(errors.position)}</FieldError>
+            </Field>
+
+            <Field data-invalid={!!errors.date}>
+              <FieldLabel htmlFor={field('date')}>Date applied</FieldLabel>
+              <Input
+                id={field('date')}
+                type="date"
+                className={CONTROL}
+                aria-invalid={errors.date ? true : undefined}
+                aria-describedby={describedBy(errors.date, 'date')}
+                {...form.register('date')}
+              />
+              <FieldError id={field('date-error')}>{fieldMessage(errors.date)}</FieldError>
             </Field>
 
             <Field data-invalid={!!errors.location}>
@@ -181,7 +192,8 @@ export function ApplicationForm({
               control={form.control}
               name="referral"
               render={({ field: referral }) => (
-                <Field orientation="horizontal" className="items-center gap-2.5">
+                // Beside Status on the wide card, level with its box rather than its label.
+                <Field orientation="horizontal" className="items-center gap-2.5 self-end min-[761px]:h-9">
                   <Checkbox
                     id={field('referral')}
                     checked={referral.value}
@@ -195,7 +207,7 @@ export function ApplicationForm({
               )}
             />
 
-            <Field data-invalid={!!errors.description}>
+            <Field data-invalid={!!errors.description} className={WIDE}>
               <FieldLabel htmlFor={field('description')}>Job description</FieldLabel>
               <Textarea
                 id={field('description')}
@@ -207,10 +219,10 @@ export function ApplicationForm({
               <FieldError id={field('description-error')}>{fieldMessage(errors.description)}</FieldError>
             </Field>
 
-            {coverLetter}
+            {coverLetter ? <div className={WIDE}>{coverLetter}</div> : null}
 
             {showFirstNote ? (
-              <Field data-invalid={!!errors.note}>
+              <Field data-invalid={!!errors.note} className={WIDE}>
                 <FieldLabel htmlFor={field('note')}>First note (optional)</FieldLabel>
                 <Textarea
                   id={field('note')}
@@ -225,7 +237,7 @@ export function ApplicationForm({
           </FieldGroup>
 
           <div className="flex gap-2.5">
-            <Button type="submit" size="lg" disabled={pending} className="flex-1">
+            <Button type="submit" size="lg" disabled={pending} className={ACTION}>
               {pending ? (
                 <>
                   <Loader2Icon aria-hidden="true" className="animate-spin" />
@@ -239,7 +251,7 @@ export function ApplicationForm({
               type="button"
               variant="outline"
               size="lg"
-              className="flex-1"
+              className={ACTION}
               onClick={() => (isDirty || coverLetterChosen ? setConfirmDiscard(true) : onCancel())}
             >
               Cancel
