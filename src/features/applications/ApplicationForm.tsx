@@ -5,7 +5,7 @@ import { Controller, useForm, type FieldError as FieldErrorType } from 'react-ho
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -151,7 +151,7 @@ export function ApplicationForm({
                 list={locationsId}
                 autoComplete="off"
                 aria-invalid={errors.location ? true : undefined}
-                aria-describedby={errors.location ? field('location-error') : field('location-help')}
+                aria-describedby={errors.location ? field('location-error') : undefined}
                 {...form.register('location')}
               />
               {/* Suggestions, not a fixed list: a new place is typed straight in (§4.3). */}
@@ -160,9 +160,6 @@ export function ApplicationForm({
                   <option key={location} value={location} />
                 ))}
               </datalist>
-              <FieldDescription id={field('location-help')}>
-                Pick one you have used before, or type a new one.
-              </FieldDescription>
               <FieldError id={field('location-error')}>{fieldMessage(errors.location)}</FieldError>
             </Field>
 
