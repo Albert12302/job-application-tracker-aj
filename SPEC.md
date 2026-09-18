@@ -528,8 +528,9 @@ until the oldest of them is an hour old — whatever account it tries, the corre
 included. Both counts are checked **before** Auth is called, so a blocked address never
 reaches Auth; that matters because Auth's own `sign_in_sign_ups` limit counts the function's
 address, making it one bucket shared by every user, which an attacker could otherwise drain
-to lock everyone out. The address is the gateway's `x-real-ip` (a client cannot set it);
-it is stored only as a peppered hash. A successful sign-in clears the account's failures but
+to lock everyone out. The address is the one the gateway vouches for — Cloudflare's
+`cf-connecting-ip` hosted, Kong's `x-real-ip` locally; a client can set neither — and it is
+stored only as a peppered hash. A successful sign-in clears the account's failures but
 not the address's — one valid account must not reset an address that is spraying others.
 Blocked responses carry the wait in minutes, and the body never says which limit tripped.
 
@@ -1219,6 +1220,19 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-18
+- **The sign-in function reads the caller's address from `cf-connecting-ip` hosted (§7.1).**
+  Found by §7.8 check 7 on the first deploy. Hosted, there is no `x-real-ip`, and the fallback —
+  the last `x-forwarded-for` entry — is an AWS load balancer that changes with every request.
+  Six failed sign-ins from one machine were stored as six addresses, so the 20-an-hour address
+  limit could never trip: one machine could spray every account, held back only by each
+  account's own lockout. Measured with a throwaway function that echoed the headers:
+  Cloudflare sets `cf-connecting-ip` and refuses a request carrying its own, forged
+  `x-forwarded-for` and `x-real-ip` are discarded, and `true-client-ip` passes through
+  untouched, so it is never read. Locally, where there is no Cloudflare, `x-real-ip` still
+  decides. Everything local had passed because Kong does write `x-real-ip`; the
+  check existed for exactly this.
 
 ### 2026-09-17
 - **The log tables take `created_at` from the server, not the client (§7.7).** Found by the

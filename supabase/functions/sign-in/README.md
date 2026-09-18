@@ -56,18 +56,27 @@ sign-up opens.
 
 ## Confirm the client IP after deploy
 
-The address comes from `x-real-ip`, falling back to the **last** `x-forwarded-for` entry
-(`limits.ts` `clientIp`). Locally both are written by Kong, and a client-sent value never
-survives — measured, not assumed. On the hosted project, confirm it once (SPEC §7.8 check 7):
-fail one sign-in from home Wi-Fi and one from a phone on cellular, then, the same day (rows are
+The address comes from `cf-connecting-ip`, then `x-real-ip`, then the **last**
+`x-forwarded-for` entry (`limits.ts` `clientIp`) — measured, not assumed, in both places:
+
+- **Hosted** (2026-09-18): Cloudflare sets `cf-connecting-ip` and refuses a request that sends
+  its own. There is no `x-real-ip`, and the last `x-forwarded-for` entry is an AWS load balancer
+  that changes per request — trusting it stored every attempt as a new address, and the
+  address limit never tripped. `true-client-ip` arrives exactly as the caller sent it.
+- **Locally**: no Cloudflare. Kong writes `x-real-ip` and replaces a client's value.
+
+Confirm it after any change to the function or the hosting (SPEC §7.8 check 7): fail three
+sign-ins from one machine and one from a phone on cellular, then, the same day (rows are
 purged after 24 hours)
 
 ```sql
 select ip_hash, count(*) from public.sign_in_attempts where outcome = 'failure' group by 1;
 ```
 
-Two hashes: correct. One hash: the function is seeing a proxy's address, every user shares
-one bucket again, and `clientIp` needs the header Supabase's edge sets for the real caller.
+One hash holding the machine's three, and one for the phone: correct. One hash for everything:
+the function is seeing a proxy's address, and every user shares one bucket. A new hash per
+attempt: it is seeing a load balancer, and no address is ever limited. Either way, find the
+header the gateway sets for the real caller before trusting anything else.
 
 ## Secrets
 
