@@ -4,10 +4,8 @@
   "outputDirectory": "dist",
   "framework": "vite",
 
-  "//rewrites": "SPA fallback. Without it, a deep link like /applications/<id> 404s on refresh because no such file exists.",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
 
-  "//headers": "SPEC §7.5. The Supabase origins name the hosted project; a Vercel build fails unless they match VITE_SUPABASE_URL (vite.config.ts).",
   "headers": [
     {
       "source": "/(.*)",

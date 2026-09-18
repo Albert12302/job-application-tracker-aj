@@ -226,11 +226,15 @@ The app lives at the repository root, so Vercel's defaults apply and no "Root Di
 needs setting.
 
 `vercel.json` is committed with the SPA rewrite and the §7.5 headers, the CSP already
-**enforced**. One edit before the first deploy:
+**enforced**. The rewrite sends every path to `index.html`; without it a deep link like
+`/applications/<id>` 404s on refresh, because no such file exists. Vercel validates the file
+against its schema and refuses a deploy with any key it does not know, so it cannot carry
+`"//"` comment keys — its explanations live here instead.
 
-1. Replace the three `YOUR_PROJECT_REF` placeholders with the hosted project ref.
+1. The CSP's Supabase origins name the hosted project (`erassiccppdoawxfbalz`). A new hosted
+   project means replacing all three.
 
-   **A Vercel build fails until that is done.** `vite.config.ts` checks the policy whenever
+   **A Vercel build fails until they match.** `vite.config.ts` checks the policy whenever
    `VERCEL` is set: it must be an enforced `Content-Security-Policy` (never `-Report-Only`),
    hold no placeholder, and allow the same project as `VITE_SUPABASE_URL`. The enforced CSP is
    the condition that makes localStorage tokens acceptable (SPEC §7.5), so it is a build
