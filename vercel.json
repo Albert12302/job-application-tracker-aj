@@ -7,14 +7,14 @@
   "//rewrites": "SPA fallback. Without it, a deep link like /applications/<id> 404s on refresh because no such file exists.",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
 
-  "//headers": "SPEC §7.5. Replace YOUR_PROJECT_REF with the hosted Supabase project ref before deploying; a Vercel build fails until it matches VITE_SUPABASE_URL (vite.config.ts).",
+  "//headers": "SPEC §7.5. The Supabase origins name the hosted project; a Vercel build fails unless they match VITE_SUPABASE_URL (vite.config.ts).",
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://YOUR_PROJECT_REF.supabase.co; font-src 'self'; connect-src 'self' https://YOUR_PROJECT_REF.supabase.co wss://YOUR_PROJECT_REF.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://erassiccppdoawxfbalz.supabase.co; font-src 'self'; connect-src 'self' https://erassiccppdoawxfbalz.supabase.co wss://erassiccppdoawxfbalz.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
