@@ -17,7 +17,9 @@ max_rows = 1000                       # a runaway query cannot pull the whole ta
 
 [db]
 port = 54322
-major_version = 15
+# Matches the hosted project — new Free projects come only on 17. Tests prove
+# nothing about a version they did not run on.
+major_version = 17
 
 [db.migrations]
 schema_paths = []
