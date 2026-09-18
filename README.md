@@ -280,8 +280,10 @@ against its schema and refuses a deploy with any key it does not know, so it can
    profile, upload a photo, and watch the console for `Refused to …` errors. (The dev server
    cannot run under it: hot reload injects inline scripts the policy blocks.)
 
-Environment variables in the Vercel project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-and `VITE_RELEASE` (set to `$VERCEL_GIT_COMMIT_SHA`). Nothing else. `SIGN_IN_HASH_PEPPER` and
+Environment variables in the Vercel project: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+(the legacy `anon` key). Nothing else. Do not add `VITE_RELEASE`: error reports are tagged with
+the commit Vercel is building (`VERCEL_GIT_COMMIT_SHA`, read in `vite.config.ts`), and a
+dashboard value of `$VERCEL_GIT_COMMIT_SHA` would arrive as that literal text. `SIGN_IN_HASH_PEPPER` and
 the service role key live only in Supabase — a `VITE_` prefix puts a value in the public
 bundle (§7.4).
 
