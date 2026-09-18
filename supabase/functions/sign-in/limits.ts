@@ -76,13 +76,23 @@ export function retryAfterMinutes(until: number, now: number): number {
 }
 
 /**
- * The caller's address as Supabase's gateway saw it. `x-real-ip` is written by
- * the gateway and replaces anything the client sent; `x-forwarded-for` is only
- * appended to, so its last entry is the gateway's own view and every entry
- * before it is whatever the client claimed. Measured locally (Kong); confirm on
- * the hosted project — see README.md "Confirm the client IP after deploy".
+ * The caller's address, from the one header a caller cannot choose.
+ *
+ * Hosted (measured 2026-09-18), Cloudflare sets `cf-connecting-ip` and refuses
+ * any request that sends its own (error 1000). There is no `x-real-ip` there,
+ * and the last `x-forwarded-for` entry is an AWS load balancer that changes
+ * with every request — trusting it made each attempt a new address, so the
+ * per-address limit never tripped. Never `true-client-ip`: hosted passes a
+ * caller's value through untouched.
+ *
+ * Locally there is no Cloudflare: Kong writes `x-real-ip` and replaces anything
+ * the client sent, and only appends to `x-forwarded-for`, so its last entry is
+ * Kong's own view. A local client could send `cf-connecting-ip`; locally there
+ * is nothing to defend. See README.md "Confirm the client IP after deploy".
  */
 export function clientIp(headers: { get(name: string): string | null }): string {
+  const cloudflare = headers.get('cf-connecting-ip')?.trim();
+  if (cloudflare) return cloudflare;
   const real = headers.get('x-real-ip')?.trim();
   if (real) return real;
   const last = headers.get('x-forwarded-for')?.split(',').pop()?.trim();

@@ -102,13 +102,30 @@ describe('retryAfterMinutes', () => {
 describe('clientIp', () => {
   const headers = (h: Record<string, string>) => new Headers(h);
 
-  it('trusts x-real-ip, which the gateway overwrites', () => {
+  // The headers the hosted project delivered on 2026-09-18: no x-real-ip, and a last
+  // x-forwarded-for entry that is a load balancer, different on every request.
+  it('hosted: trusts cf-connecting-ip, never the load balancer at the end of x-forwarded-for', () => {
+    const hosted = (balancer: string) =>
+      headers({
+        'cf-connecting-ip': '198.51.100.7',
+        'x-forwarded-for': `198.51.100.7,198.51.100.7, ${balancer}`,
+        'true-client-ip': '192.0.2.55',
+      });
+    expect(clientIp(hosted('13.248.108.171'))).toBe('198.51.100.7');
+    expect(clientIp(hosted('13.248.108.147'))).toBe('198.51.100.7');
+  });
+
+  it('never trusts true-client-ip, which hosted passes through from the caller', () => {
+    expect(clientIp(headers({ 'true-client-ip': '192.0.2.55', 'x-real-ip': '198.51.100.7' }))).toBe('198.51.100.7');
+  });
+
+  it('locally: trusts x-real-ip, which Kong overwrites', () => {
     expect(clientIp(headers({ 'x-real-ip': '198.51.100.7', 'x-forwarded-for': '203.0.113.9, 198.51.100.7' }))).toBe(
       '198.51.100.7',
     );
   });
 
-  it('otherwise takes the last x-forwarded-for entry — the ones before it are client claims', () => {
+  it('locally, otherwise takes the last x-forwarded-for entry — the ones before it are client claims', () => {
     expect(clientIp(headers({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1, 198.51.100.7' }))).toBe('198.51.100.7');
   });
 
