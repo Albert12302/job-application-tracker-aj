@@ -21,12 +21,12 @@ name: Backup database
 #   3. Repository variable  BACKUP_AGE_RECIPIENT  = the public key line from
 #      that file (starts `age1…`). A public key is not a secret.
 #   4. Repository secret    SUPABASE_DB_URL       = the hosted project's
-#      Postgres connection string (Supabase dashboard → Project Settings →
-#      Database → Connection string, URI).
+#      Postgres connection string: dashboard → Connect → Session pooler URI.
+#      Not the direct db.<ref> address — it is IPv6, and runners are IPv4.
 #
-# To restore:
-#   age -d -i backup-key.txt -o backup.tar.gz backup.tar.gz.age
-#   tar xzf backup.tar.gz     # then psql the schema, then the data
+# To restore: README.md → Deploy → Backups. The migrations at the commit in
+# backup/README.txt first, then data.sql — schema.sql alone leaves out the
+# storage policies, the auth.users trigger and the cron jobs.
 #
 # Until those are set the job skips rather than failing, so it does not send a
 # failure email every morning before there is anything to back up.

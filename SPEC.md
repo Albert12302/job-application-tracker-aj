@@ -725,7 +725,11 @@ SVG is not an accepted type anywhere. It is a script execution vector.
   it is uploaded — this repo is public, and artifacts on a public repo are readable by anyone,
   so an unencrypted dump would publish the whole database. CI holds no key that can read its
   own backups. Losing a window of writes between nightly dumps is the accepted cost of not
-  having PITR; revisit if the data ever justifies the plan.
+  having PITR; revisit if the data ever justifies the plan. The dump is the database only:
+  cover letters and photos live in Storage and are not in it, so losing the project loses
+  them — accepted at two users, with the export (§9.8) as each user's copy. A restore is the
+  migrations at the dump's commit, then its data (README, Deploy → Backups); tested once,
+  2026-09-18.
 
 ### 7.7 Logging and monitoring
 The rule "never log PII" leaves a gap unless what *should* be logged is written down.
@@ -1233,6 +1237,14 @@ the prototype is the reference for those.
   untouched, so it is never read. Locally, where there is no Cloudflare, `x-real-ip` still
   decides. Everything local had passed because Kong does write `x-real-ip`; the
   check existed for exactly this.
+- **A restore is the migrations, then the data — not the dump's own schema (§7.6).** The first
+  restore test found that `schema.sql` comes back without everything Supabase keeps outside
+  `public`: the four storage policies, the `auth.users` trigger that creates a profile, and all
+  three pg_cron jobs. Nothing would have failed loudly — files would be unreadable, new users
+  would have no profile, and sessions and logs would never expire. Restoring the migrations at
+  the commit the dump records, then `data.sql`, matched the live project on every count and
+  object checked. The same test made plain that files are not in the dump at all; that is
+  accepted at two users and now written down rather than assumed.
 
 ### 2026-09-17
 - **The log tables take `created_at` from the server, not the client (§7.7).** Found by the
