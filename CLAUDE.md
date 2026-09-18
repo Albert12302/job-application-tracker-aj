@@ -663,7 +663,10 @@ supabase/
   defaults, insert-only, clamped).
 - Browser support is SPEC §12. iOS Safari 17+ is a first-class target, not an afterthought —
   every browser on iOS is WebKit.
-- **Security headers live in `vercel.json`**, the one place (SPEC §7.5). Hosting is Vercel
+- **Security headers live in `vercel.json`**, the one place (SPEC §7.5). It takes no `"//"`
+  comment keys — Vercel refuses a deploy with any key outside its schema — so its reasons live
+  in README's Deploy section. Check a change against `https://openapi.vercel.sh/vercel.json`
+  (ajv, `strict: false`) before pushing. Hosting is Vercel
   Hobby + Supabase Free; README.md's Deploy section has the steps and the reason GitHub Pages
   was rejected. Never add a payment card to either service — that is what guarantees the
   project cannot generate a bill.
