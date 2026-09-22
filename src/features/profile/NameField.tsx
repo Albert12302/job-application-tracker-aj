@@ -91,8 +91,16 @@ export function NameField({ name, stored }: { name: string; stored: string | nul
 
   return (
     <div className="flex w-full flex-col items-center gap-2">
-      <div className="flex items-center gap-1">
-        <h1 id="profile-name" className="font-heading text-lg font-semibold">
+      {/* min-w-0 on both, or the heading refuses to shrink below its text and
+          a long name pushes itself out of the card instead of truncating. */}
+      <div className="flex w-full min-w-0 items-center justify-center gap-1">
+        <h1
+          id="profile-name"
+          // Truncated in CSS, so the whole name is still in the DOM for a
+          // screen reader and the title shows it on hover (§10.1).
+          className="min-w-0 truncate font-heading text-lg font-semibold"
+          title={name}
+        >
           {name}
         </h1>
         {editing ? null : (

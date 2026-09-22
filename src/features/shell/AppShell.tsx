@@ -25,8 +25,13 @@ export function AppShell() {
       </a>
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2 max-[760px]:px-3.5">
-          <div className="flex items-center gap-6">
-            <Link to="/applications" className="rounded-sm font-heading text-[15px] font-semibold">
+          {/* shrink-0 and nowrap: a long profile name must not squeeze the
+              brand and nav, which it did by wrapping "AJ's Hunt" onto two lines. */}
+          <div className="flex shrink-0 items-center gap-6">
+            <Link
+              to="/applications"
+              className="rounded-sm font-heading text-[15px] font-semibold whitespace-nowrap"
+            >
               AJ's Hunt
             </Link>
             <nav aria-label="Main">
@@ -50,7 +55,11 @@ export function AppShell() {
               </ul>
             </nav>
           </div>
-          <Link to="/profile" className="flex min-h-11 items-center gap-2 rounded-md px-1 text-sm font-semibold">
+          {/* min-w-0 so a long name truncates rather than squeezing the nav. */}
+          <Link
+            to="/profile"
+            className="flex min-w-0 min-h-11 items-center gap-2 rounded-md px-1 text-sm font-semibold"
+          >
             <UserAvatar name={name} src={avatar.data} />
             {profile.isPending ? (
               <>
@@ -58,7 +67,9 @@ export function AppShell() {
                 <span className="sr-only">Profile</span>
               </>
             ) : (
-              <span>
+              // Capped as well as truncated, so a very long name takes a
+              // readable strip of the header rather than all of it.
+              <span className="min-w-0 max-w-[14rem] truncate max-[760px]:max-w-[7rem]" title={name}>
                 <span className="sr-only">Profile: </span>
                 {name}
               </span>

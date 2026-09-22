@@ -215,6 +215,15 @@ Three layers, each with a job:
   Tests that add or delete applications sign in as `dev-d`: `auth.spec.ts` asserts `dev-a`'s
   exact application count, and the suites run in parallel.
 
+  **`dev-a`'s name is asserted too**, by `auth.spec.ts`, `export.spec.ts` and
+  `profile-errors.spec.ts` — and since §4.6's field shipped, it is editable in the dev app, so
+  saving a name there as `dev-a` fails three suites at once with nothing wrong in the code. It
+  looks like a regression and is not one: check
+  `select name from public.profiles where id = '11111111-1111-1111-1111-111111111111'` before
+  reading further, and restore `Dev A` (or `db reset`). The only writer of that column is the
+  field, so an unguarded `PATCH /rest/v1/profiles?id=eq.1111…&select=id` in the kong log is one
+  real save, whoever made it.
+
   **Stats cover a user's whole set, so an exact number needs a set nobody else is changing.**
   `stats.spec.ts` reads `dev-a`'s seed read-only and asserts its numbers exactly — a change to
   `dev-a`'s seeded applications or history in `seed.sql` changes them (and `auth.spec.ts`'s

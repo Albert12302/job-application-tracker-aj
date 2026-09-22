@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { expectAxeClean } from './a11y.js';
+import { expectAxeClean, settled } from './a11y.js';
 import { apiActor, startSignedIn } from './session.js';
 
 /**
@@ -141,4 +141,51 @@ test('the control is 44px on a phone (§11)', async ({ page }) => {
   expect((await page.getByLabel('Your name').boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect((await page.getByRole('button', { name: 'Save' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect((await page.getByRole('button', { name: 'Cancel' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
+test('a name at the 120-character cap truncates instead of breaking the layout', async ({ page }) => {
+  const banner = page.getByRole('banner');
+  const brand = banner.getByRole('link', { name: "AJ's Hunt" });
+
+  // The header as it stands, to compare against: a long name must not change it.
+  await page.goto('/profile');
+  await settled(page);
+  const headerHeight = (await banner.boundingBox())!.height;
+
+  // Set through the client: this test is about the drawing, not about saving,
+  // and the field's own write is covered above.
+  const long = 'b'.repeat(120);
+  const { error } = await client!.from('profiles').update({ name: long }).eq('id', DEV_H_ID);
+  expect(error, 'could not set the long name').toBeNull();
+
+  await page.goto('/profile');
+  const heading = page.getByRole('heading', { level: 1 });
+  // Cut in CSS only: the whole name is still there for a screen reader.
+  await expect(heading).toHaveText(long);
+  await settled(page);
+
+  // It really is clipped, rather than merely happening to fit.
+  expect(await heading.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+
+  const card = page.locator('section[aria-labelledby="profile-name"]');
+  const headingBox = (await heading.boundingBox())!;
+  const cardBox = (await card.boundingBox())!;
+  expect(headingBox.width).toBeLessThanOrEqual(cardBox.width);
+  expect(headingBox.x).toBeGreaterThanOrEqual(cardBox.x);
+
+  // The header shows the same name, and it stays one line: the name used to
+  // take the whole header and wrap "AJ's Hunt" onto a second one.
+  await expect(banner.getByRole('link', { name: new RegExp(long) })).toBeVisible();
+  expect((await banner.boundingBox())!.height).toBe(headerHeight);
+  expect(await brand.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+
+  // Nor does the page overflow sideways, at either width (§11).
+  for (const width of [1280, 360]) {
+    await page.setViewportSize({ width, height: 780 });
+    await settled(page);
+    const fits = await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    );
+    expect(fits, `the page scrolls sideways at ${width}px`).toBe(true);
+  }
 });
