@@ -330,6 +330,20 @@ Avatar (click to upload a photo; "Remove photo" reverts to the initial), name, a
 count, **Export my data** (§9.8), sign out, and **Delete my account** (§9.7) set apart
 under its own heading — not another profile control, and not on the way to signing out.
 
+The name is editable. "Edit name" beside it opens a labelled field holding the stored name,
+with **Save** and **Cancel**; the heading stays on screen throughout, because it is the
+screen's `h1` and what the profile section is labelled by. Focus moves to the field on
+opening and back to the button on saving or cancelling. Saving shows "Name updated."
+
+A new account has no name, and the name shown then is derived from the email — the local part
+up to its first `.`, `_`, `+` or `-`, capitalised. **Emptying the field clears the name**
+rather than failing: the column goes back to null, that derived name returns, and the toast
+reads "Name removed." Cancel discards the edit and leaves the stored name alone.
+
+Over 120 characters (§7.3) the field says "Keep this under 120 characters." and nothing is
+written. A failed save keeps the field open holding what was typed, so Save is a retry with
+nothing to retype (§8.2).
+
 A chosen photo is checked before upload, in this order, and the first failure is shown under
 the avatar (§7.3):
 - type, by magic bytes — "Choose a PNG, JPEG, or WebP image."
@@ -510,8 +524,10 @@ Failure counts key on a **SHA-256 of a peppered, lowercased email**, never the a
 | File upload, per user | 20 / hour | reject with a clear message |
 | Write mutations, per user | 120 / min | reject |
 
-A write counts once for each row the user writes. Rows a cascade removes along with it — the
-notes of a deleted application — are part of that one action and are not counted.
+A write counts once for each row the user writes, on every table a signed-in user can write:
+applications, notes, saved filters, status history, and profiles. Rows a cascade removes along
+with it — the notes of a deleted application — are part of that one action and are not counted,
+and neither is the profile row an account's confirmation creates, which the user did not write.
 
 Lockouts are per account **and** per IP — per-IP alone is trivially bypassed, per-account
 alone allows targeted denial of service.
@@ -611,6 +627,7 @@ single note can be a megabyte.
 | description | 15,000 characters |
 | note body | 2,000 characters |
 | saved filter name | 60 characters |
+| profile name | 120 characters |
 | email | 254 characters |
 | password | 12–128 characters |
 | notes per application | 200 |
@@ -927,7 +944,7 @@ Nothing ships with an unhandled failure.
 | Saved filter save | "Saving…" in the button, the builder's fields kept | n/a | "Couldn't save the filter." + error reference inside the builder, every choice kept. Over the write limit (§7.1): the wait-a-minute copy instead of a reference |
 | Saved filter delete | the tab goes at once (§9.5) | n/a | The tab comes back, with the toast "Couldn't delete the filter." — plus the wait-a-minute copy when over the write limit |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
-| Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry |
+| Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry. Name save: "Couldn't save your name." + error reference, the field left open holding what was typed so Save is the retry — plus the wait-a-minute copy when over the write limit |
 | Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
 | Delete account (dialog) | "Counting what goes…" in place of the sentence, confirm disabled until counted **and while an export started in the dialog is still running** (§9.8); then "Removing your files…" and "Deleting your account…" in the confirm button, with the dialog's other controls disabled and the same words in a live region (§10.4) | n/a | Stops where it failed, dialog open, confirming again carries on (§9.7). On Storage: "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again." On the account: "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish." Both with an error reference. A count that will not load does not block the delete: the sentence loses its numbers instead |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
@@ -1224,6 +1241,24 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-21
+- **The profile name is editable (§4.6).** It was specified as a field the profile *shows* and
+  the column has existed since the first migration, but nothing ever set it: every account read
+  as the local part of its email, which on the hosted project means the user's address is what
+  the header says. The field edits the stored name, not the derived one — starting from the
+  derived name would quietly adopt it as a chosen name the first time anything was saved — and
+  emptying it clears the column back to null rather than failing, so the derived name is
+  reachable again. Capped at 120 characters, which is where `profiles_name_len` already capped
+  it; §7.3's table was simply missing the row.
+- **`profiles` joined the tables the write limit counts (§7.1).** The trigger covered four
+  tables and not this one, because its only write was the avatar path, already held down by the
+  20-uploads-an-hour limit above it. An editable name is a write with nothing above it, so
+  without this it would have been the one client write nothing counted. It adds no new limit:
+  the same bucket, the same 120 a minute, and `consume_rate_limit`'s list of accepted limits is
+  unchanged. Deciding it now rather than later was the cheaper order — whether the write can be
+  refused is what decides whether the mutation maps the refusal and whether §8.2 needs the
+  wait-a-minute copy, so leaving it out would have meant revisiting all three.
 
 ### 2026-09-18
 - **The sign-in function reads the caller's address from `cf-connecting-ip` hosted (§7.1).**

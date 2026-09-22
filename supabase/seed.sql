@@ -30,6 +30,11 @@
 --   dev-g@example.test / devpassword1234
 -- User G is for e2e/pagination.spec.ts, read-only: 23 applications, enough for three
 -- pages of 10, which no other seed user has. Nothing writes as dev-g.
+--   dev-h@example.test / devpassword1234
+-- User H is for e2e/profile-name.spec.ts, which changes and clears the display name
+-- (§4.6). It cannot borrow another seed user: e2e/auth.spec.ts asserts dev-a's and
+-- dev-b's names exactly, and dev-d's write budget is nearly spent by a full run.
+-- Its name is the only thing that suite touches, and it puts it back afterwards.
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -63,6 +68,10 @@ values
   ('77777777-7777-7777-7777-777777777777', '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'dev-g@example.test',
    extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
+   now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
+  ('88888888-8888-8888-8888-888888888888', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'dev-h@example.test',
+   extensions.crypt('devpassword1234', extensions.gen_salt('bf')),
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
 on conflict (id) do nothing;
 
@@ -94,7 +103,9 @@ values
   (gen_random_uuid(), '66666666-6666-6666-6666-666666666666', '66666666-6666-6666-6666-666666666666',
    'email', '{"sub":"66666666-6666-6666-6666-666666666666","email":"dev-f@example.test"}', now(), now()),
   (gen_random_uuid(), '77777777-7777-7777-7777-777777777777', '77777777-7777-7777-7777-777777777777',
-   'email', '{"sub":"77777777-7777-7777-7777-777777777777","email":"dev-g@example.test"}', now(), now())
+   'email', '{"sub":"77777777-7777-7777-7777-777777777777","email":"dev-g@example.test"}', now(), now()),
+  (gen_random_uuid(), '88888888-8888-8888-8888-888888888888', '88888888-8888-8888-8888-888888888888',
+   'email', '{"sub":"88888888-8888-8888-8888-888888888888","email":"dev-h@example.test"}', now(), now())
 on conflict do nothing;
 
 update public.profiles set name = 'Dev A' where id = '11111111-1111-1111-1111-111111111111';
@@ -103,6 +114,7 @@ update public.profiles set name = 'Dev D' where id = '44444444-4444-4444-4444-44
 update public.profiles set name = 'Dev E' where id = '55555555-5555-5555-5555-555555555555';
 update public.profiles set name = 'Dev F' where id = '66666666-6666-6666-6666-666666666666';
 update public.profiles set name = 'Dev G' where id = '77777777-7777-7777-7777-777777777777';
+update public.profiles set name = 'Dev H' where id = '88888888-8888-8888-8888-888888888888';
 
 -- Applications for user A, spread across the funnel so stats and the
 -- breakdown bar have something to render.

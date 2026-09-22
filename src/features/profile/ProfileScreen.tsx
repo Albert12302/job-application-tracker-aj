@@ -7,6 +7,7 @@ import { useProfile } from '@/queries/use-profile';
 import { useSignedInUser } from '@/queries/use-session';
 import { ApplicationCount } from './ApplicationCount';
 import { AvatarUpload } from './AvatarUpload';
+import { NameField } from './NameField';
 import { DeleteAccountButton } from './DeleteAccountButton';
 import { ExportDataButton } from './ExportDataButton';
 import { SignOutButton } from './SignOutButton';
@@ -15,8 +16,9 @@ const CARD = 'mx-auto flex w-full max-w-[320px] flex-col gap-5 rounded-xl border
 
 /**
  * SPEC §4.6: avatar (click to upload, "Remove photo" reverts to the initial),
- * name, application count, sign out. Sign out stays reachable in every state,
- * so a broken profile never traps anyone in the app.
+ * name (its own control, NameField), application count, sign out. Sign out
+ * stays reachable in every state, so a broken profile never traps anyone in
+ * the app.
  */
 export function ProfileScreen() {
   const user = useSignedInUser();
@@ -57,9 +59,7 @@ export function ProfileScreen() {
     <section aria-labelledby="profile-name" className={CARD}>
       <div className="flex flex-col items-center gap-2 text-center">
         <AvatarUpload name={name} path={profile.data?.avatar_path ?? null} />
-        <h1 id="profile-name" className="font-heading text-lg font-semibold">
-          {name}
-        </h1>
+        <NameField name={name} stored={profile.data?.name ?? null} />
         <ApplicationCount />
       </div>
       <ExportDataButton />

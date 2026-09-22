@@ -5,6 +5,7 @@ import {
   applicationSchema,
   applicationsSearchSchema,
   noteSchema,
+  profileNameSchema,
   savedFilterFormSchema,
   signUpSchema,
 } from './schemas';
@@ -209,5 +210,30 @@ describe('savedFilterFormSchema', () => {
     expect(savedFilterFormSchema.safeParse({ ...blank, text: 'x'.repeat(121) }).success).toBe(false);
     expect(savedFilterFormSchema.safeParse({ ...blank, statuses: ['Ghosted'] }).success).toBe(false);
     expect(savedFilterFormSchema.safeParse({ ...blank, referral: 'maybe' }).success).toBe(false);
+  });
+});
+
+describe('profileNameSchema', () => {
+  it('accepts an empty name — that is how a name is cleared (§4.6), not a failure', () => {
+    expect(profileNameSchema.safeParse({ name: '' }).success).toBe(true);
+  });
+
+  it('trims, so surrounding spaces never become the stored name', () => {
+    expect(profileNameSchema.parse({ name: '  Albert  ' }).name).toBe('Albert');
+  });
+
+  it('treats an all-spaces name as empty, so it clears rather than storing blanks', () => {
+    expect(profileNameSchema.parse({ name: '   ' }).name).toBe('');
+  });
+
+  it('caps at 120 characters, where the column caps, with the copy', () => {
+    const result = profileNameSchema.safeParse({ name: 'x'.repeat(121) });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Keep this under 120 characters.');
+    expect(profileNameSchema.safeParse({ name: 'x'.repeat(120) }).success).toBe(true);
+  });
+
+  it('counts the trimmed length, so spaces cannot push a valid name over the cap', () => {
+    expect(profileNameSchema.safeParse({ name: `  ${'x'.repeat(120)}  ` }).success).toBe(true);
   });
 });
