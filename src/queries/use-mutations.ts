@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { signIn, SignInError } from '@/data/auth';
+import { PasswordResetError, recoveryLink, requestPasswordReset, setPasswordWithRecovery, signIn, SignInError } from '@/data/auth';
 import { setName } from '@/data/profile';
-import type { SignInValues } from '@/domain/schemas';
+import type { ForgotPasswordValues, ResetPasswordValues, SignInValues } from '@/domain/schemas';
 import { removeAvatar } from '@/services/remove-avatar';
 import { AvatarRejectedError, setAvatar } from '@/services/set-avatar';
 import { signOut } from '@/services/sign-out';
@@ -9,8 +9,8 @@ import { isRateLimited, reporting } from './errors';
 import { keys } from './keys';
 import { useSignedInUser } from './use-session';
 
-export { AvatarRejectedError, SignInError };
-export type { SignInFailure } from '@/data/auth';
+export { AvatarRejectedError, PasswordResetError, SignInError };
+export type { PasswordResetFailure, SignInFailure } from '@/data/auth';
 
 /**
  * No invalidation: the session change re-runs the router guards, which move
@@ -23,6 +23,41 @@ export function useSignIn() {
         'sign_in',
         () => signIn(email, password),
         (error) => error instanceof SignInError && error.reason !== 'unavailable',
+      ),
+  });
+}
+
+/**
+ * The reset request (§4.1c). No invalidation and nothing to put in a cache:
+ * the answer is the same sentence whatever Auth did, and the screen that shows
+ * it needs only to know the request was made.
+ */
+export function useRequestPasswordReset() {
+  return useMutation({
+    mutationFn: ({ email }: ForgotPasswordValues) =>
+      reporting('request_password_reset', () => requestPasswordReset(email)),
+  });
+}
+
+/**
+ * The new password (§4.1d). The link is read once, at module load, so the
+ * mutation takes only what the user typed.
+ *
+ * Nothing is invalidated and no cache is cleared: this runs with the app signed
+ * out, so there is nothing cached to be wrong. Every outcome but `unavailable`
+ * is the user's to act on — a spent link, a password Auth would not take — so
+ * only the last is reported.
+ */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: ({ password }: ResetPasswordValues) =>
+      reporting(
+        'reset_password',
+        () => {
+          if (recoveryLink.status !== 'ready') throw new PasswordResetError('invalid-link');
+          return setPasswordWithRecovery(recoveryLink, password);
+        },
+        (error) => error instanceof PasswordResetError && error.reason !== 'unavailable',
       ),
   });
 }

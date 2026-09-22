@@ -1,13 +1,19 @@
-import { FunctionsHttpError, type Session } from '@supabase/supabase-js';
+import { AuthError, FunctionsHttpError, type Session } from '@supabase/supabase-js';
 import { signInLockedBodySchema, signInResponseSchema } from '@/domain/schemas';
-import { AUTH_STORAGE_KEY, supabase } from './client';
+import { AUTH_STORAGE_KEY, createRecoveryClient, supabase } from './client';
+import { logSecurityEvent } from './security-events';
 
 /**
- * Sign-in, sign-out, and the session as the rest of the app sees it.
+ * Sign-in, sign-out, password reset, and the session as the rest of the app
+ * sees it.
  *
  * Sign-in goes through the `sign-in` edge function, never
  * `supabase.auth.signInWithPassword` — the function owns the per-account
  * lockout (SPEC §7.1), and calling Auth directly would walk around it.
+ *
+ * The reset (§4.1c–d) is here for the same reason sign-in is: it is the one
+ * place that decides what a credential does, and it deliberately does *not*
+ * touch the session store — see `recoveryLink` below.
  */
 
 export type SessionUser = { id: string; email: string | null };
@@ -152,4 +158,149 @@ export async function signOut(): Promise<void> {
   } finally {
     signOutRequested = false;
   }
+}
+
+/* ------------------------------------------------------------------------- *
+ * Password reset (SPEC §4.1c–d)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * What this page load arrived with in its fragment.
+ *
+ * A recovery link carries a real session, so the whole design of this half of
+ * the file is about not letting it become one. supabase-js would adopt it
+ * (`detectSessionInUrl`), which would sign the visitor in before they had set
+ * a password and hand them the app through the router guards. Instead the
+ * fragment is read here, synchronously at module load — the same reason
+ * `startedWithStoredSession` is — and the tokens are spent on one request by a
+ * client that stores nothing.
+ */
+export type RecoveryLink =
+  | { status: 'ready'; accessToken: string; refreshToken: string }
+  /** The link was used already, or its 60 minutes are up (§7.1). */
+  | { status: 'invalid' }
+  /** No link: someone typed the address. */
+  | { status: 'none' };
+
+export const recoveryLink: RecoveryLink = (() => {
+  try {
+    const fragment = window.location.hash.slice(1);
+    // The skip link's `#main` is a fragment too, and stripping it would break
+    // it (§10.2) — so only a fragment that is plainly an auth answer is read
+    // or removed.
+    if (!fragment.includes('=')) return { status: 'none' };
+    const params = new URLSearchParams(fragment);
+    const isRecovery = params.get('type') === 'recovery';
+    const failed = params.get('error_code') !== null;
+    if (!isRecovery && !failed) return { status: 'none' };
+
+    // Out of the address bar, history, and anything that reads either, before
+    // the app renders. Nothing else needs it: it lives in this module now.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (failed || !isRecovery || !accessToken || !refreshToken) return { status: 'invalid' };
+    return { status: 'ready', accessToken, refreshToken };
+  } catch {
+    return { status: 'none' };
+  }
+})();
+
+export type PasswordResetFailure = 'invalid-link' | 'same-password' | 'weak-password' | 'unavailable';
+
+/** An expected reset outcome, not a bug — only `unavailable` is worth reporting. */
+export class PasswordResetError extends Error {
+  readonly reason: PasswordResetFailure;
+
+  constructor(reason: PasswordResetFailure, options?: { cause?: unknown }) {
+    super(`password_reset_${reason}`, { cause: options?.cause });
+    this.name = 'PasswordResetError';
+    this.reason = reason;
+  }
+}
+
+/**
+ * Ask Auth to send a reset link (§4.1c).
+ *
+ * It resolves for an address with an account and one without, and so does
+ * Auth — that is §7.1's "no account enumeration", and it is why nothing here
+ * inspects the answer beyond whether Auth gave one. An address Auth refused for
+ * its own reasons (its send limit, §7.1's "silently succeed, send nothing")
+ * resolves too: a caller learns only that the request was made. A *transport*
+ * failure throws, because "we could not ask" says nothing about the address and
+ * leaving the user with a confirmation for an email that was never requested is
+ * the one genuinely misleading outcome.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  // A status means Auth answered; only a fetch that never landed has none.
+  if (error && !(error instanceof AuthError && typeof error.status === 'number')) throw error;
+}
+
+/** Auth's codes for the outcomes a user can do something about. */
+const RESET_FAILURE_BY_CODE: Record<string, PasswordResetFailure> = {
+  same_password: 'same-password',
+  weak_password: 'weak-password',
+  session_expired: 'invalid-link',
+  session_not_found: 'invalid-link',
+  bad_jwt: 'invalid-link',
+  reauthentication_needed: 'invalid-link',
+};
+
+function resetFailure(error: AuthError): PasswordResetFailure {
+  const byCode = error.code ? RESET_FAILURE_BY_CODE[error.code] : undefined;
+  if (byCode) return byCode;
+  // A refused token reads as 401/403 whatever code came with it.
+  return error.status === 401 || error.status === 403 ? 'invalid-link' : 'unavailable';
+}
+
+/**
+ * Set the password the link was sent for (§4.1d), then end every session the
+ * account has — including the link's own, which is why this returns to
+ * sign-in rather than into the app.
+ *
+ * The client here is built for this one call and stores nothing, so the
+ * recovery token never reaches `AUTH_STORAGE_KEY` and the app's own session is
+ * untouched throughout. `password_reset_complete` is written before the
+ * sign-out, while there is still a user to attribute it to (§7.7) — and never
+ * at the cost of the reset, which by then has already happened.
+ */
+export async function setPasswordWithRecovery(
+  link: Extract<RecoveryLink, { status: 'ready' }>,
+  password: string,
+): Promise<void> {
+  const client = createRecoveryClient();
+
+  const { error: sessionError } = await client.auth.setSession({
+    access_token: link.accessToken,
+    refresh_token: link.refreshToken,
+  });
+  if (sessionError) throw new PasswordResetError('invalid-link', { cause: sessionError });
+
+  const { error } = await client.auth.updateUser({ password });
+  if (error) {
+    throw error instanceof AuthError
+      ? new PasswordResetError(resetFailure(error), { cause: error })
+      : new PasswordResetError('unavailable', { cause: error });
+  }
+
+  await logSecurityEvent('password_reset_complete', 'success', client).catch(() => {
+    // §7.7's log is not worth undoing a password the user has already changed.
+  });
+
+  // §4.1d: saving signs out every other device. `global`, so the promise on
+  // screen is the one Auth carries out — and so the link's own session, which
+  // is a live credential until this call, stops being one.
+  //
+  // A failure here is not reported and does not fail the reset: the password
+  // has already changed, and telling the user it did not would be false. What
+  // it leaves is other devices holding refresh tokens that outlive the
+  // password until the §7.1 session job reaches them — recorded as an accepted
+  // residual there rather than silently. Nothing is left behind on *this*
+  // device either way: the client stores nothing, and auth-js drops its local
+  // session whether or not the revoke lands.
+  await client.auth.signOut({ scope: 'global' }).catch(() => {});
 }

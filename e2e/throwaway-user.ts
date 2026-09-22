@@ -147,6 +147,18 @@ async function storeFile(
   return path;
 }
 
+/**
+ * An account and nothing else, for the password-reset flow (§4.1c–d), which
+ * needs a real confirmed address and none of the rows above. It cannot borrow a
+ * seed user either: the test changes the password it signs in with, and every
+ * other suite expects `devpassword1234`.
+ */
+export async function createBareUser(email: string, password = THROWAWAY_PASSWORD): Promise<string> {
+  const { data, error } = await adminClient().auth.admin.createUser({ email, password, email_confirm: true });
+  if (error || !data.user) throw new Error(`could not create ${email}: ${error?.message}`);
+  return data.user.id;
+}
+
 /** For a test that did not get as far as deleting its user. Already gone is fine. */
 export async function removeThrowawayUser(id: string): Promise<void> {
   await adminClient().auth.admin.deleteUser(id).catch(() => {});

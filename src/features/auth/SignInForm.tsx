@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -95,6 +96,15 @@ export function SignInForm() {
             />
           </Field>
         </FieldGroup>
+
+        {/* §4.1. Under the field it is about, and outside the tab order's way
+            to the button: a user who knows their password never meets it. */}
+        <Link
+          to="/forgot-password"
+          className="self-end rounded-sm text-sm text-muted-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring"
+        >
+          Forgot password?
+        </Link>
 
         <Button type="submit" disabled={pending} className="h-9 w-full max-[760px]:h-11">
           {pending ? (

@@ -120,9 +120,12 @@ the detail screen. Rejected and Withdrawn are terminal and sit outside the funne
 ### 4.1 Sign in
 Email + password, both required; empty submit shows "Enter an email and password."
 Successful sign-in goes straight to the dashboard (no profile picker).
-Links to **Create one** (§4.1a) and **Forgot password?** (§4.1c). Until those screens are
-built, the links are not rendered — a link to a screen that does not exist is a dead end
-(§8.1).
+Links to **Create one** (§4.1a) and **Forgot password?** (§4.1c). **Forgot password?** sits
+under the password field and is rendered. **Create one** is not: sign-up is gated, and a link
+to a screen that does not exist is a dead end (§8.1).
+
+A banner above the form names why the user is here when something sent them: a deleted
+account (§9.7), an expired session (§8.2), or a finished password reset (§4.1d).
 
 ### 4.1a Sign up
 Email, password, confirm password. Validation, in order:
@@ -145,10 +148,39 @@ Email field, one button. Always advances to the same confirmation screen: "If th
 has an account, we've sent a link to reset the password." Never confirms or denies that the
 address exists.
 
+The confirmation adds "Check spam before requesting another. Links expire in 60 minutes.",
+and both states offer **Back to sign in**. It is not a URL state, so a reload returns to the
+form — which is also the way back from a typo.
+
+The **only** failure this screen can show is not having reached Auth at all ("Couldn't send
+the link. Check your connection and try again."). Anything Auth answered — including its own
+send limit, which §7.1 defines as "silently succeed, send nothing" — advances to the
+confirmation, because a message that appears for some addresses and not others is the
+enumeration this screen exists to prevent.
+
 ### 4.1d Reset password
-Reached from the emailed link. New password + confirm, same rules as sign-up. States that
-saving signs out all other devices. On success, returns to sign-in with a confirmation
-banner rather than auto-signing-in.
+Reached from the emailed link, at `/reset-password`. New password + confirm, same rules and
+the same copy as sign-up, from the same schema. States that saving signs out all other
+devices. On success, returns to sign-in with a confirmation banner rather than
+auto-signing-in.
+
+**The app never takes a session from the link.** A recovery link carries real credentials; if
+the app adopted them, opening the email would sign the visitor in and the route guards would
+let them into the data before any password had been set. Instead the tokens are read out of
+the URL fragment as the page loads, removed from the address bar, and spent on one request by
+a client that stores nothing. Saving then ends *every* session the account has — the link's
+own included — which is what makes "returns to sign-in" true rather than cosmetic.
+
+Three states, decided by what the page load arrived with:
+
+| arrived with | shows |
+|---|---|
+| a valid link | the form |
+| a link Auth refused — used already, or past its 60 minutes | "That reset link has expired or has already been used." |
+| no link (the address was typed) | "Open the link in your password reset email to set a new password." |
+
+Neither of the last two is a dead end (§8.1): both offer **Request a new link** and **Back to
+sign in**.
 
 **Access:** two accounts at launch. Self-serve sign-up exists but should be gated (invite
 list or an allowlist check) until the product is meant to be open — the screens are built,
@@ -566,6 +598,35 @@ except that a successful sign-in clears it with the account's failures once it i
 any live request could be (7 minutes; hosted functions end at 150 s on Free, 400 s on paid).
 Otherwise a user who had just signed in could be locked out by attempts that never finished.
 
+**Accepted risk: the reset request is limited only by `config.toml`.** §7.1's table asks for
+3 reset requests per email an hour and 10 per address, and neither has a home. The counters in
+`public.rate_limits` key on `auth.uid()`, and a person asking for a reset has no session, so
+`consume_rate_limit` cannot see them. What is enforced instead is provider-side and
+approximate: `email_sent` (10 an hour) and `max_frequency` (60 s between sends to one
+address). Two further consequences, recorded rather than waived:
+
+- **Timing may distinguish a known address from an unknown one**, because Auth sends the mail
+  inside the request. The screens never say which, but a stopwatch might.
+- **No `password_reset_request` row is written to `security_events`** (§7.7), for the same
+  reason the limit has no home: there is no session to attribute it to. The *completion* is
+  logged, by the recovery session, before it is spent.
+
+Closing all three is one edge function, built like `sign-in`: it alone would see the caller's
+address, could hash the email with the same pepper, and could write the row with the service
+role. It is not built, because it would not close the hole it looks like it closes — Auth's
+`/auth/v1/recover` is public to anyone holding the anon key, exactly as the password endpoint
+below is, so a script can still enumerate by timing and drain the send budget whatever the app
+routes through. It protects the button, not the endpoint. **Revisit when sign-up opens**, the
+same trigger as the risk below: the function is worth building at the point where the accounts
+are no longer few and hand-made.
+
+**Accepted residual: a reset cannot guarantee every other device is signed out.** §4.1d's
+"saving signs out every other device" is carried out by a global sign-out issued straight
+after the password changes. If that one call fails, the reset still succeeded and the screen
+says so — claiming otherwise would be false — but other devices keep refresh tokens that
+outlive the password until the `expire-sessions` job reaches them. Nothing is left on the
+device that did the reset: its client stores nothing either way.
+
 **Accepted risk: Auth's password endpoint can be called directly.** The limits above bind only
 callers of the sign-in function. Auth's own endpoint (`/auth/v1/token?grant_type=password`)
 is public to anyone holding the anon key, which ships in the app bundle. A script calling it
@@ -943,6 +1004,8 @@ Nothing ships with an unhandled failure.
 | Saved filters | n/a; `+ Filter` disabled until they load | "No saved filters yet" next to `+ Filter` | Fall back to the built-in status tabs; do not block the list. "Couldn't load your saved filters." + Retry beside `+ Filter`, which stays disabled; a linked saved filter shows All |
 | Saved filter save | "Saving…" in the button, the builder's fields kept | n/a | "Couldn't save the filter." + error reference inside the builder, every choice kept. Over the write limit (§7.1): the wait-a-minute copy instead of a reference |
 | Saved filter delete | the tab goes at once (§9.5) | n/a | The tab comes back, with the toast "Couldn't delete the filter." — plus the wait-a-minute copy when over the write limit |
+| Forgot password | spinner in the button ("Sending…"), form disabled | n/a | Inline, above the form, and only for a request that never reached Auth: "Couldn't send the link. Check your connection and try again." with the error reference. Every answer Auth gave advances to the confirmation instead (§4.1c) |
+| Reset password | spinner in the button ("Saving…"), form disabled, and kept disabled through the redirect so a second submit cannot spend a link that is already gone | n/a | Inline, above the form, entered values preserved. A spent link: "That reset link has expired or has already been used. Request a new one to try again." A password Auth refuses: "Choose a password you haven't used for this account before." or "Choose a longer or less common password." Neither carries an error reference — nothing was reported. Anything else: "Couldn't save your new password. Check your connection and try again." with the reference |
 | Sign in | spinner in the button, form disabled | n/a | Inline, above the form. Generic copy for bad credentials — never reveal whether the email exists. Blocked (account or address, never saying which): "Too many attempts. Try again in about N minutes." with the wait the function returns, or "Too many attempts. Try again later." when it gives none Network or server failure: "Couldn't sign you in. Check your connection and try again." with the error reference |
 | Profile | skeleton of avatar, name, and count; sign out stays usable | n/a | "Couldn't load your profile." + Retry, sign out still usable. Photo upload: "Upload failed." + Retry, current photo kept. Count: "Couldn't load your application count." + Retry. Name save: "Couldn't save your name." + error reference, the field left open holding what was typed so Save is the retry — plus the wait-a-minute copy when over the write limit |
 | Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
@@ -1259,6 +1322,33 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-22
+
+- **Password reset built (§4.1c–d)** — `/forgot-password` and `/reset-password`, the last two
+  screens §6 left standing. Sign-in's **Forgot password?** link is rendered now that it leads
+  somewhere; **Create one** still is not, because sign-up is still gated.
+- **The app never adopts the recovery link's session.** The obvious build — let supabase-js
+  detect the link and sign the user in — would hand anyone who opens the email a working
+  session before a password was set, and would make §4.1d's "rather than auto-signing-in" a
+  redirect racing a session that already existed. The tokens are instead read from the URL
+  fragment at page load, stripped from the address bar, and spent by a client that stores
+  nothing. `detectSessionInUrl` therefore stays off, which is the opposite of what the comment
+  in `data/client.ts` predicted when the app was built.
+- **Saving ends every session, globally, not just this device's.** §4.1d promises it on screen,
+  so the app issues it rather than assuming Auth does. Its failure does not fail the reset —
+  recorded as a residual in §7.1 instead, because telling a user their password did not change
+  when it did is the worse error.
+- **The reset request's two rate limits have no home, and that is now written down** (§7.1)
+  rather than implied by their absence. They need the caller's address and a session-less
+  identity, which only an edge function has; the reason one is not built is that Auth's
+  `/auth/v1/recover` is public regardless, so the function would protect the button and not the
+  endpoint. Same revisit trigger as the sign-in risk: when sign-up opens.
+- **Sign-up's password rules became one definition** shared with the reset form, after they
+  were nearly copied. The two screens promise the same thing in the same words because they
+  read from the same schema, not because someone kept them in step.
+- **The signed-out screens share one card** (`features/auth/AuthCard.tsx`), extracted at the
+  third copy rather than the second.
 
 ### 2026-09-21
 - **Each screen sets its own document title (§10.2).** The tab read "Job Application Tracker"
