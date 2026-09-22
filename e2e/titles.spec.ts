@@ -69,18 +69,24 @@ test.describe('signed in', () => {
     await page.goto(`/applications/${first!.id}`);
     await expect(page).toHaveTitle(`${first!.company} Application`);
 
-    // The edit screen stays plain: one title per screen is enough, and it is
-    // reached from a detail screen that already said which application it is.
+    // The edit screen names it too, so a tab opened to edit says which one.
     await page.goto(`/applications/${first!.id}/edit`);
-    await expect(page).toHaveTitle('Edit application');
+    await expect(page).toHaveTitle(`Edit ${first!.company} Application`);
   });
 
-  test('a detail screen that loads nothing keeps the plain title', async ({ page }) => {
+  test('a screen that loads nothing keeps the plain title', async ({ page }) => {
     // No row, so no company: the route's own head has to stand rather than the
-    // title being built from data that is not there.
-    await page.goto('/applications/00000000-0000-0000-0000-000000000000');
+    // title being built from data that is not there. Both screens that name a
+    // company have this state.
+    const missing = '/applications/00000000-0000-0000-0000-000000000000';
+
+    await page.goto(missing);
     await expect(page.getByRole('heading', { level: 1, name: 'Application not found' })).toBeVisible();
     await expect(page).toHaveTitle('Application');
+
+    await page.goto(`${missing}/edit`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Application not found' })).toBeVisible();
+    await expect(page).toHaveTitle('Edit application');
   });
 
   test('the title moves from one application to another', async ({ page }) => {
