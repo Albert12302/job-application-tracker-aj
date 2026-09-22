@@ -200,6 +200,22 @@ export const profileSchema = z.object({
 
 export type Profile = z.infer<typeof profileSchema>;
 
+/**
+ * What the profile's name field submits (§4.6). Capped where the column is
+ * (`profiles_name_len`, 120).
+ *
+ * Empty is valid and is not a way to fail: it clears the name, and
+ * `displayName()` falls back to the one derived from the email — so the field
+ * is also the way back out of a name you no longer want. `data/profile.ts`
+ * `setName` stores that as null rather than an empty string, because null is
+ * what the column means by "no name chosen" and what a new account starts as.
+ */
+export const profileNameSchema = z.object({
+  name: z.string().trim().max(CAPS.shortText, 'Keep this under 120 characters.'),
+});
+
+export type ProfileNameValues = z.infer<typeof profileNameSchema>;
+
 /** The upload function's 201 body: the path it chose, `{user_id}/{uuid}.ext` (§7.3). */
 export const uploadResponseSchema = z.object({
   path: z.string().min(1).max(512),

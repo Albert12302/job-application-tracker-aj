@@ -34,8 +34,10 @@ const { createApplication, updateApplicationFields, setStarred, changeApplicatio
   await import('./applications');
 const { addNote, updateNote, deleteNote, restoreNote } = await import('./notes');
 const { createSavedFilter, deleteSavedFilter } = await import('./saved-filters');
+const { setName, setAvatarPath } = await import('./profile');
 
 const APPLICATION_ID = 'a0000000-0000-0000-0000-000000000001';
+const USER_ID = '11111111-1111-1111-1111-111111111111';
 // The edit form's fields; the status is not among them, it changes on its own path (§9.1).
 const FIELDS = {
   date_applied: '2026-09-08T00:00:00+00:00',
@@ -70,6 +72,10 @@ describe('a refused write', () => {
     ['restoreNote', () => restoreNote(noteRow({ application_id: APPLICATION_ID }))],
     ['createSavedFilter', () => createSavedFilter(SAVED_FILTER)],
     ['deleteSavedFilter', () => deleteSavedFilter(APPLICATION_ID)],
+    // profiles joined the counted tables with the editable name (migration
+    // 20260921234631), which made these two writes refusable for the first time.
+    ['setName', () => setName(USER_ID, 'Albert')],
+    ['setAvatarPath', () => setAvatarPath(USER_ID, 'u/new.png', null)],
   ];
 
   it.each(writes)('is what %s throws, so the user is asked to wait rather than reported (§7.1)', async (_name, run) => {

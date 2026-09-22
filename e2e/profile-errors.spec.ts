@@ -39,6 +39,33 @@ test('profile load failure: plain message, reference, Retry — and sign out sti
   await expect(page.getByRole('heading', { level: 1, name: 'Dev A' })).toBeVisible();
 });
 
+test('name save failure: plain message, reference, and the field keeps what was typed', async ({ page }) => {
+  await signInToProfile(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'Dev A' })).toBeVisible();
+
+  // Failed at the network, so nothing is written and dev-a's seeded name — which
+  // e2e/auth.spec.ts asserts — is never touched (CLAUDE.md).
+  await page.route('**/rest/v1/profiles?*', (route) =>
+    route.request().method() === 'PATCH' ? route.fulfill({ status: 500, body: '{"message":"boom"}' }) : route.fallback(),
+  );
+
+  await page.getByRole('button', { name: 'Edit name' }).click();
+  await page.getByLabel('Your name').fill('Ada Lovelace');
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  const alert = page.getByRole('alert').filter({ hasText: "Couldn't save your name." });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText(/Error reference [0-9a-f]{8}/);
+  await expect(page.getByText('boom')).toHaveCount(0); // never the raw server message (§8.1)
+  // The field stays open holding the edit, so Save is a retry with nothing retyped.
+  await expect(page.getByLabel('Your name')).toHaveValue('Ada Lovelace');
+  await expect(page.getByRole('heading', { level: 1, name: 'Dev A' })).toBeVisible();
+
+  await page.unroute('**/rest/v1/profiles?*');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Dev A' })).toBeVisible();
+});
+
 test('upload failure: "Upload failed." + Retry, no photo half-set, Retry succeeds', async ({ page }) => {
   await signInToProfile(page);
   if (await page.getByRole('button', { name: 'Remove photo' }).isVisible()) {

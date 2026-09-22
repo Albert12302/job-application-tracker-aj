@@ -202,6 +202,11 @@ Three layers, each with a job:
   messages, the three states of a list (§8), keyboard operation of the filter builder.
   Query by role and label, never by test id — a test that cannot find the button by its
   accessible name is telling you the button is inaccessible.
+  **jest-dom is not installed**, so assert on the DOM: `toBeTruthy()` on a `getBy*` (which
+  throws when absent), `toBeNull()` on a `queryBy*`, `toHaveProperty('value', …)`,
+  `element.textContent`, and `expect(document.activeElement).toBe(el)` for focus. A matcher
+  like `toBeVisible` or `toHaveTextContent` fails with "Invalid Chai property", which reads
+  like a broken assertion rather than a missing plugin.
 - **Playwright** for the flows that cross layers: sign-in, add → appears in list → edit →
   delete, and the two security checks SPEC §7.8 requires as tests rather than manual steps:
   1. user B cannot read or write user A's application by id;
@@ -229,6 +234,13 @@ Three layers, each with a job:
   `dev-g` belongs to `pagination.spec.ts`: 23 applications, read-only, with a date tie across the
   end of page 1 and one on the 1st of a month — nothing may write as `dev-g`, and the spec takes
   its expected order from the database rather than from a list in the test.
+  `dev-h` belongs to `profile-name.spec.ts`, which changes and clears the display name (§4.6).
+  It could not borrow one: `auth.spec.ts` asserts `dev-a`'s and `dev-b`'s names exactly, and
+  `dev-d`'s budget is nearly spent. The suite is serial, each test starting from what the last
+  left, and its `afterAll` puts `Dev H` back so a second run without `db reset` behaves the same.
+  **Every seed user's derived name is "Dev"** — `displayName()` takes the email's local part up to
+  its first separator, so `dev-h@example.test` reads as "Dev", which is what the cleared-name test
+  asserts.
   `dev-f` belongs to the saving-and-deleting half of `filters.spec.ts`, which runs in Chromium
   only and serially, because its tests change one user's saved filters and "Custom N"; the
   reading half asserts `dev-a`'s seeded tabs exactly (`All (7)`, `Live (3)`, …), so a change to
@@ -534,7 +546,7 @@ supabase/
   `ErrorAction` is a closed union — add a member, never a free-form string.
 - **Every write in `data/` throws through `write-limit.ts` `writeFailure()`**, and every
   mutation that writes passes `isRateLimited` to `reporting`. §7.1's 120-a-minute limit can
-  refuse any write on the four writable tables, and a refusal the user causes is not a bug:
+  refuse any write on the five writable tables, and a refusal the user causes is not a bug:
   unmapped, it lands in `app_errors` and the user gets generic copy instead of being told to
   wait. The copy comes from `failureMessage(message, error)` in `queries/errors.ts` — the one
   place that decides a refusal reads differently — and carries no error reference, because
@@ -596,6 +608,10 @@ supabase/
   five did, shipping 32px buttons on phones. When a wrapper cannot carry it, say it at the
   call site as every other control does, and measure it at 360px in e2e
   (`delete-account.spec.ts`, `bulk-delete.spec.ts`).
+- **`form.handleSubmit(...)` is called inside the submit handler, not during render**, when its
+  callback touches a ref. Built in the render pass it reads as a ref read during render and
+  `react-hooks/refs` fails the lint (`features/profile/NameField.tsx`, whose callback sets the
+  flag that returns focus to the button it came from).
 - **Focus uses the full-strength `ring` token.** shadcn generates `ring-ring/50`, which
   measures 2.1:1 on white and fails §10.1; `button.tsx` and `input.tsx` were edited to
   `ring-ring`. Re-check any newly generated primitive for `/50` rings.

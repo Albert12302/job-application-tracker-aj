@@ -1,14 +1,16 @@
 /**
  * The per-user write limit (SPEC §7.1), as every write reports it.
  *
- * 120 writes a minute, counted by a trigger on each of the four writable tables
- * (migration 20260910090800). The trigger raises a bare code — never the row's
+ * 120 writes a minute, counted by a trigger on each of the five writable tables
+ * (migration 20260910090800, and 20260921234631 for `profiles`). The trigger
+ * raises a bare code — never the row's
  * content — and PostgREST hands it back as the message, the same whether the
  * write was a plain statement or one inside `create_application` /
  * `change_application_status`.
  *
  * It lives here rather than in `data/applications.ts` because it belongs to no
- * one table: applications, notes, saved filters and status history all raise it.
+ * one table: applications, notes, saved filters, status history and profiles all
+ * raise it.
  */
 
 /** The write limit refused this change. The user's to wait out, so never reported (§7.7). */

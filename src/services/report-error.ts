@@ -17,6 +17,7 @@ export type ErrorAction =
   | 'sign_in'
   | 'sign_out'
   | 'load_profile'
+  | 'update_name'
   | 'load_avatar'
   | 'upload_avatar'
   | 'remove_avatar'

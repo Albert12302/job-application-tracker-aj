@@ -1,5 +1,6 @@
 import { profileSchema, type Profile } from '@/domain/schemas';
 import { supabase } from './client';
+import { writeFailure } from './write-limit';
 
 /** Null when the row is missing — the name then falls back to the email (domain/profile.ts). */
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -10,6 +11,35 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .maybeSingle();
   if (error) throw error;
   return data ? profileSchema.parse(data) : null;
+}
+
+/**
+ * Set what the app calls the user, or clear it (§4.6). An empty name arrives
+ * here as null: the column's "no name chosen", which `displayName()` answers
+ * with the email-derived one.
+ *
+ * Insert-if-missing for the same reason as `setAvatarPath` below — the row comes
+ * from an auth trigger, and a missing one should not make the name unsettable.
+ * No guard on the current value, though: unlike the photo, nothing outside the
+ * row depends on what it held, so there is no orphan to avoid and the last
+ * write wins. A 23505 from the insert means a row appeared in between, which
+ * the user retries; it is not worth a second round trip to distinguish.
+ *
+ * The name is the user's own text, so it is never logged (§7.7) — the caller
+ * reports the action alone.
+ */
+export async function setName(userId: string, name: string | null): Promise<void> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ name })
+    .eq('id', userId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw writeFailure(error);
+  if (data) return;
+
+  const { error: insertError } = await supabase.from('profiles').insert({ id: userId, name });
+  if (insertError) throw writeFailure(insertError);
 }
 
 /**
@@ -41,11 +71,11 @@ export async function setAvatarPath(userId: string, next: string | null, current
   const update = supabase.from('profiles').update({ avatar_path: next }).eq('id', userId);
   const guarded = current === null ? update.is('avatar_path', null) : update.eq('avatar_path', current);
   const { data, error } = await guarded.select('id').maybeSingle();
-  if (error) throw error;
+  if (error) throw writeFailure(error);
   if (data) return;
   if (current !== null) throw new AvatarChangedError();
 
   const { error: insertError } = await supabase.from('profiles').insert({ id: userId, avatar_path: next });
   if (insertError?.code === '23505') throw new AvatarChangedError();
-  if (insertError) throw insertError;
+  if (insertError) throw writeFailure(insertError);
 }
