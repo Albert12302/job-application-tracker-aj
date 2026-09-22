@@ -1135,6 +1135,24 @@ screen is a release requirement, checked the same way as §7.
   (not the browser default suppressed by a CSS reset).
 - Touch/click targets at least 24×24 CSS px (2.2 requirement); aim for 44×44 on touch.
 - "Skip to content" link before the header nav.
+- **Every screen sets its own document title** (2.4.2 Page Titled, Level A): "Sign in", "My
+  Applications", "Add application", "Application", "Edit application", "Your Stats",
+  "Profile". The page name alone, with **no app-name suffix** — a tab is narrow and truncates
+  from the right, so a suffix repeated on every screen costs the room the distinguishing part
+  needs, and the app already names itself in its own header. One static title for the whole
+  app does not meet this criterion: the title is how a screen-reader user learns the page
+  changed, and how anyone with several tabs open tells them apart. It has to follow a
+  navigation made inside the app, not only a page load. An address that matches nothing falls
+  back to `AJ's Hunt`, there being no page to name; the screen still says "Page not found".
+- **The two screens about one application name its company** in their titles: "Litware
+  Application" and "Edit Litware Application". They are the only titles that have to
+  distinguish one instance from another — "Application" on every one of them describes nothing,
+  and several open tabs become unreadable. The cost is accepted knowingly: a title is read
+  aloud, sits in the tab strip, and is kept in browser history, so this is where the app says
+  who you are applying to outside the page. The position is not added — one identifying field
+  is enough to be useful. Until the row arrives, and on the error and not-found states, the
+  plain "Application" / "Edit application" stands rather than a title built from data that is
+  not there.
 - Dialogs trap focus while open, close on Escape, and return focus to the trigger.
 - No time limits on any interaction.
 
@@ -1243,6 +1261,22 @@ looks arbitrary later can be traced to its reason. Layout and copy tweaks do not
 the prototype is the reference for those.
 
 ### 2026-09-21
+- **Each screen sets its own document title (§10.2).** The tab read "Job Application Tracker"
+  on every page, which fails WCAG 2.4.2 (Level A) — and the app name it showed was not even the
+  one in the header. Each route now declares a title through the router's `head`, rendered by
+  `HeadContent`, so it also changes on a navigation inside the app where the document is never
+  reloaded. **No app-name suffix**: `<page> — AJ's Hunt` was tried first and read badly in a
+  real tab, which is narrow and truncates from the right — the suffix crowded out the only part
+  that differs. `index.html`'s title became `AJ's Hunt`, which is the fallback before the
+  router renders and the title of an address that matches nothing.
+- **The detail and edit screens name the company in their titles (§10.2).** Shipped generic first, on the
+  argument that a company name in the tab strip and in browser history is a privacy cost a job
+  hunt should not pay. Seen live that was the wrong trade: it is the only screen whose title
+  has to tell one instance from another, and "Application" on all of them told nothing. The
+  privacy cost is real and is now accepted deliberately rather than by default. It is also the
+  only titles that cannot come from a route's `head`, since the company is not known until the
+  row loads — `hooks/use-document-title.ts` exists for that, and each route's `head` remains
+  the fallback for its loading, error and not-found states.
 - **The profile name is editable (§4.6).** It was specified as a field the profile *shows* and
   the column has existed since the first migration, but nothing ever set it: every account read
   as the local part of its email, which on the hosted project means the user's address is what

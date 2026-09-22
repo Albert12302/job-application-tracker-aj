@@ -16,5 +16,6 @@ export const signInRoute = createRoute({
       throw redirect({ href: safeRedirect(search.redirect), replace: true });
     }
   },
+  head: () => ({ meta: [{ title: 'Sign in' }] }),
   component: SignInScreen,
 });

@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toApplicationInput, toFormValues } from '@/domain/application-input';
 import { uniqueLocations } from '@/domain/location';
 import { applicationIdSchema } from '@/domain/schemas';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { useUpdateApplication } from '@/queries/use-application-mutations';
 import { useApplication } from '@/queries/use-application';
 import { useApplications } from '@/queries/use-applications';
@@ -28,6 +29,11 @@ export function EditApplicationScreen() {
   const applicationId = parsed.success ? parsed.data : null;
 
   const application = useApplication(applicationId);
+  // Which application is being edited, in the tab (§10.2) — as the detail
+  // screen does. Until the row arrives, the route's own "Edit application"
+  // stands.
+  const company = application.data?.company;
+  useDocumentTitle(company ? `Edit ${company} Application` : null);
   const applications = useApplications();
   const update = useUpdateApplication(applicationId ?? '');
   const listSearch = useListReturn();

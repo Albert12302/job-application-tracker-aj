@@ -5,5 +5,6 @@ import { authenticatedRoute } from './authenticated';
 export const profileRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/profile',
+  head: () => ({ meta: [{ title: 'Profile' }] }),
   component: ProfileScreen,
 });

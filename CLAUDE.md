@@ -511,6 +511,18 @@ supabase/
   - field-level messages come from the schema so the copy matches SPEC §8 in both forms;
   - Zod validates *user input*; it does not replace RLS. Never treat a parsed shape as proof
     of authorization.
+- **A route's document title is its `head`, never a `useEffect`.** Each route in `routes/`
+  declares `head: () => ({ meta: [{ title: 'Add application' }] })` — the page name alone, no
+  app-name suffix (SPEC §10.2) — and `features/shell/RootLayout.tsx` renders the one
+  `HeadContent` that writes it. `routes/title.ts` holds only `APP_NAME`, which the root route
+  carries as the fallback, because an address that matches nothing renders `notFoundComponent`
+  with only the root matched.
+  **One exception:** a title that is not known until a row loads. The detail and edit screens
+  name their company ("Litware Application", "Edit Litware Application"), which no `head` can
+  produce, so they call `hooks/use-document-title.ts` with the loaded value and `null` while
+  they have none — leaving each route's `head` title standing through its loading, error and
+  not-found states. Those two screens are the only callers; a third mechanism is how titles
+  start disagreeing with each other.
 - Route state via TanStack Router search params with `validateSearch`: `filter`, `q`, `sort`,
   `page`, `pageSize`. Derive the query key from those params so navigation and caching agree.
   Give every search field `.default()` as well as `.catch()` — the router types links from the

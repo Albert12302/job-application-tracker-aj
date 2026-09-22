@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatUtcDate } from '@/domain/date';
 import { applicationIdSchema } from '@/domain/schemas';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import {
   useDeleteApplication,
   useForgetApplication,
@@ -54,6 +55,10 @@ export function ApplicationDetailScreen() {
   const applicationId = parsed.success ? parsed.data : null;
 
   const application = useApplication(applicationId);
+  // The tab says which application this is (§10.2). Until the row arrives — and
+  // on the error and not-found states — the route's own "Application" stands.
+  const company = application.data?.company;
+  useDocumentTitle(company ? `${company} Application` : null);
   // The same query the notes list uses, so the dialog can say how many go with
   // the record (§9.2) without asking again.
   const notes = useNotes(applicationId);

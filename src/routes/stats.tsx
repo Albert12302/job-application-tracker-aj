@@ -5,5 +5,6 @@ import { authenticatedRoute } from './authenticated';
 export const statsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/stats',
+  head: () => ({ meta: [{ title: 'Your Stats' }] }),
   component: StatsScreen,
 });

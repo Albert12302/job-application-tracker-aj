@@ -5,5 +5,6 @@ import { authenticatedRoute } from './authenticated';
 export const applicationEditRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/applications/$id/edit',
+  head: () => ({ meta: [{ title: 'Edit application' }] }),
   component: EditApplicationScreen,
 });
