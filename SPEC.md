@@ -1135,13 +1135,15 @@ screen is a release requirement, checked the same way as §7.
   (not the browser default suppressed by a CSS reset).
 - Touch/click targets at least 24×24 CSS px (2.2 requirement); aim for 44×44 on touch.
 - "Skip to content" link before the header nav.
-- **Every screen sets its own document title**, as `<page> — AJ's Hunt` (2.4.2 Page Titled,
-  Level A): "Sign in", "My Applications", "Add application", "Application", "Edit
-  application", "Your Stats", "Profile". The page comes first because a tab narrows from the
-  right. One static title for the whole app does not meet this — the title is how a
-  screen-reader user learns the page changed, and how anyone with several tabs open tells them
-  apart. It has to follow a navigation made inside the app, not only a page load. An address
-  that matches nothing falls back to `AJ's Hunt` alone; the screen still says "Page not found".
+- **Every screen sets its own document title** (2.4.2 Page Titled, Level A): "Sign in", "My
+  Applications", "Add application", "Application", "Edit application", "Your Stats",
+  "Profile". The page name alone, with **no app-name suffix** — a tab is narrow and truncates
+  from the right, so a suffix repeated on every screen costs the room the distinguishing part
+  needs, and the app already names itself in its own header. One static title for the whole
+  app does not meet this criterion: the title is how a screen-reader user learns the page
+  changed, and how anyone with several tabs open tells them apart. It has to follow a
+  navigation made inside the app, not only a page load. An address that matches nothing falls
+  back to `AJ's Hunt`, there being no page to name; the screen still says "Page not found".
   **A detail screen's title never names the company or position** (§7.3): a title is read
   aloud, shown in the tab strip, and kept in browser history, and this is a job hunt — whose
   job it is stays inside the page.
@@ -1257,9 +1259,11 @@ the prototype is the reference for those.
   on every page, which fails WCAG 2.4.2 (Level A) — and the app name it showed was not even the
   one in the header. Each route now declares a title through the router's `head`, rendered by
   `HeadContent`, so it also changes on a navigation inside the app where the document is never
-  reloaded. The detail screen's title is deliberately generic: a company name in the tab strip
-  and in browser history is a privacy cost a job hunt should not pay, so it stays inside the
-  page. `index.html`'s title became `AJ's Hunt`, which is the fallback before the router
+  reloaded. **No app-name suffix**: `<page> — AJ's Hunt` was tried first and read badly in a
+  real tab, which is narrow and truncates from the right — the suffix crowded out the only part
+  that differs. The detail screen's title is deliberately generic: a company name in the tab
+  strip and in browser history is a privacy cost a job hunt should not pay, so it stays inside
+  the page. `index.html`'s title became `AJ's Hunt`, which is the fallback before the router
   renders and the title of an address that matches nothing.
 - **The profile name is editable (§4.6).** It was specified as a field the profile *shows* and
   the column has existed since the first migration, but nothing ever set it: every account read

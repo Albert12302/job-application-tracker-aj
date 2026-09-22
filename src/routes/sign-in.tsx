@@ -3,7 +3,6 @@ import { safeRedirect } from '@/domain/redirect';
 import { signInSearchSchema } from '@/domain/schemas';
 import { SignInScreen } from '@/features/auth/SignInScreen';
 import { rootRoute } from './root';
-import { pageTitle } from './title';
 
 export const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -17,6 +16,6 @@ export const signInRoute = createRoute({
       throw redirect({ href: safeRedirect(search.redirect), replace: true });
     }
   },
-  head: () => ({ meta: [{ title: pageTitle('Sign in') }] }),
+  head: () => ({ meta: [{ title: 'Sign in' }] }),
   component: SignInScreen,
 });

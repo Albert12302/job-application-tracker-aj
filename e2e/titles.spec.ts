@@ -10,11 +10,17 @@ import { apiActor, startSignedIn } from './session.js';
  * navigation inside the app, where the document is never reloaded and only
  * `HeadContent` updates the title.
  *
+ * The titles are the page name alone, with no app-name suffix: a tab truncates
+ * from the right, so a suffix on every screen eats the room the distinguishing
+ * part needs. `toHaveTitle` takes the whole title, so these assertions would
+ * fail if one crept back in.
+ *
  * dev-a, read only: this reads one id and asserts titles, and writes nothing.
  */
 
 const DEV_A = 'dev-a@example.test';
-const SUFFIX = "— AJ's Hunt";
+/** Only where no page can give a title: an address that matches nothing. */
+const APP_NAME = "AJ's Hunt";
 
 let session: string;
 let applicationId: string;
@@ -30,7 +36,7 @@ test.beforeAll(async () => {
 test('the sign-in screen names itself, before any session exists', async ({ page }) => {
   await page.goto('/sign-in');
   await expect(page.getByLabel('Email')).toBeVisible();
-  await expect(page).toHaveTitle(`Sign in ${SUFFIX}`);
+  await expect(page).toHaveTitle('Sign in');
 });
 
 test.describe('signed in', () => {
@@ -48,7 +54,7 @@ test.describe('signed in', () => {
 
     for (const [path, name] of screens) {
       await page.goto(path);
-      await expect(page).toHaveTitle(`${name} ${SUFFIX}`);
+      await expect(page).toHaveTitle(name);
     }
   });
 
@@ -56,23 +62,23 @@ test.describe('signed in', () => {
     // A title is read aloud, sits in the tab strip, and is kept in browser
     // history. Whose job it is stays inside the page.
     await page.goto(`/applications/${applicationId}`);
-    await expect(page).toHaveTitle(`Application ${SUFFIX}`);
+    await expect(page).toHaveTitle('Application');
 
     await page.goto(`/applications/${applicationId}/edit`);
-    await expect(page).toHaveTitle(`Edit application ${SUFFIX}`);
+    await expect(page).toHaveTitle('Edit application');
   });
 
   test('the title follows a navigation made inside the app, with no reload', async ({ page }) => {
     await page.goto('/applications');
-    await expect(page).toHaveTitle(`My Applications ${SUFFIX}`);
+    await expect(page).toHaveTitle('My Applications');
 
     await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Stats' }).click();
     await expect(page).toHaveURL(/\/stats$/);
-    await expect(page).toHaveTitle(`Your Stats ${SUFFIX}`);
+    await expect(page).toHaveTitle('Your Stats');
 
     await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
     await expect(page).toHaveURL(/\/applications$/);
-    await expect(page).toHaveTitle(`My Applications ${SUFFIX}`);
+    await expect(page).toHaveTitle('My Applications');
   });
 
   test('an unknown URL falls back to the app name', async ({ page }) => {
@@ -80,6 +86,6 @@ test.describe('signed in', () => {
     // The screen itself says "Page not found"; the title says who we are.
     await page.goto('/no-such-page');
     await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
-    await expect(page).toHaveTitle("AJ's Hunt");
+    await expect(page).toHaveTitle(APP_NAME);
   });
 });
