@@ -516,7 +516,12 @@ supabase/
   app-name suffix (SPEC §10.2) — and `features/shell/RootLayout.tsx` renders the one
   `HeadContent` that writes it. `routes/title.ts` holds only `APP_NAME`, which the root route
   carries as the fallback, because an address that matches nothing renders `notFoundComponent`
-  with only the root matched. A second mechanism for one screen is how titles start disagreeing
+  with only the root matched.
+  **One exception, and only one:** a title that is not known until a row loads. The detail
+  screen names its company ("Litware Application"), which no `head` can produce, so it calls
+  `hooks/use-document-title.ts` with the loaded value and `null` while it has none — leaving the
+  route's `head` title standing through the loading, error and not-found states. Nothing else
+  should reach for that hook; a second mechanism per screen is how titles start disagreeing
   with each other.
 - Route state via TanStack Router search params with `validateSearch`: `filter`, `q`, `sort`,
   `page`, `pageSize`. Derive the query key from those params so navigation and caching agree.

@@ -23,14 +23,18 @@ const DEV_A = 'dev-a@example.test';
 const APP_NAME = "AJ's Hunt";
 
 let session: string;
-let applicationId: string;
+/** Two of dev-a's, so a move between them can be asserted. Read only. */
+let rows: { id: string; company: string }[];
 
 test.beforeAll(async () => {
   const { client, session: stored } = await apiActor(DEV_A);
   session = stored;
-  const { data, error } = await client.from('applications').select('id').limit(1);
-  expect(error, 'could not read an application id').toBeNull();
-  applicationId = data![0]!.id as string;
+  // Taken from the database, never written into the test: the titles have to
+  // match the rows the screen loads, whatever the seed says.
+  const { data, error } = await client.from('applications').select('id, company').order('company').limit(2);
+  expect(error, 'could not read dev-a’s applications').toBeNull();
+  rows = data as typeof rows;
+  expect(rows[0]!.company, 'need two companies with different names').not.toBe(rows[1]!.company);
 });
 
 test('the sign-in screen names itself, before any session exists', async ({ page }) => {
@@ -58,14 +62,42 @@ test.describe('signed in', () => {
     }
   });
 
-  test("a detail screen's title names no company (§7.3)", async ({ page }) => {
-    // A title is read aloud, sits in the tab strip, and is kept in browser
-    // history. Whose job it is stays inside the page.
-    await page.goto(`/applications/${applicationId}`);
-    await expect(page).toHaveTitle('Application');
+  test("a detail screen's title names its company", async ({ page }) => {
+    // The one screen whose title has to tell one instance from another: with
+    // several tabs open, "Application" on all of them says nothing.
+    const [first] = rows;
+    await page.goto(`/applications/${first!.id}`);
+    await expect(page).toHaveTitle(`${first!.company} Application`);
 
-    await page.goto(`/applications/${applicationId}/edit`);
+    // The edit screen stays plain: one title per screen is enough, and it is
+    // reached from a detail screen that already said which application it is.
+    await page.goto(`/applications/${first!.id}/edit`);
     await expect(page).toHaveTitle('Edit application');
+  });
+
+  test('a detail screen that loads nothing keeps the plain title', async ({ page }) => {
+    // No row, so no company: the route's own head has to stand rather than the
+    // title being built from data that is not there.
+    await page.goto('/applications/00000000-0000-0000-0000-000000000000');
+    await expect(page.getByRole('heading', { level: 1, name: 'Application not found' })).toBeVisible();
+    await expect(page).toHaveTitle('Application');
+  });
+
+  test('the title moves from one application to another', async ({ page }) => {
+    // Both are the same route, so `head` never changes and HeadContent does not
+    // rewrite: only the loaded company can move this title, which is the whole
+    // reason the screen sets it rather than the route.
+    const [first, second] = rows;
+    await page.goto(`/applications/${first!.id}`);
+    await expect(page).toHaveTitle(`${first!.company} Application`);
+
+    await page.goto(`/applications/${second!.id}`);
+    await expect(page).toHaveTitle(`${second!.company} Application`);
+
+    // And leaving restores a route's own title.
+    await page.getByRole('link', { name: 'Back to applications' }).click();
+    await expect(page).toHaveURL(/\/applications(\?|$)/);
+    await expect(page).toHaveTitle('My Applications');
   });
 
   test('the title follows a navigation made inside the app, with no reload', async ({ page }) => {
