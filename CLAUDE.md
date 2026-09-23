@@ -325,6 +325,8 @@ src/
   routes/                     one file per URL, thin — compose features, no logic.
                               Each route declares a Zod `validateSearch` for its params.
     sign-in.tsx
+    forgot-password.tsx       (§4.1c)
+    reset-password.tsx        (§4.1d) — no validateSearch: the link arrives in the fragment
     applications.tsx          the list (SPEC §4.2)
     application-detail.tsx    (§4.4)
     application-new.tsx       (§4.3)
@@ -385,6 +387,9 @@ src/
   features/                   feature-owned UI. May import ui/, domain/, queries/, hooks/ —
                               never another feature's internals.
     auth/                     SignInScreen, SignInForm (guard: routes/authenticated.tsx)
+                              AuthCard — the card every signed-out screen sits in
+                              ForgotPasswordScreen/Form (§4.1c)
+                              ResetPasswordScreen/Form  (§4.1d)
     shell/                    AppShell (header + skip link), RouteError, NotFound
     applications/
       ApplicationsScreen.tsx      the list and its three states (§8.2)
@@ -462,6 +467,8 @@ src/
     save-file.ts              hands the browser a blob to save; used by the cover-letter
                               download (§4.4) and the export (§9.8), so it sits above both
                               rather than inside either feature
+    app-name.ts               APP_NAME — the root route's fallback title and the signed-out
+                              card's heading, so it sits above routes/ and features/ both
   styles/globals.css          Tailwind layers + the audited palette (§3) as CSS variables
                               wired into the shadcn theme tokens
   test/                       setup, factories, a11y helpers
@@ -514,9 +521,10 @@ supabase/
 - **A route's document title is its `head`, never a `useEffect`.** Each route in `routes/`
   declares `head: () => ({ meta: [{ title: 'Add application' }] })` — the page name alone, no
   app-name suffix (SPEC §10.2) — and `features/shell/RootLayout.tsx` renders the one
-  `HeadContent` that writes it. `routes/title.ts` holds only `APP_NAME`, which the root route
-  carries as the fallback, because an address that matches nothing renders `notFoundComponent`
-  with only the root matched.
+  `HeadContent` that writes it. The root route carries `APP_NAME` as the fallback, because an
+  address that matches nothing renders `notFoundComponent` with only the root matched.
+  **`APP_NAME` lives in `lib/app-name.ts`, not in `routes/`** — the signed-out card
+  (`features/auth/AuthCard.tsx`) shows it too, and `features/` may not import from `routes/`.
   **One exception:** a title that is not known until a row loads. The detail and edit screens
   name their company ("Litware Application", "Edit Litware Application"), which no `head` can
   produce, so they call `hooks/use-document-title.ts` with the loaded value and `null` while
@@ -574,6 +582,17 @@ supabase/
   nothing was reported. `data/write-limit.test.ts` asks every write what it throws when the
   client refuses everything, so a new write that forgets is caught there rather than in
   production.
+- **The recovery link never becomes the app's session** (§4.1d). `detectSessionInUrl` stays
+  `false` in `data/client.ts` — the comment there once said reset would turn it on; it does
+  not. A reset link carries real credentials, so adopting them would sign in whoever opened
+  the email, before a password had been set, and the route guards would wave them through.
+  `data/auth.ts` reads the fragment itself at module load (`recoveryLink`), strips it from the
+  address bar, and spends it through `createRecoveryClient()` — a second client that persists
+  nothing and is dropped after the one request. That is the only place a second Supabase client
+  exists, and `createClient` is still called in exactly one file. Two things follow: read the
+  fragment **synchronously at module load** (the same reason `startedWithStoredSession` is
+  read that way), and strip **only** a fragment that is plainly an auth answer — `#main` is the
+  skip link's target, and removing it breaks §10.2.
 - **The session is a store, not a query.** `data/auth.ts` owns it (supabase-js announces
   changes); `useSession()` subscribes. Route guards read it from router context in
   `beforeLoad`; `main.tsx` re-runs them on every change and clears the query cache on every
@@ -583,6 +602,24 @@ supabase/
   storage (`AUTH_STORAGE_KEY`, read synchronously at module load) that did not come back;
   auth-js's event order differs by browser and is not used. `useSignedInUser()` still answers
   during the redirect after sign-out, so screens never crash on the way out.
+- **auth-js's transport failures are matched by class, never by status.** A fetch that never
+  landed arrives as `AuthRetryableFetchError` with `status: 0` — a *number* — so a check for
+  "has a numeric status" reads a dead connection as an answer from the server. It wraps
+  retryable 5xx in the same class with a real status, and those are equally not answers.
+  supabase-js re-exports neither the class nor `isAuthRetryableFetchError`, so the check is
+  `error.name === 'AuthRetryableFetchError'`, which is what auth-js's own guard does. The same
+  goes for `AuthSessionMissingError`, which auth-js raises itself with **no code and a 400**:
+  a `code`-keyed map cannot see it. `data/auth.ts` does both; a test that fabricates an
+  `AuthError` with `status: undefined` is testing a shape auth-js never produces.
+- **A `vi.mock` factory cannot close over a top-level const** — the factory is hoisted above
+  every declaration in the file, so a shared fixture object throws "Cannot access X before
+  initialization" as a module-mocking error, which reads like a broken mock rather than a
+  hoisting problem. Inline the value, or build it with `vi.hoisted()`.
+- **A component that links anywhere needs the router in its test.** Rendering one bare throws
+  `Cannot read properties of null (reading 'isServer')` from deep inside react-query, which
+  names neither the link nor the router. Either render through `test/render-routes.tsx`, or
+  stub `Link` as a plain anchor when where the link *goes* is the only thing the test is
+  about (`SignInForm.test.tsx`).
 - **Ids validate with `z.guid()`, not `z.string().uuid()`.** Zod 4's `uuid()` enforces the RFC
   variant bits, and the seed's fixed ids (`1111…`, `a000…`) fail it.
 - **Timestamps validate with `z.iso.datetime({ offset: true })`.** PostgREST sends
@@ -742,6 +779,12 @@ limit, and do not add a new limit without deciding where it lives:
   **as the user**. It is Storage's only writer and stores with the service role, whose
   `auth.uid()` is null, so a trigger on `storage.objects` would count nothing.
 
+- **Nowhere — the password reset request.** §7.1 asks for 3 an hour per email and 10 per
+  address; neither is enforced, because `consume_rate_limit` keys on `auth.uid()` and the
+  caller has no session. `config.toml`'s `email_sent` and `max_frequency` are what actually
+  stands there. This is a documented accepted risk in SPEC §7.1, not an oversight — read it
+  before "fixing" it, because the edge function it would take does not close what it looks
+  like it closes.
 - `supabase/functions/delete-account` — no limit of its own; it is the only place that can
   remove an `auth.users` row (SPEC §9.7). Deletion is not rate-limited: a user deleting their
   own account once is the end of the story, and a second call has no account to act on.

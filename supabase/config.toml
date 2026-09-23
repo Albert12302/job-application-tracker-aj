@@ -39,7 +39,16 @@ file_size_limit = "10MiB"             # SPEC §7.3 cover-letter cap
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:5173"
-additional_redirect_urls = ["http://127.0.0.1:5173"]
+# Every address an auth link may return to, exactly — GoTrue refuses a
+# redirect_to that is not listed, and a reset link that bounces looks like a
+# broken account rather than a configuration mistake (§4.1d). Both hosts are here because
+# the dev server answers on either and Playwright uses localhost.
+additional_redirect_urls = [
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5173/reset-password",
+  "http://localhost:5173",
+  "http://localhost:5173/reset-password",
+]
 
 jwt_expiry = 3600                     # 1 hour access token (§7.1)
 enable_refresh_token_rotation = true

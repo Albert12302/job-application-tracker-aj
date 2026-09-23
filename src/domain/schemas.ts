@@ -174,6 +174,8 @@ export const signInSearchSchema = z.object({
   expired: z.boolean().optional().catch(undefined),
   /** Arrived here because the account was just deleted (§9.7). */
   deleted: z.boolean().optional().catch(undefined),
+  /** Arrived here from a finished password reset (§4.1d). */
+  reset: z.boolean().optional().catch(undefined),
 });
 
 /** The sign-in edge function's 200 body. Only the two tokens setSession needs
@@ -238,20 +240,44 @@ export const storageObjectInfoSchema = z.object({
   size: z.number().int().nonnegative(),
 });
 
+/** An email a user typed, where the app has to decide whether it is one at all
+ *  — sign-up and the reset request (§4.1a, §4.1c). Sign-in does not use it: there
+ *  the server decides, and a client-side verdict there says something about the
+ *  address before the password has been checked. */
+const emailInput = z.string().trim().email('Enter a valid email address.').max(254);
+
+/** §7.1's password policy: 12 to 128 characters, no composition rules. One
+ *  definition, because sign-up and the reset form promise the same thing and a
+ *  second copy is how the two forms start disagreeing (§4.1d). */
+const newPassword = z
+  .string()
+  .min(12, 'Password must be at least 12 characters.')
+  .max(128, 'Passwords are limited to 128 characters.');
+
+/** The confirm-field rule, shared for the same reason as the password itself. */
+const matchesPassword = {
+  check: (v: { password: string; confirm: string }) => v.password === v.confirm,
+  error: { message: "Those passwords don't match.", path: ['confirm'] },
+};
+
 /** Sign-up (§4.1a). Validation order matters: email, then length, then match. */
 export const signUpSchema = z
-  .object({
-    email: z.string().trim().email('Enter a valid email address.').max(254),
-    password: z
-      .string()
-      .min(12, 'Password must be at least 12 characters.')
-      .max(128, 'Passwords are limited to 128 characters.'),
-    confirm: z.string(),
-  })
-  .refine((v) => v.password === v.confirm, {
-    message: "Those passwords don't match.",
-    path: ['confirm'],
-  });
+  .object({ email: emailInput, password: newPassword, confirm: z.string() })
+  .refine(matchesPassword.check, matchesPassword.error);
+
+/** The reset request (§4.1c). One field, and the only thing it decides is
+ *  whether an address was typed at all — the answer is the same either way. */
+export const forgotPasswordSchema = z.object({ email: emailInput });
+
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+
+/** The new password (§4.1d), by design the same rules and the same copy as
+ *  sign-up's two password fields. */
+export const resetPasswordSchema = z
+  .object({ password: newPassword, confirm: z.string() })
+  .refine(matchesPassword.check, matchesPassword.error);
+
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 /** The dashboard's URL state (§4.2). Every field has a fallback, so a malformed
  *  link degrades to the default view instead of a blank screen (§8).

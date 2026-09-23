@@ -145,7 +145,18 @@ npx supabase secrets set ALLOWED_ORIGINS="https://<your-app>.vercel.app"   # wit
 ```
 
 Then, in the dashboard: add the Vercel URL to **Auth → URL Configuration** (site URL and
-redirect allowlist), or every verification and reset link bounces.
+redirect allowlist), or every verification and reset link bounces. The allowlist needs
+`https://<your-app>.vercel.app/reset-password` **by path** — GoTrue matches `redirect_to`
+against the list, and the site URL alone does not cover it. `supabase/config.toml` has the
+local equivalents; keep the two in step.
+
+**Password reset needs custom SMTP before it works for anyone.** Supabase's built-in email
+sender on the Free plan is throttled to a handful of messages an hour and is documented as for
+testing only, so a reset link will silently fail to arrive — and §4.1c's screen says the same
+thing whether or not it was sent, so nobody finds out. Set an SMTP provider under **Auth →
+Emails → SMTP Settings** (Resend, Brevo and Postmark all have a free tier; a verified sender
+is needed either way) before telling anyone the button works. Locally there is nothing to do:
+Inbucket catches every message at <http://127.0.0.1:54324>.
 
 Do **not** run `db reset` against the hosted project — it drops everything. `db push` only
 applies what is new.

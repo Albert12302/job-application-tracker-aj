@@ -4,9 +4,12 @@ import {
   applicationIdSchema,
   applicationSchema,
   applicationsSearchSchema,
+  forgotPasswordSchema,
   noteSchema,
   profileNameSchema,
+  resetPasswordSchema,
   savedFilterFormSchema,
+  signInSearchSchema,
   signUpSchema,
 } from './schemas';
 
@@ -235,5 +238,72 @@ describe('profileNameSchema', () => {
 
   it('counts the trimmed length, so spaces cannot push a valid name over the cap', () => {
     expect(profileNameSchema.safeParse({ name: `  ${'x'.repeat(120)}  ` }).success).toBe(true);
+  });
+});
+
+describe('forgotPasswordSchema', () => {
+  it('asks for an address that could be one (§4.1c)', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'not an email' });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Enter a valid email address.');
+  });
+
+  it('trims, so a pasted address with a trailing space still gets its link', () => {
+    expect(forgotPasswordSchema.parse({ email: '  dev-a@example.test ' }).email).toBe('dev-a@example.test');
+  });
+
+  it('caps at 254 characters, where the address column does', () => {
+    const long = `${'x'.repeat(250)}@e.test`;
+    expect(forgotPasswordSchema.safeParse({ email: long }).success).toBe(false);
+  });
+});
+
+describe('resetPasswordSchema', () => {
+  const ok = { password: 'correct horse battery', confirm: 'correct horse battery' };
+
+  it('accepts a passphrase of at least 12 characters', () => {
+    expect(resetPasswordSchema.safeParse(ok).success).toBe(true);
+    expect(resetPasswordSchema.safeParse({ password: 'x'.repeat(12), confirm: 'x'.repeat(12) }).success).toBe(true);
+  });
+
+  it('gives §7.1 policy failures the same words sign-up does (§4.1d)', () => {
+    const short = resetPasswordSchema.safeParse({ password: 'short', confirm: 'short' });
+    const shortSignUp = signUpSchema.safeParse({ email: 'a@b.test', password: 'short', confirm: 'short' });
+    expect(short.success).toBe(false);
+    if (!short.success && !shortSignUp.success) {
+      expect(short.error.issues[0]?.message).toBe('Password must be at least 12 characters.');
+      expect(short.error.issues[0]?.message).toBe(shortSignUp.error.issues[0]?.message);
+    }
+  });
+
+  it('caps at 128, where §7.1 does', () => {
+    const long = 'x'.repeat(129);
+    expect(resetPasswordSchema.safeParse({ password: long, confirm: long }).success).toBe(false);
+  });
+
+  it('flags a mismatch on the confirm field, so the message points at the field to fix', () => {
+    const result = resetPasswordSchema.safeParse({ password: 'correct horse battery', confirm: 'correct horse' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe("Those passwords don't match.");
+      expect(result.error.issues[0]?.path).toEqual(['confirm']);
+    }
+  });
+
+  it('checks the length before the match, so a short pair says what is actually wrong', () => {
+    const result = resetPasswordSchema.safeParse({ password: 'short', confirm: 'other' });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe('Password must be at least 12 characters.');
+  });
+});
+
+describe('signInSearchSchema', () => {
+  it('reads the banner flags §4.1d and §9.7 arrive with', () => {
+    expect(signInSearchSchema.parse({ reset: true }).reset).toBe(true);
+    expect(signInSearchSchema.parse({}).reset).toBeUndefined();
+  });
+
+  it('falls back rather than failing on a hand-edited flag (§8)', () => {
+    expect(signInSearchSchema.parse({ reset: 'yes' }).reset).toBeUndefined();
   });
 });

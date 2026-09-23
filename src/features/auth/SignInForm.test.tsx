@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignInForm } from './SignInForm';
 
@@ -13,6 +14,17 @@ import { SignInForm } from './SignInForm';
  */
 const invoke = vi.fn();
 const setSession = vi.fn();
+
+// The form links to the reset screen (§4.1c). A plain anchor stands in for the
+// router's Link: where the link goes is this file's business, getting there is
+// the route tree's.
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 vi.mock('@/data/client', () => ({
   AUTH_STORAGE_KEY: 'aj-hunt-auth',
@@ -138,6 +150,11 @@ describe('SignInForm', () => {
     expect(screen.getByLabelText('Password').matches(':disabled')).toBe(true);
     resolve(httpError(401));
     await screen.findByRole('button', { name: 'Sign in' });
+  });
+
+  it('offers the way to a new password, for the user who cannot remember this one (§4.1c)', () => {
+    renderForm();
+    expect(screen.getByRole('link', { name: 'Forgot password' }).getAttribute('href')).toBe('/forgot-password');
   });
 
   it('has no axe violations, including with an error showing', async () => {

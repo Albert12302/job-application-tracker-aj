@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -95,6 +96,16 @@ export function SignInForm() {
             />
           </Field>
         </FieldGroup>
+
+        {/* §4.1. Under the field it is about, centred in the card like the
+            other signed-out screens' secondary links (AuthCard's "Back to sign
+            in"), so the four screens read as one. */}
+        <Link
+          to="/forgot-password"
+          className="self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring"
+        >
+          Forgot password
+        </Link>
 
         <Button type="submit" disabled={pending} className="h-9 w-full max-[760px]:h-11">
           {pending ? (
