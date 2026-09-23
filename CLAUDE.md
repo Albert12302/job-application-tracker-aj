@@ -467,6 +467,8 @@ src/
     save-file.ts              hands the browser a blob to save; used by the cover-letter
                               download (§4.4) and the export (§9.8), so it sits above both
                               rather than inside either feature
+    app-name.ts               APP_NAME — the root route's fallback title and the signed-out
+                              card's heading, so it sits above routes/ and features/ both
   styles/globals.css          Tailwind layers + the audited palette (§3) as CSS variables
                               wired into the shadcn theme tokens
   test/                       setup, factories, a11y helpers
@@ -519,9 +521,10 @@ supabase/
 - **A route's document title is its `head`, never a `useEffect`.** Each route in `routes/`
   declares `head: () => ({ meta: [{ title: 'Add application' }] })` — the page name alone, no
   app-name suffix (SPEC §10.2) — and `features/shell/RootLayout.tsx` renders the one
-  `HeadContent` that writes it. `routes/title.ts` holds only `APP_NAME`, which the root route
-  carries as the fallback, because an address that matches nothing renders `notFoundComponent`
-  with only the root matched.
+  `HeadContent` that writes it. The root route carries `APP_NAME` as the fallback, because an
+  address that matches nothing renders `notFoundComponent` with only the root matched.
+  **`APP_NAME` lives in `lib/app-name.ts`, not in `routes/`** — the signed-out card
+  (`features/auth/AuthCard.tsx`) shows it too, and `features/` may not import from `routes/`.
   **One exception:** a title that is not known until a row loads. The detail and edit screens
   name their company ("Litware Application", "Edit Litware Application"), which no `head` can
   produce, so they call `hooks/use-document-title.ts` with the loaded value and `null` while
@@ -599,6 +602,15 @@ supabase/
   storage (`AUTH_STORAGE_KEY`, read synchronously at module load) that did not come back;
   auth-js's event order differs by browser and is not used. `useSignedInUser()` still answers
   during the redirect after sign-out, so screens never crash on the way out.
+- **auth-js's transport failures are matched by class, never by status.** A fetch that never
+  landed arrives as `AuthRetryableFetchError` with `status: 0` — a *number* — so a check for
+  "has a numeric status" reads a dead connection as an answer from the server. It wraps
+  retryable 5xx in the same class with a real status, and those are equally not answers.
+  supabase-js re-exports neither the class nor `isAuthRetryableFetchError`, so the check is
+  `error.name === 'AuthRetryableFetchError'`, which is what auth-js's own guard does. The same
+  goes for `AuthSessionMissingError`, which auth-js raises itself with **no code and a 400**:
+  a `code`-keyed map cannot see it. `data/auth.ts` does both; a test that fabricates an
+  `AuthError` with `status: undefined` is testing a shape auth-js never produces.
 - **A `vi.mock` factory cannot close over a top-level const** — the factory is hoisted above
   every declaration in the file, so a shared fixture object throws "Cannot access X before
   initialization" as a module-mocking error, which reads like a broken mock rather than a

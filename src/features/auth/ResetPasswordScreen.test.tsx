@@ -20,13 +20,11 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }));
 
-vi.mock('@/data/auth', () => ({
+vi.mock('@/queries/use-mutations', () => ({
+  // A getter, so each test can set the arrival before rendering.
   get recoveryLink() {
     return { status: status.value, accessToken: 'access', refreshToken: 'refresh' };
   },
-}));
-
-vi.mock('@/queries/use-mutations', () => ({
   useResetPassword: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, error: null, submittedAt: 0 }),
   PasswordResetError: class extends Error {},
 }));

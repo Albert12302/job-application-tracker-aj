@@ -149,6 +149,16 @@ describe('ResetPasswordForm', () => {
       'a link spent between opening and saving',
       () => updateUser.mockResolvedValue({ error: new AuthError('expired', 401, 'session_expired') }),
     ],
+    [
+      // auth-js raises this itself when the session has gone: no code, and a
+      // 400 rather than a 401, so only its name tells you what happened.
+      'a session that vanished under the form',
+      () => {
+        const error = new AuthError('Auth session missing!', 400);
+        error.name = 'AuthSessionMissingError';
+        updateUser.mockResolvedValue({ error });
+      },
+    ],
   ])('offers a new link for %s, without an error reference', async (_label, arrange) => {
     arrange();
     const { user } = renderForm();

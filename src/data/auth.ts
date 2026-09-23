@@ -221,6 +221,23 @@ export class PasswordResetError extends Error {
 }
 
 /**
+ * Whether Auth never answered at all — a dropped connection, a gateway that
+ * would not talk, a retryable 5xx.
+ *
+ * Matched on the class rather than the status, and the difference is the whole
+ * point: auth-js gives a failed fetch `status: 0`, which is a *number*, so a
+ * check for "has a numeric status" quietly treats a dead connection as an
+ * answer. It builds this same class for retryable 5xx too, with a real status,
+ * and those are equally not answers.
+ *
+ * By name because supabase-js re-exports neither the class nor its type guard;
+ * auth-js's own `isAuthRetryableFetchError` is this exact comparison.
+ */
+function unanswered(error: unknown): boolean {
+  return !(error instanceof AuthError) || error.name === 'AuthRetryableFetchError';
+}
+
+/**
  * Ask Auth to send a reset link (§4.1c).
  *
  * It resolves for an address with an account and one without, and so does
@@ -236,8 +253,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/reset-password`,
   });
-  // A status means Auth answered; only a fetch that never landed has none.
-  if (error && !(error instanceof AuthError && typeof error.status === 'number')) throw error;
+  if (error && unanswered(error)) throw error;
 }
 
 /** Auth's codes for the outcomes a user can do something about. */
@@ -253,6 +269,11 @@ const RESET_FAILURE_BY_CODE: Record<string, PasswordResetFailure> = {
 function resetFailure(error: AuthError): PasswordResetFailure {
   const byCode = error.code ? RESET_FAILURE_BY_CODE[error.code] : undefined;
   if (byCode) return byCode;
+  // auth-js raises this one itself, with no code and a 400, when the session
+  // the link opened has gone — so it is matched by name or it would fall
+  // through to `unavailable` and be reported as a bug. (The codes above stay:
+  // Auth sends them on its own responses.)
+  if (error.name === 'AuthSessionMissingError') return 'invalid-link';
   // A refused token reads as 401/403 whatever code came with it.
   return error.status === 401 || error.status === 403 ? 'invalid-link' : 'unavailable';
 }

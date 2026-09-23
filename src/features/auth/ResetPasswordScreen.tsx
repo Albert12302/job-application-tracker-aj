@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { buttonVariants } from '@/components/ui/button';
-import { recoveryLink } from '@/data/auth';
+import { recoveryLink } from '@/queries/use-mutations';
 import { AuthCard } from './AuthCard';
 import { ResetPasswordForm } from './ResetPasswordForm';
 

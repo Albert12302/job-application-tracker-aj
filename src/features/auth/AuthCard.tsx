@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { APP_NAME } from '@/routes/title';
+import { APP_NAME } from '@/lib/app-name';
 
 /**
  * The shell the four signed-out screens share (SPEC §4.1, §4.1c–d): the app's

@@ -25,6 +25,20 @@ vi.mock('@/data/client', () => ({
   },
 }));
 
+/**
+ * auth-js's `AuthRetryableFetchError` as it actually arrives. It matters that
+ * this is exact: a dropped connection carries `status: 0` — a *number* — so a
+ * guard asking "does it have a numeric status?" treats it as an answer from
+ * Auth and shows the confirmation for an email nobody sent. An earlier version
+ * of this test fabricated an `AuthError` with no status, a shape auth-js never
+ * produces, and passed against exactly that bug.
+ */
+function unanswered(status: number): AuthError {
+  const error = new AuthError('Failed to fetch', status);
+  error.name = 'AuthRetryableFetchError';
+  return error;
+}
+
 function renderForm() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   const onSent = vi.fn();
@@ -84,10 +98,13 @@ describe('ForgotPasswordForm', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('says so when it could not ask at all, and stays on the form', async () => {
-    // No status: the request never reached Auth, so nothing was learned about
-    // the address and a confirmation would be a lie.
-    resetPasswordForEmail.mockResolvedValue({ data: null, error: new AuthError('Failed to fetch') });
+  it.each([
+    ['a dropped connection', 0],
+    ['a gateway that would not talk', 503],
+  ])('says so for %s, and stays on the form', async (_label, status) => {
+    // Auth never answered, so nothing was learned about the address and a
+    // confirmation would be a lie.
+    resetPasswordForEmail.mockResolvedValue({ data: null, error: unanswered(status) });
     const { user, onSent } = renderForm();
     await submit(user, 'dev-a@example.test');
 

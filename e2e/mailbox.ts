@@ -42,7 +42,12 @@ export async function resetLinkFor(email: string, timeoutMs = 15_000): Promise<s
     if (match) {
       const body = await fetch(`${MAILPIT}/api/v1/message/${match.ID}`);
       const { Text, HTML } = (await body.json()) as { Text: string; HTML: string };
-      const link = (Text || HTML).match(/https?:\/\/[^\s"'<>]+/g)?.find((url) => url.includes('/auth/v1/verify'));
+      // The text part is what GoTrue's default template sends and what this
+      // reads today. The HTML fallback is decoded first: a link taken out of
+      // markup carries `&amp;`, which drops `type` and `redirect_to` from the
+      // query and turns a working link into one the app reads as "no link".
+      const source = Text || HTML.replaceAll('&amp;', '&');
+      const link = source.match(/https?:\/\/[^\s"'<>]+/g)?.find((url) => url.includes('/auth/v1/verify'));
       expect(link, `the reset email to ${email} carried no verify link`).toBeTruthy();
       return link!;
     }

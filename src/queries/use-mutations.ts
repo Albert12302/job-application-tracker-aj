@@ -13,6 +13,15 @@ export { AvatarRejectedError, PasswordResetError, SignInError };
 export type { PasswordResetFailure, SignInFailure } from '@/data/auth';
 
 /**
+ * What the page load arrived with (§4.1d), surfaced here so the screen that
+ * branches on it does not reach into `data/` — features read `queries/`. It is
+ * a value rather than a hook because it is decided once, at module load, before
+ * anything rendered; see `data/auth.ts`.
+ */
+export { recoveryLink } from '@/data/auth';
+export type { RecoveryLink } from '@/data/auth';
+
+/**
  * No invalidation: the session change re-runs the router guards, which move
  * the user off /sign-in (main.tsx).
  */

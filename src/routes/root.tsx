@@ -3,7 +3,7 @@ import { NotFound } from '@/features/shell/NotFound';
 import { RootLayout } from '@/features/shell/RootLayout';
 import { RouteError } from '@/features/shell/RouteError';
 import type { SessionState } from '@/queries/use-session';
-import { APP_NAME } from './title';
+import { APP_NAME } from '@/lib/app-name';
 
 /** The session rides in router context so guards run in beforeLoad, before anything renders. */
 export type RouterContext = { session: SessionState };
