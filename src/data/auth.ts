@@ -320,8 +320,33 @@ export async function setPasswordWithRecovery(
   // has already changed, and telling the user it did not would be false. What
   // it leaves is other devices holding refresh tokens that outlive the
   // password until the §7.1 session job reaches them — recorded as an accepted
-  // residual there rather than silently. Nothing is left behind on *this*
-  // device either way: the client stores nothing, and auth-js drops its local
-  // session whether or not the revoke lands.
+  // residual there rather than silently. The recovery client itself leaves
+  // nothing on this device whatever happens: it stores nothing, and auth-js
+  // drops its in-memory session whether or not the revoke lands.
+  //
+  // What that call does *not* reach is the app's own stored session, if this
+  // browser had one — see `endLocalSession`, which the reset calls next.
   await client.auth.signOut({ scope: 'global' }).catch(() => {});
+}
+
+/**
+ * Drop this browser's own stored session, after a reset has ended it
+ * server-side (§4.1d).
+ *
+ * The global sign-out above revokes every session the account has, this
+ * browser's included — but only at Auth. supabase-js still holds its copy in
+ * `AUTH_STORAGE_KEY`, and the app still believes it is signed in. Left there,
+ * someone resetting their password in a browser they were already signed into
+ * would be carried straight past the sign-in screen and its confirmation by
+ * the route guard, into the app, on a session that is already dead — working
+ * only until the access token expired up to an hour later (§7.1: PostgREST
+ * checks the signature, not whether the session still exists).
+ *
+ * `signOutRequested`, so §8.2 reads this as a sign-out and not an expiry: the
+ * sign-in screen should say the password changed, not that the session did
+ * something wrong. A failure changes nothing that matters — the session it
+ * would have dropped is already revoked — so it never fails the reset.
+ */
+export async function endLocalSession(): Promise<void> {
+  await signOut().catch(() => {});
 }

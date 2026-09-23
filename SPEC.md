@@ -164,6 +164,11 @@ the same copy as sign-up, from the same schema. States that saving signs out all
 devices. On success, returns to sign-in with a confirmation banner rather than
 auto-signing-in.
 
+Saving ends the session on **this** device too, not only the others. A user resetting their
+password in a browser they were already signed into is returned to sign-in and sees the
+confirmation, exactly as one who was signed out does — there is no path where a reset quietly
+drops someone back into the app on the session they arrived with.
+
 **The app never takes a session from the link.** A recovery link carries real credentials; if
 the app adopted them, opening the email would sign the visitor in and the route guards would
 let them into the data before any password had been set. Instead the tokens are read out of
@@ -1341,6 +1346,11 @@ the prototype is the reference for those.
   so the app issues it rather than assuming Auth does. Its failure does not fail the reset —
   recorded as a residual in §7.1 instead, because telling a user their password did not change
   when it did is the worse error.
+- **And the stored session on the device doing the reset goes with it.** Revoking at Auth does
+  not empty this browser's storage, and the sign-in route sends a session it still believes in
+  straight to the dashboard — so a reset performed while signed in skipped its own
+  confirmation and carried on into the app, on a session already dead at the server, until the
+  access token expired up to an hour later. Found by the §7.8 review of this branch.
 - **The reset request's two rate limits have no home, and that is now written down** (§7.1)
   rather than implied by their absence. They need the caller's address and a session-less
   identity, which only an edge function has; the reason one is not built is that Auth's

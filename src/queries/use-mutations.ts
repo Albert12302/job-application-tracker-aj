@@ -1,5 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PasswordResetError, recoveryLink, requestPasswordReset, setPasswordWithRecovery, signIn, SignInError } from '@/data/auth';
+import {
+  endLocalSession,
+  PasswordResetError,
+  recoveryLink,
+  requestPasswordReset,
+  setPasswordWithRecovery,
+  signIn,
+  SignInError,
+} from '@/data/auth';
 import { setName } from '@/data/profile';
 import type { ForgotPasswordValues, ResetPasswordValues, SignInValues } from '@/domain/schemas';
 import { removeAvatar } from '@/services/remove-avatar';
@@ -68,6 +76,13 @@ export function useResetPassword() {
         },
         (error) => error instanceof PasswordResetError && error.reason !== 'unavailable',
       ),
+    // Before anything navigates: the reset ended this browser's own session
+    // server-side, so the copy in storage goes too, or the guard on /sign-in
+    // sees a session that still looks live and sends the user into the app
+    // instead of showing the confirmation (§4.1d). Declared here rather than at
+    // the call site because React Query settles a mutation's own onSuccess
+    // before the one passed to `mutate`, which is the one that navigates.
+    onSuccess: () => endLocalSession(),
   });
 }
 

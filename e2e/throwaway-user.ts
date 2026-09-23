@@ -159,6 +159,27 @@ export async function createBareUser(email: string, password = THROWAWAY_PASSWOR
   return data.user.id;
 }
 
+/**
+ * A recovery link for `email`, minted rather than emailed.
+ *
+ * The admin API returns the link instead of sending it, so a test that only
+ * needs *a* valid link spends none of §7.1's send budget. The one test that is
+ * about the email itself still goes through the real send and reads the mail
+ * (`mailbox.ts`); this is for the ones that are about what happens after the
+ * link is opened.
+ */
+export async function recoveryLinkFor(email: string, redirectTo: string): Promise<string> {
+  const { data, error } = await adminClient().auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: { redirectTo },
+  });
+  if (error || !data.properties?.action_link) {
+    throw new Error(`could not mint a recovery link: ${error?.message ?? 'no action_link'}`);
+  }
+  return data.properties.action_link;
+}
+
 /** For a test that did not get as far as deleting its user. Already gone is fine. */
 export async function removeThrowawayUser(id: string): Promise<void> {
   await adminClient().auth.admin.deleteUser(id).catch(() => {});

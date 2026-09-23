@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 import { expectAxeClean } from './a11y.js';
 import { resetLinkFor, SPENT_LINK_FRAGMENT, throwawayEmail } from './mailbox.js';
-import { STORAGE_KEY } from './session.js';
-import { createBareUser, removeThrowawayUser } from './throwaway-user.js';
+import { startSignedIn, STORAGE_KEY } from './session.js';
+import { createBareUser, recoveryLinkFor, removeThrowawayUser } from './throwaway-user.js';
 
 /**
  * SPEC §4.1c–d end to end: ask for a link, open the one that arrives, set a
@@ -81,6 +81,41 @@ test('a reset link sets a new password and comes back to sign in with it', async
     const client = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
     const { error } = await client.auth.signInWithPassword({ email, password: OLD_PASSWORD });
     expect(error, 'the old password still works after a reset').not.toBeNull();
+  } finally {
+    await removeThrowawayUser(id);
+  }
+});
+
+test('a reset in a browser that is already signed in still ends at sign-in (§4.1d)', async ({
+  page,
+  browserName,
+}) => {
+  // Chromium only: the subject is the router guard and what is left in storage,
+  // neither of which is engine-specific, and the browsers share one seed stack.
+  test.skip(browserName !== 'chromium', 'not engine-specific');
+
+  const email = throwawayEmail('signed-in');
+  const id = await createBareUser(email, OLD_PASSWORD);
+
+  try {
+    const client = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
+    const { data } = await client.auth.signInWithPassword({ email, password: OLD_PASSWORD });
+    // Resetting on the laptop you are already signed in on — the ordinary case,
+    // and the one where the guard used to carry the user straight into the app.
+    await startSignedIn(page, JSON.stringify(data.session));
+
+    await page.goto(await recoveryLinkFor(email, 'http://localhost:5173/reset-password'));
+    await expect(page).toHaveURL(/\/reset-password$/);
+
+    await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
+    await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
+    await page.getByRole('button', { name: 'Save new password' }).click();
+
+    // Not /applications, which is where the guard sends a session it still
+    // believes in, and the confirmation is actually on screen.
+    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page.getByText('Password updated. Sign in with your new password.')).toBeVisible();
+    expect(await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY)).toBeNull();
   } finally {
     await removeThrowawayUser(id);
   }

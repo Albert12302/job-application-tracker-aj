@@ -20,6 +20,7 @@ const updateUser = vi.fn();
 const revoke = vi.fn();
 const insertEvent = vi.fn();
 const navigate = vi.fn();
+const appSignOut = vi.fn();
 const order: string[] = [];
 
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }));
@@ -49,11 +50,16 @@ vi.mock('@/data/client', () => ({
       },
     }),
   }),
-  // The app's own client. Nothing in this flow may reach it, and these throws
-  // are how we would find out if it ever did.
+  // The app's own client. The reset may do exactly one thing with it — end the
+  // session this browser already had (§4.1d) — and the throws are how we would
+  // find out if it ever did anything else.
   supabase: {
     auth: {
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+      signOut: (...args: unknown[]) => {
+        order.push('app-sign-out');
+        return appSignOut(...args);
+      },
       updateUser: () => {
         throw new Error('the reset must never touch the app session');
       },
@@ -84,11 +90,12 @@ async function submit(user: ReturnType<typeof userEvent.setup>, password = GOOD,
 
 beforeEach(() => {
   order.length = 0;
-  for (const mock of [setSession, updateUser, revoke, insertEvent, navigate]) mock.mockReset();
+  for (const mock of [setSession, updateUser, revoke, insertEvent, navigate, appSignOut]) mock.mockReset();
   setSession.mockResolvedValue({ error: null });
   updateUser.mockResolvedValue({ error: null });
   revoke.mockResolvedValue({ error: null });
   insertEvent.mockResolvedValue({ error: null });
+  appSignOut.mockResolvedValue({ error: null });
 });
 
 describe('ResetPasswordForm', () => {
@@ -120,9 +127,22 @@ describe('ResetPasswordForm', () => {
     expect(insertEvent).toHaveBeenCalledWith({ event_type: 'password_reset_complete', outcome: 'success' });
     // §4.1d: every other device, not just this one.
     expect(revoke).toHaveBeenCalledWith({ scope: 'global' });
-    // The row is written while there is still a session to attribute it to (§7.7).
-    expect(order).toEqual(['security-event', 'sign-out']);
+    // The row is written while there is still a session to attribute it to (§7.7),
+    // and this browser's own session is dropped before anything navigates — the
+    // guard on /sign-in sends a signed-in visitor into the app, so a session
+    // left in storage would carry the user past the confirmation (§4.1d).
+    expect(order).toEqual(['security-event', 'sign-out', 'app-sign-out']);
+    expect(appSignOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(navigate).toHaveBeenCalledWith({ to: '/sign-in', search: { reset: true }, replace: true });
+  });
+
+  it('still reaches sign-in when this browser had no session to drop', async () => {
+    appSignOut.mockRejectedValue(new Error('no session'));
+    const { user } = renderForm();
+    await submit(user);
+
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('still finishes when the log will not write — the password has already changed', async () => {
