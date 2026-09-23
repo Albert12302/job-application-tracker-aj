@@ -31,7 +31,7 @@ test('a reset link sets a new password and comes back to sign in with it', async
 
   try {
     await page.goto('/sign-in');
-    await page.getByRole('link', { name: 'Forgot password?' }).click();
+    await page.getByRole('link', { name: 'Forgot password' }).click();
     await expect(page).toHaveURL(/\/forgot-password$/);
 
     await page.getByLabel('Email').fill(email);

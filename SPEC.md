@@ -120,9 +120,9 @@ the detail screen. Rejected and Withdrawn are terminal and sit outside the funne
 ### 4.1 Sign in
 Email + password, both required; empty submit shows "Enter an email and password."
 Successful sign-in goes straight to the dashboard (no profile picker).
-Links to **Create one** (§4.1a) and **Forgot password?** (§4.1c). **Forgot password?** sits
-under the password field and is rendered. **Create one** is not: sign-up is gated, and a link
-to a screen that does not exist is a dead end (§8.1).
+Links to **Create one** (§4.1a) and **Forgot password** (§4.1c). **Forgot password** sits
+centred under the password field and is rendered. **Create one** is not: sign-up is gated, and
+a link to a screen that does not exist is a dead end (§8.1).
 
 A banner above the form names why the user is here when something sent them: a deleted
 account (§9.7), an expired session (§8.2), or a finished password reset (§4.1d).
@@ -1326,8 +1326,10 @@ the prototype is the reference for those.
 ### 2026-09-22
 
 - **Password reset built (§4.1c–d)** — `/forgot-password` and `/reset-password`, the last two
-  screens §6 left standing. Sign-in's **Forgot password?** link is rendered now that it leads
-  somewhere; **Create one** still is not, because sign-up is still gated.
+  screens §6 left standing. Sign-in's **Forgot password** link is rendered now that it leads
+  somewhere — centred under the password field, and without the question mark, so it reads as
+  a destination rather than a prompt; **Create one** still is not, because sign-up is still
+  gated.
 - **The app never adopts the recovery link's session.** The obvious build — let supabase-js
   detect the link and sign the user in — would hand anyone who opens the email a working
   session before a password was set, and would make §4.1d's "rather than auto-signing-in" a

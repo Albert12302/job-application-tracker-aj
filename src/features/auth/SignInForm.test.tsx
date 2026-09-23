@@ -154,7 +154,7 @@ describe('SignInForm', () => {
 
   it('offers the way to a new password, for the user who cannot remember this one (§4.1c)', () => {
     renderForm();
-    expect(screen.getByRole('link', { name: 'Forgot password?' }).getAttribute('href')).toBe('/forgot-password');
+    expect(screen.getByRole('link', { name: 'Forgot password' }).getAttribute('href')).toBe('/forgot-password');
   });
 
   it('has no axe violations, including with an error showing', async () => {
