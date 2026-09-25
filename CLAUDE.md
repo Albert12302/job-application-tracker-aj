@@ -268,7 +268,13 @@ Three layers, each with a job:
   (`page.route`) rather than spending uploads on them; refused files cost nothing. Locally,
   `delete from public.rate_limits;` resets the count.
 
-  **`getByText('…')` is a case-insensitive substring match.** "Cover letter attached." matches
+  **`getByRole('status')` matches the offline banner on every page.** Its live region is mounted
+  always and empty (`features/shell/OfflineBanner.tsx`), because a region that arrives already
+  holding its text is not reliably announced — so a bare `getByRole('status')` is a strict-mode
+  violation wherever a screen has a status of its own. Filter it by text
+  (`.filter({ hasText })`), as `delete-account.spec.ts` does.
+
+    **`getByText('…')` is a case-insensitive substring match.** "Cover letter attached." matches
   "No cover letter attached.", and a filename matches "Uploading *name*…" — either passes before
   the thing it waits for has happened. Use `{ exact: true }` for any text that can appear inside
   other text.
@@ -553,6 +559,14 @@ supabase/
     matching SPEC §8.3;
   - `staleTime` set deliberately per query — stats and the list can tolerate seconds, an open
     detail screen cannot.
+  - **`networkMode` is `'always'` on mutations only, never on queries.** It is what makes §8.2's
+    "Changes won't save" true: the default `'online'` pauses a write with no network and replays
+    it on reconnect, so a disclaimed change lands later unannounced. Reads must keep the default,
+    because the option quietly flips another: `refetchOnReconnect` defaults to
+    `networkMode !== 'always'`, so setting it stops every screen refreshing itself when the
+    network comes back — the opposite of what it would be set for. Paused reads are the better
+    failure besides: the cached rows stay on screen under the banner rather than racing a
+    refetch that cannot land.
 - Every list and mutation handles three states explicitly: loading, empty, error — specified
   per surface in SPEC.md §8. The prototype only shows the happy path; do not ship without the
   other two.

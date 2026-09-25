@@ -1016,7 +1016,7 @@ Nothing ships with an unhandled failure.
 | Export my data | Progress in the button, which is disabled: "Preparing your data…", then "Adding files (*n* of *m*)…", then "Building your export…". The same words go to a live region (§10.4), and "Your export is ready." when the file is saved | n/a; a user with nothing still has a profile to export | "Couldn't export your data." + error reference + Retry, under the button. A file that will not download is **not** an error: the export still succeeds and names it in `export-errors.txt` (§9.8) |
 | Delete account (dialog) | "Counting what goes…" in place of the sentence, confirm disabled until counted **and while an export started in the dialog is still running** (§9.8); then "Removing your files…" and "Deleting your account…" in the confirm button, with the dialog's other controls disabled and the same words in a live region (§10.4) | n/a | Stops where it failed, dialog open, confirming again carries on (§9.7). On Storage: "Couldn't delete your account. It and your data are still here, though some files may already have been removed. Try again." On the account: "Couldn't delete your account. Your files have been removed, but the account itself is still here. Try again to finish." Both with an error reference. A count that will not load does not block the delete: the sentence loses its numbers instead |
 | Session expired | n/a | n/a | Redirect to sign-in with "Your session expired. Sign in to continue." Return to the previous screen after sign-in |
-| Offline | n/a | n/a | Persistent banner: "You're offline. Changes won't save." Disable mutations |
+| Offline | n/a | n/a | Persistent banner above every screen, signed-out ones included: "You're offline. Changes won't save." A change attempted anyway **fails at once** rather than waiting for the network — it is never queued and never replayed when the connection returns, since a save the banner has just disclaimed must not land later unannounced. Reads **pause** instead: rows already on screen stay put under the banner, and a screen still loading waits on its skeleton until the network comes back, rather than erroring. Any failure while offline carries "You're offline. Check your connection and try again." **in place of the error reference the rows above promise** — nothing was reported, so there is nothing to quote (§7.7) |
 
 ### 8.3 Optimistic updates
 Status change, star toggle, and note add update the UI immediately, then reconcile. On
@@ -1327,6 +1327,35 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-24
+
+- **§8.2's offline row built** — the last unimplemented row in the table. A persistent banner
+  above every screen, signed out as much as signed in, and a failure that names the connection
+  instead of quoting an error reference. It sits in `RootLayout` rather than `AppShell` so it
+  survives a route error and a 404, which are the states where knowing the network is down
+  explains the most.
+- **Mutations run with `networkMode: 'always'`, against the library default; reads keep it.**
+  TanStack Query's default is `'online'`, which does not fail a write with no network — it
+  *pauses* it and replays it on reconnect. So the banner promised "Changes won't save" while the
+  change was in fact queued to save minutes later, with nothing on screen having said so. §8.1's
+  rule against failing silently is the one that broke, and in the direction hardest to notice.
+  Reads were given the same setting at first, on the reasoning that a paused read leaves a first
+  load on its skeleton for ever; it was reverted. The setting turns another off behind your back:
+  `refetchOnReconnect` defaults to `networkMode !== 'always'`, so every screen would have stopped
+  refreshing itself when the network returned — the opposite of what it was set for. Paused is
+  the better failure besides: the cached rows stay on screen under the banner rather than racing
+  a refetch that cannot land, and query-core dispatches `status: 'error'` on a failed refetch
+  whether or not the cache still holds rows. (The list was measured under the reverted setting
+  and did *not* in fact fall to its error state — so the reason to revert is `refetchOnReconnect`,
+  not a wiped table.) A first load with no network waits on its skeleton, which the banner
+  explains.
+- **An offline failure is never reported (§7.7).** It joins the refused write as an outcome that
+  is the user's to resolve rather than a bug: no `app_errors` row, no error reference, its own
+  line of copy from `failureMessage()`. Reporting one would also have been a request with no
+  network to make it on. The check reads `navigator.onLine` only for its trustworthy direction —
+  false means no network, true means merely that an interface is up — so a failure while it
+  reads true keeps the ordinary reported path.
 
 ### 2026-09-22
 
