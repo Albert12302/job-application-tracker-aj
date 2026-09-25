@@ -44,7 +44,10 @@ test.describe('deleting an account', () => {
 
     // Returns to sign-in and says what happened (§9.7).
     await expect(page).toHaveURL(/\/sign-in\?.*deleted=true/);
-    await expect(page.getByRole('status')).toHaveText('Your account and data have been deleted.');
+    // Filtered: the offline banner's live region is on every page, so a bare
+    // getByRole('status') matches two things (features/shell/OfflineBanner.tsx).
+    const DELETED = 'Your account and data have been deleted.';
+    await expect(page.getByRole('status').filter({ hasText: DELETED })).toHaveText(DELETED);
 
     // The account itself.
     const { data: gone } = await admin.auth.admin.getUserById(user.id);
