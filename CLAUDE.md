@@ -339,6 +339,8 @@ src/
     application-edit.tsx      (§9.1)
     stats.tsx                 (§4.5)
     profile.tsx               (§4.6)
+    privacy.tsx               (§4.7) — no guard, like terms.tsx
+    terms.tsx                 (§4.7)
 
   domain/                     PURE business rules — no React, no Supabase, no imports from
                               elsewhere in src/. Unit-tested (§5).
@@ -454,6 +456,8 @@ src/
       layout.ts                   panel and grid classes shared with the skeleton
     profile/
       AvatarUpload.tsx
+    legal/                      PrivacyScreen, TermsScreen, LegalPage, LegalSection (§4.7)
+      contact.ts                  the contact address and last-updated date both pages show
 
   components/
     ui/                       shadcn-generated primitives. Ours once generated — edit in place,
@@ -465,6 +469,7 @@ src/
                               input, textarea) and aborts when nothing answers — run it as
                               `yes n | npx shadcn@latest add <name>` so those edits survive.
     EmptyState.tsx            app-level primitives shadcn does not ship (SPEC §8)
+    LegalLinks.tsx            Privacy + Terms footer; shown by auth/ and shell/, so it sits here
     ErrorState.tsx
 
   hooks/                      generic: useMediaQuery, prefersReducedMotion

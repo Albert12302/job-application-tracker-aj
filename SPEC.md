@@ -393,6 +393,24 @@ A refused photo leaves the current one in place. Success shows a toast: "Photo u
 Sign out ends this device's session only; ending every session is the password-change path
 (§7.1).
 
+### 4.7 Privacy policy and terms
+Two public pages, `/privacy` and `/terms`, with no route guard: someone deciding whether to
+accept an invitation has to be able to read them. Each has a "Back to AJ's Hunt" link to `/`
+(the list if signed in, sign-in if not), a "Last updated" date, and a link to the other page.
+They are linked from a footer on every screen, signed in and signed out, which sits at the
+bottom of the window when the screen is shorter than it and after the content when it is not.
+
+The privacy policy states, in plain words: what is stored (§2), the technical records and
+their retention (§7.7: security events and error reports 90 days, sign-in hashes 24 hours),
+that there is no analytics, advertising or cookie, who else handles data (Supabase, US region;
+Vercel; Brevo for reset emails), the nightly encrypted backups and their 90 days (§7.6),
+export (§9.8) and deletion (§9.7), and a contact address. The terms cover invitation-only
+personal use, content ownership, fair use, no warranty, and ending an account.
+
+**The policy is a description of the code, so it changes with it.** A new field, a new
+processor, a change to what is logged or how long anything is kept updates
+`features/legal/PrivacyScreen.tsx` and `LEGAL_UPDATED` in the same commit.
+
 ---
 
 ## 5. Business rules
@@ -1327,6 +1345,13 @@ scheduling, import from job boards. None of these are designed yet.
 Newest first. One line per substantive decision — what changed and *why*, so a choice that
 looks arbitrary later can be traced to its reason. Layout and copy tweaks do not belong here;
 the prototype is the reference for those.
+
+### 2026-09-29
+
+- **§4.7 privacy policy and terms added.** The live app held real people's job searches and
+  said nothing about what happened to them. Written from what the code does, not from a
+  template, so every retention figure and processor in it is one this repo can point to. The
+  contact is the maintainer's address; the operator is named as the app, not a person.
 
 ### 2026-09-24
 
