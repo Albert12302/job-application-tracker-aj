@@ -1,4 +1,5 @@
 import { Link, Outlet } from '@tanstack/react-router';
+import { LegalLinks } from '@/components/LegalLinks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserAvatar } from '@/components/UserAvatar';
 import { displayName } from '@/domain/profile';
@@ -7,7 +8,8 @@ import { useSignedInUser } from '@/queries/use-session';
 
 /**
  * The persistent header (SPEC §4.2): app name, nav, avatar + name opening
- * Profile.
+ * Profile. And the footer with the privacy and terms links (§4.7), held at the
+ * bottom of the window when a screen is shorter than it.
  */
 export function AppShell() {
   const user = useSignedInUser();
@@ -16,7 +18,7 @@ export function AppShell() {
   const name = displayName(profile.data?.name, user.email);
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       <a
         href="#main"
         className="sr-only rounded-md bg-card px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
@@ -77,9 +79,14 @@ export function AppShell() {
           </Link>
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-4 py-6 outline-none max-[760px]:px-3.5">
+      {/* flex-1 is what holds the footer down; w-full keeps max-w centring now
+          that the parent is a flex column. */}
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 outline-none max-[760px]:px-3.5">
         <Outlet />
       </main>
+      <footer className="py-4">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }
