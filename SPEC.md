@@ -407,6 +407,13 @@ Vercel; Brevo for reset emails), the nightly encrypted backups and their 90 days
 export (§9.8) and deletion (§9.7), and a contact address. The terms cover invitation-only
 personal use, content ownership, fair use, no warranty, and ending an account.
 
+**No cookie banner, because nothing needs one.** The app sets no cookies, and the only thing
+it keeps in the browser is the sign-in session (`localStorage`), which is strictly necessary
+for the service the user asked for and so exempt from consent. That stays true only while
+nothing else is added: analytics, a tracking pixel, an embedded third-party widget, or
+anything non-essential kept in cookies or storage needs consent asked for *before* it runs,
+and a change to this page, in the same commit.
+
 **The policy is a description of the code, so it changes with it.** A new field, a new
 processor, a change to what is logged or how long anything is kept updates
 `features/legal/PrivacyScreen.tsx` and `LEGAL_UPDATED` in the same commit.
@@ -1338,6 +1345,75 @@ blank screen.
 Multi-user sharing, email/calendar integration, reminders, resume versioning, interview
 scheduling, import from job boards. None of these are designed yet.
 
+### 13.1 Opening sign-up (planned, not started)
+
+Sign-up is closed (§4.1d) and several decisions in §7 were accepted *because* the accounts are
+few and hand-made. Opening it to everyone is a project of its own, aimed at roughly
+November–December 2026. **`enable_signup` stays false until every item below is done or
+explicitly waived in writing here** — the same bar as §7.9.
+
+**What sign-up needs**
+- The sign-up and verify-email screens (§4.1a–b), specified but not built, and the **Create
+  one** link on sign-in (§4.1).
+- A landing page at `/` for signed-out visitors: what the app does, a screenshot, and one
+  call to action, "Create an account". Today `/` sends everyone to sign-in, which is right
+  while nobody can join. **No FAQ at launch** — write one once real questions repeat, not
+  from guesses.
+- `public/robots.txt` and a sitemap, with the landing page, so search engines find it. Not
+  before: while sign-up is closed there is nothing worth finding. Until then `/robots.txt`
+  answers with the app's HTML (the SPA rewrite), which crawlers read as "nothing
+  disallowed" — harmless. robots.txt is a request to crawlers, never access control; a page
+  that must stay out of results takes a `noindex` tag instead.
+- **Decide then whether a missing page should answer 404.** Today every address is rewritten
+  to the app, so "Page not found" arrives with status 200 (a "soft 404"). People never see
+  the difference; search engines do. The fix is to rewrite only known routes in `vercel.json`
+  and ship `404.html` as a copy of `index.html` (Vercel serves it with a 404, and the app
+  boots and shows NotFound) — at the price of a second route list that must track `App.tsx`,
+  where a forgotten route becomes a real 404 in production. Not worth it while nothing is
+  meant to be found.
+- **A wide link-preview image** (1200×630) in place of the app icon in `index.html`'s
+  `og:image`, and `twitter:card` moved to `summary_large_image`. The description and preview
+  tags already exist; they are the same for every page, because link previewers do not run
+  the app and read only `index.html`.
+- **A canonical URL on the landing page only**, set by that route, not in `index.html`.
+  `index.html` is every page's document, so a canonical there would declare every page a
+  duplicate of `/`. Until the landing page exists there is nothing to canonicalise: the
+  production address is the only indexable one, and Vercel marks preview deployments
+  `noindex` itself.
+- **The landing page's images get real alt text** (§10.1). Today the only image is the
+  avatar, decorative beside the name and so `alt=""`; a screenshot of the app is content and
+  needs a description of what it shows.
+- **Decide on analytics.** None today, and §4.7 promises "no analytics or tracking of any
+  kind" — so adding any changes that page first and is announced to account holders. The
+  question it would answer is whether visitors to the landing page sign up. If yes: cookieless
+  only (no consent banner), such as Vercel Web Analytics, which is served from the app's own
+  origin — check its console under the enforced CSP (§7.5) on a Vercel preview deployment
+  before adopting it (its endpoints exist only on Vercel, not in `npm run preview`), and
+  name it in §4.7 as a processor.
+
+**Accepted risks whose trigger is this** (each says "revisit when sign-up opens")
+- Direct calls to Auth's password endpoint (§7.1): Turnstile CAPTCHA through Auth, with its
+  CSP change, Cloudflare as a new processor, e2e test keys, and an accessibility check.
+- The reset request's missing per-email and per-address limits (§7.1).
+- Session tokens in `localStorage` (§7.5): server-side auth, or a written decision to keep
+  the trade with its three conditions.
+- Files not in the backups (§7.6), and no alerting on `app_errors` (§7.7).
+
+**Capacity and email**
+- Email: `email_sent` is 10 an hour **for the whole project**, so verification mails for
+  every new user share it with resets, and one abuser can exhaust it for everyone. Brevo's
+  sender is a verified `@gmail.com` address, which fails Gmail's DMARC alignment when sent
+  from Brevo's servers and so tends to land in spam; open sign-up likely needs a sending
+  domain, which is a cost to decide on (the no-card rule covers the hosting accounts).
+- The Free plans' storage, database, egress, and function quotas: a per-user file quota
+  before strangers can upload 10 MB cover letters into a shared allowance.
+- A way to suspend an account, which §4.7's terms already promise.
+
+**Before real users, whatever else**
+- The iOS Safari pass (§12) and Playwright in CI.
+- §4.7's pages: drop "by invitation only", reconsider international users (the data sits in
+  the US), update the date, and name any new processor (Cloudflare, a mail domain).
+
 ---
 
 ## 14. Changelog
@@ -1348,6 +1424,17 @@ the prototype is the reference for those.
 
 ### 2026-09-29
 
+- **§13.1 added: what opening sign-up takes.** The "revisit when sign-up opens" notes were
+  scattered through §7, so there was no one place to see whether the door could open. They
+  are listed together now, with the landing page and call to action the open product needs,
+  and a deliberate **no FAQ at launch**: an FAQ written before anyone asks is guesses.
+- **A meta description and link-preview tags in `index.html`.** A pasted link showed only the
+  name and address. The copy leaves out "invite-only" on purpose, so it stays true when
+  sign-up opens.
+- **No cookie banner and no canonical URL, both on purpose (§4.7, §13.1).** Neither is
+  missing by oversight: nothing the app stores needs consent, and a canonical in the one
+  shared `index.html` would mark every page a duplicate. Written down so that adding a
+  tracker, or a site-wide canonical, is a decision rather than an accident.
 - **§4.7 privacy policy and terms added.** The live app held real people's job searches and
   said nothing about what happened to them. Written from what the code does, not from a
   template, so every retention figure and processor in it is one this repo can point to. The

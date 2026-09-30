@@ -50,3 +50,11 @@ test('a short signed-in screen holds the footer at the bottom of the window', as
   await page.getByRole('link', { name: "Back to AJ's Hunt" }).click();
   await expect(page).toHaveURL(/\/applications/);
 });
+
+test('the not-found page carries the footer too', async ({ page }) => {
+  // It renders outside AppShell, so it has a footer of its own to forget.
+  await page.goto('/no-such-page');
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Privacy' }).click();
+  await expect(page).toHaveTitle('Privacy policy');
+});
