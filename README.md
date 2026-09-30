@@ -291,6 +291,13 @@ against its schema and refuses a deploy with any key it does not know, so it can
    profile, upload a photo, and watch the console for `Refused to …` errors. (The dev server
    cannot run under it: hot reload injects inline scripts the policy blocks.)
 
+3. **`/assets/*` is cached for a year, `immutable`.** Vite names every file there by a hash
+   of its content, so a changed file is a new name and an old name never changes meaning;
+   without the rule Vercel sends `max-age=0, must-revalidate` and every visit re-asks for
+   each file. The rule is safe **only** for hashed names: never widen it to `/(.*)`, which
+   would pin `index.html` — and with it an old release — in browsers for a year. Files in
+   `public/` (the icon) keep their plain names and Vercel's default.
+
 Environment variables in the Vercel project: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 (the legacy `anon` key). Nothing else. Do not add `VITE_RELEASE`: error reports are tagged with
 the commit Vercel is building (`VERCEL_GIT_COMMIT_SHA`, read in `vite.config.ts`), and a

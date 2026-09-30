@@ -735,6 +735,14 @@ supabase/
   would only work until the first run consumed it. The helper reads the local service-role key
   from `supabase status`, so it cannot be aimed at a hosted project.
 - Debug mode and verbose errors off in production builds.
+- **Nothing non-essential in the browser without consent** (SPEC §4.7). The sign-in session
+  is the only thing the app stores, and it is why there is no cookie banner. A new cookie,
+  `localStorage` key, analytics script, pixel, or third-party embed is either strictly needed
+  for what the user asked for, or it waits for consent and a §4.7 update. A per-viewer
+  convenience (a remembered sort, say) is borderline — say so in the PR rather than assume.
+- **No canonical `<link>` in `index.html`.** It is every page's document, so it would mark
+  every page a duplicate of one. A canonical belongs to the one route that needs it (SPEC
+  §13.1).
 - **Every error is reported through `reportError()`** — never a direct insert or SDK call from
   a component. Stack traces yes; form values, note bodies, and emails never.
 - `app_errors` / `security_events` are client-written, so: `user_id` defaults to `auth.uid()`
@@ -833,6 +841,12 @@ retention in the backups too. A default only fills a column the client left out.
 Follow SPEC.md §6. Ship auth → CRUD → persistence before touching stats, filters, or
 pagination. Write `status_history` rows from the first status-change feature — it cannot be
 backfilled.
+
+**Opening sign-up is gated on SPEC §13.1.** Never set `enable_signup = true` — in
+`config.toml` or on the hosted project — while an item there is open and unwaived. Several
+§7 risks were accepted only because the accounts are few and hand-made; flipping the switch
+un-accepts them silently. Work that item list as its own feature branches, not as a side
+effect of something else.
 
 ## When unsure
 
