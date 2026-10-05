@@ -80,8 +80,8 @@ jobs:
       - name: Install tools
         if: success() && steps.configured.outputs.ready == 'true'
         env:
-          CLI_VERSION: '2.117.0'
-          CLI_SHA256: '69c05f85b9e47ee706d30f1a6ca8a526b4e337bfd12c7ef1ef522d24e7280d24'
+          CLI_VERSION: '2.119.0'
+          CLI_SHA256: 'bf1c3ae93be98533eb8a3105dbf4564bd0b2d9dc24690d8a920f980ef975c1b4'
         run: |
           tarball="supabase_${CLI_VERSION}_linux_amd64.tar.gz"
           curl --proto '=https' --tlsv1.2 -fsSL -o "$tarball" \
